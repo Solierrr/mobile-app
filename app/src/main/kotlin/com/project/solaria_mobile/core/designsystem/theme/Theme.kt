@@ -1,4 +1,4 @@
-package com.project.solaria_mobile.ui.theme
+package com.project.solaria_mobile.core.designsystem.theme
 
 import android.os.Build
 import androidx.compose.foundation.isSystemInDarkTheme
@@ -32,6 +32,13 @@ private val LightColorScheme = lightColorScheme(
     */
 )
 
+/**
+ * App-wide theme. Equivalent to a design-system "ThemeProvider" in React
+ * (e.g. styled-components/MUI ThemeProvider) or Vuetify's theme plugin:
+ * every Composable rendered inside `content` can read the current
+ * colors/typography via `MaterialTheme.colorScheme` / `MaterialTheme.typography`,
+ * the same way components read theme tokens from React context.
+ */
 @Composable
 fun SolariamobileTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),

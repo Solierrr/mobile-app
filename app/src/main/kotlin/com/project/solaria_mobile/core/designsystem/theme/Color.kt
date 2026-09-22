@@ -1,4 +1,4 @@
-package com.project.solaria_mobile.ui.theme
+package com.project.solaria_mobile.core.designsystem.theme
 
 import androidx.compose.ui.graphics.Color
 

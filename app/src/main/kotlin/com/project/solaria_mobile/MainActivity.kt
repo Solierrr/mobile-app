@@ -7,12 +7,15 @@ import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.tooling.preview.Preview
-import com.project.solaria_mobile.ui.theme.SolariamobileTheme
+import com.project.solaria_mobile.core.designsystem.theme.SolariamobileTheme
+import com.project.solaria_mobile.presentation.navigation.AppNavHost
 
+/**
+ * Composition root. Equivalent to `index.tsx`/`main.ts` mounting `<App />`
+ * inside a theme/router provider tree in a React/Vue SPA: it sets up the
+ * theme and hands off all further UI decisions to `AppNavHost`.
+ */
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -20,28 +23,9 @@ class MainActivity : ComponentActivity() {
         setContent {
             SolariamobileTheme {
                 Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
-                    Greeting(
-                        name = "Android",
-                        modifier = Modifier.padding(innerPadding)
-                    )
+                    AppNavHost(modifier = Modifier.padding(innerPadding))
                 }
             }
         }
-    }
-}
-
-@Composable
-fun Greeting(name: String, modifier: Modifier = Modifier) {
-    Text(
-        text = "Hello $name!",
-        modifier = modifier
-    )
-}
-
-@Preview(showBackground = true)
-@Composable
-fun GreetingPreview() {
-    SolariamobileTheme {
-        Greeting("Android")
     }
 }
