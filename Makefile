@@ -1,6 +1,12 @@
 SHELL := /bin/sh
 
 GRADLEW := ./gradlew
+ORG_SCRIPTS_DIR ?= $(HOME)/.local/share/solierrr-infra-scripts
+ORG_SCRIPTS_POWERSHELL ?= powershell
+EXTRACT_ENV := $(ORG_SCRIPTS_DIR)/scripts/extract-env.ps1
+SERVICE := mobile-app
+ENV ?= local
+OUT ?= .env
 ADB ?= adb
 EMULATOR ?= emulator
 KTLINT ?= ktlint
@@ -11,10 +17,16 @@ ADB_DEVICE := $(if $(DEVICE),-s $(DEVICE),)
 
 .DEFAULT_GOAL := help
 
-.PHONY: help doctor build install run launch devices avds emulator test lint android-lint check clean
+.PHONY: help tools-check env doctor build install run launch devices avds emulator test lint android-lint check clean
 
 help: ## Show the available commands
 	@awk 'BEGIN {FS = ":.*## "; printf "Usage: make <target>\n\n"} /^[a-zA-Z_-]+:.*## / {printf "  %-12s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
+
+tools-check: ## Verify that the shared organization scripts are installed
+	@test -f "$(EXTRACT_ENV)" || { echo "error: infra-scripts was not found at $(ORG_SCRIPTS_DIR)"; exit 1; }
+
+env: tools-check ## Generate the mobile environment file (ENV=local OUT=.env)
+	$(ORG_SCRIPTS_POWERSHELL) -NoProfile -ExecutionPolicy Bypass -File "$(EXTRACT_ENV)" -Service "$(SERVICE)" -Environment "$(ENV)" -OutputPath "$(OUT)"
 
 doctor: ## Check the command-line dependencies
 	@command -v java >/dev/null 2>&1 || { echo "error: java was not found (JDK 21 is required)"; exit 1; }
