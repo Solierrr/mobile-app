@@ -43,6 +43,7 @@ mockk = "1.14.11"
 
 # Testa emissoes de Flow/StateFlow em sequência
 turbine = "1.2.1"
+lucideIcons = "2.2.1"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -85,6 +86,7 @@ androidx-datastore-preferences = { group = "androidx.datastore", name = "datasto
 # Testes
 mockk = { group = "io.mockk", name = "mockk", version.ref = "mockk" }
 turbine = { group = "app.cash.turbine", name = "turbine", version.ref = "turbine" }
+lucide-icons = { group = "com.composables", name = "icons-lucide-android", version.ref = "lucideIcons" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
