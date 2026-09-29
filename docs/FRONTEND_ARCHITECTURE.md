@@ -1,226 +1,60 @@
-# Arquitetura de Frontend (Jetpack Compose)
+# Arquitetura do frontend Compose
 
-Este documento descreve a arquitetura de apresentação/UI adotada neste app, escrita
-para quem já é confortável com React, Vue, Java e Spring, mas está vendo Jetpack
-Compose pela primeira vez. A ideia não é "aprender Android do zero", e sim mapear
-os conceitos de Compose para o vocabulário que você já usa no frontend web.
+O app usa um módulo Gradle (`:app`) e organiza o código por feature. Esta refatoração mantém as telas e os fluxos existentes; dados ainda são demonstrativos, sem conexão com backend ou persistência. O Figma não é alterado nesta etapa.
 
-## TL;DR das analogias
+## Estrutura
 
-| Compose / Android                          | Equivalente que você já conhece                                   |
-|---------------------------------------------|---------------------------------------------------------------------|
-| `@Composable fun Foo(...)`                  | Componente funcional React / componente de função Vue (setup)      |
-| Parâmetros de uma função `@Composable`      | `props`                                                              |
-| State hoisting (estado subindo para o pai)  | "Lifting state up" no React / `v-model` + prop+emit no Vue          |
-| `remember { mutableStateOf(x) }`            | `useState(x)` (React) / `ref(x)` (Vue) - estado local do componente |
-| `ViewModel`                                 | Store de tela (tipo um Pinia store ou um slice de Redux, escopado à tela) |
-| `StateFlow` exposto pelo ViewModel          | O valor observável de um store (getter reativo do Pinia / selector do Redux) |
-| `collectAsStateWithLifecycle()`             | `useSelector()` / `storeToRefs()` - assina o store e vira estado de UI |
-| `LaunchedEffect(key) { ... }`               | `useEffect(() => {...}, [key])`                                     |
-| Navigation Compose (`NavHost`, `composable`)| React Router / Vue Router (rotas -> tela)                           |
-| Hilt (`@Inject`, `@HiltViewModel`, módulos) | Spring DI (`@Autowired`, `@Component`, `@Bean`, `@Service`)          |
-| Recomposição                                | Re-render (React) / reatividade (Vue) - Compose decide o que re-executar de forma granular, parecido com o Vue 3 (Proxy/reatividade fina) mais do que com o "re-render da árvore inteira" ingênuo do React |
-| `Modifier`                                  | Algo entre `className`/`style` (aparência/layout) e `props` de comportamento (clique, padding, etc), encadeado como um builder |
-
-Compose é **declarativo**: você descreve "como a UI deveria ser para este estado",
-e o framework decide o que precisa mudar na tela, como já fez em React/Vue.
-Não existe manipulação manual de View (o `findViewById` do Android "antigo"
-morreu no Compose, assim como manipular o DOM manualmente morreu com React/Vue).
-
-## Estado do projeto (checado antes de escrever este documento)
-
-O repositório está em estágio inicial - `ARCHITECTURE.md` já confirma isso.
-Antes desta branch, o único código-fonte era o template "Empty Activity" do Android
-Studio (`MainActivity` + tema em `ui/theme`), e já existiam pastas vazias
-(`core/common`, `core/designsystem/components`, `core/designsystem/theme`,
-`core/network`, `data`, `di`, `domain`, `presentation`) marcadas só com `.gitkeep`,
-indicando que a divisão de pacotes abaixo já era a intenção do time, mas nada
-tinha sido implementado. Este trabalho preenche o mínimo necessário para a camada
-de apresentação (`core/designsystem/theme` e `presentation/`) com um exemplo real,
-sem inventar uma estrutura nova.
-
-## Camadas da apresentação
-
-```
-presentation/
-├── home/
-│   ├── HomeViewModel.kt   # estado + eventos da tela "Home"
-│   └── HomeScreen.kt      # HomeRoute (com estado) + HomeScreen (sem estado)
-└── navigation/
-    └── AppNavHost.kt      # grafo de rotas (equivalente a <Routes> do React Router)
-
-core/designsystem/
-├── theme/                 # Theme.kt, Color.kt, Type.kt - "design tokens" + ThemeProvider
-└── components/            # (ainda vazio) componentes reutilizáveis do design system
+```text
+com/project/solaria_mobile/
+├── MainActivity.kt                    # tema e NavHost
+├── SolariaApplication.kt              # Hilt
+├── core/designsystem/
+│   ├── theme/                         # cores, tipografia, espaçamento e raios
+│   └── components/                    # componentes compartilhados, por responsabilidade
+├── presentation/navigation/
+│   ├── AppDestination.kt              # destinos @Serializable
+│   └── AppNavHost.kt                  # único mapeamento de destinos para rotas
+└── feature/
+    ├── home/
+    ├── project/
+    ├── communication/
+    ├── discovery/
+    └── profile/
+        ├── data/                     # contrato + FakeRepository + binding Hilt
+        ├── *ViewModel.kt              # UiState, eventos e transformações
+        └── *Screen.kt                 # Route + Screen + componentes locais
 ```
 
-### 1. UI Composables (`presentation/<feature>/`)
+Uma feature pode ter várias rotas. O nome do arquivo acompanha a tela, e pequenos componentes privados permanecem próximos da tela que os usa. Componentes públicos reutilizados entre features ficam em `core/designsystem/components`. Não se cria um arquivo para cada `Text`, `Row` ou detalhe de layout.
 
-Cada tela vira um pacote sob `presentation/`, com (pelo menos) dois tipos de
-Composable, seguindo o padrão "container / presentational" que você já usa em
-React:
+## Responsabilidades e fluxo
 
-- **Route Composable** (`HomeRoute`): o "container". Obtém o `ViewModel` (via
-  `viewModel()`, o equivalente a chamar um hook de store), assina o estado
-  (`collectAsStateWithLifecycle()`), dispara efeitos (`LaunchedEffect`) e repassa
-  tudo como parâmetros simples para o Composable de baixo. É o único lugar que
-  "sabe" que existe um ViewModel.
-- **Screen Composable** (`HomeScreen`): "presentational"/"dumb component".
-  Recebe só dados primitivos e lambdas (`uiState: HomeUiState`,
-  `onNameChanged: (String) -> Unit`), não conhece ViewModel nem navegação.
-  Isso é o que permite usar `@Preview` (o "Storybook" do Compose) sem precisar
-  de contexto de app rodando, e testar a UI isoladamente.
+| Peça | Responsabilidade | Analogia aproximada no React |
+| --- | --- | --- |
+| `Route` | Obtém o ViewModel via Hilt, coleta `StateFlow` com `collectAsStateWithLifecycle()` e conecta eventos/navegação. | Container conectado a uma store. |
+| `Screen` | Recebe estado imutável e callbacks; desenha a UI sem buscar nem mutar dados. | Componente controlado por props. |
+| `ViewModel` | Expõe `UiState` somente-leitura, filtra listas, trata eventos e chama repositórios. | Store escopada à rota. |
+| `Repository` | Contrato para dados e ações. A implementação fake usa `MutableStateFlow` em memória e é `@Singleton`. | Serviço/store de dados compartilhado. |
+| Design system | Fonte de tokens e componentes reutilizáveis. | Tokens e biblioteca de UI. |
 
-Essa separação é a mesma razão pela qual, em React, você evita colocar `useSelector`
-espalhado em componentes de folha: centraliza a conexão com o "store" no
-componente de topo da feature e deixa o resto burro/reutilizável.
+O fluxo é `interação → callback da Screen → ViewModel → Repository/StateFlow → UiState → recomposição`. Não passar o ViewModel para componentes de folha. Estado puramente visual, como bottom sheet aberta, pode ficar em `remember`; mensagens, busca, calendário e ações compartilhadas ficam fora da UI.
 
-### 2. State & ViewModel (padrão MVVM + fluxo unidirecional)
+Cada repositório fake é uma fonte única de verdade por feature enquanto o processo do app vive. Enviar mensagem e salvar localização atualiza o mesmo estado observado por outras rotas; não há DataStore nem chamada HTTP nesta versão. `HomeViewModel` usa também `ProjectRepository` para os projetos recentes. Previews usam fixtures próprias no source set `debug`, não Hilt.
 
-O `ViewModel` (`androidx.lifecycle.ViewModel`) é uma classe que:
+## Navegação e detalhes
 
-- **Sobrevive a recomposições e a mudanças de configuração** (ex: rotação de
-  tela), porque não vive "dentro" do Composable - o Android Framework mantém
-  uma instância por destino de navegação/Activity, parecido com como um store
-  Pinia/Redux existe fora do ciclo de vida de um componente Vue/React específico.
-- **Expõe estado somente-leitura** via `StateFlow` (`val uiState: StateFlow<HomeUiState>`),
-  igual a um getter reativo/computed de um store: a UI só lê, nunca escreve
-  diretamente no `StateFlow`.
-- **Expõe eventos como métodos públicos** (`onNameChanged(newName)`), que a UI
-  chama em resposta a interação do usuário - o equivalente a `dispatch(action)`
-  no Redux ou a chamar uma `action`/método do store no Pinia.
+`AppDestination` define objetos tipados com Kotlin Serialization. `AppNavHost` é o único lugar que chama `NavController`; telas recebem callbacks e, quando necessário, um `AppDestination`, nunca strings de rota. Detalhes de projetos, conversas e perfis continuam demonstrativos/genéricos. IDs tipados só devem ser introduzidos quando o conteúdo do item selecionado realmente for exibido, para não fingir semântica que a UI ainda não tem.
 
-Isso implementa **fluxo unidirecional de dados** (unidirectional data flow),
-o mesmo princípio do Redux/Flux e do Pinia:
+## Tokens
 
-```
-Evento de UI -> método do ViewModel -> novo estado (StateFlow) -> UI recompõe
-```
+Usar `SolariaColorScheme`/`MaterialTheme` e os tokens em `core/designsystem/theme`. Cores de marca, superfície e estados semânticos têm nomes; evitar hexadecimais nas telas. `SolariaSpace` e `SolariaRadius` cobrem valores compartilhados. Não é necessário transformar cada dimensão incidental de desenho em variável global: um token deve representar uma decisão de design repetida ou semântica, não apenas um número.
 
-Nunca o contrário: a UI não muta o estado do ViewModel diretamente, do mesmo jeito
-que um componente React não deveria mutar o state do Redux store na mão.
+## Evolução por feature
 
-### 3. State hoisting
+1. Definir estado, eventos e contrato de dados antes de conectar a rota.
+2. Manter `Route` pequena e `Screen` parametrizada; extrair componente para o design system apenas se houver reuso ou identidade visual compartilhada.
+3. Trocar a implementação fake no binding Hilt quando houver API, sem colocar Retrofit em Composables.
+4. Preservar comportamento e layout em refatorações; mudanças de produto ficam separadas.
+5. Verificar `:app:assembleDebug`, `:app:testDebugUnitTest` e smoke tests instrumentados de navegação. Atualizar este documento e `ARCHITECTURE.md` quando os limites mudarem.
 
-Dentro de uma mesma feature, o mesmo princípio se aplica em miniatura entre
-Composables: o estado "sobe" para quem precisa compartilhá-lo/controlá-lo, e
-desce como parâmetro + callback para quem só precisa exibi-lo/reagir a ele.
-`HomeScreen(uiState, onNameChanged)` é literalmente "lifting state up": o pai
-(`HomeRoute`, apoiado no ViewModel) é a fonte da verdade; o filho é controlado
-(*controlled component*, no vocabulário React) - o mesmo padrão de
-`<input value={x} onChange={e => setX(e.target.value)} />`.
-
-Para estado que é **puramente de UI e local a um único Composable** (ex: se um
-`DropdownMenu` está aberto), não é preciso subir isso até o ViewModel - use
-`remember { mutableStateOf(...) }`, equivalente a um `useState`/`ref` que não
-precisa ser compartilhado.
-
-### 4. Efeitos (`LaunchedEffect`)
-
-`LaunchedEffect(chave) { ... }` roda uma coroutine quando o Composable entra em
-composição (e recomeça se `chave` mudar), sendo cancelada automaticamente quando
-o Composable sai de tela - o paralelo direto de `useEffect(() => {...}, [chave])`.
-No exemplo (`HomeRoute`), é usado para disparar `viewModel.loadInitialData()` uma
-única vez (`LaunchedEffect(Unit)`), do mesmo jeito que um `useEffect(() => {...}, [])`
-dispararia um fetch inicial.
-
-### 5. Navigation (`presentation/navigation/AppNavHost.kt`)
-
-Navigation Compose é o React Router/Vue Router deste app: um `NavHost` mapeia
-rotas (strings, como `"home"`) para o Composable que deve ser renderizado,
-igual a um `<Route path="/home" element={<Home />} />`. Novas telas entram como
-novas entradas `composable("rota") { TelaRoute() }` dentro do mesmo grafo, e
-navegação entre telas usa o `NavHostController` (`navController.navigate("rota")`),
-parecido com `useNavigate()`/`router.push()`.
-
-### 6. Design System / Theming (`core/designsystem/`)
-
-- `theme/Theme.kt` define `SolariamobileTheme`, que envolve toda a árvore de UI
-  (chamado uma vez em `MainActivity`) e disponibiliza cores/tipografia via
-  `MaterialTheme.colorScheme` / `MaterialTheme.typography` para qualquer
-  Composable descendente - o mesmo papel de um `<ThemeProvider theme={...}>`
-  do styled-components/MUI, ou do plugin de tema do Vuetify. É "Context API"
-  por baixo dos panos (Compose tem seu próprio mecanismo de contexto local,
-  `CompositionLocal`, que é o que `MaterialTheme` usa).
-- `theme/Color.kt` / `Type.kt` são os *design tokens* (paleta, escalas de
-  tipografia) - o equivalente a um `tokens.ts`/arquivo de variáveis de tema.
-- `designsystem/components/` (ainda vazio, mantido como `.gitkeep`) é onde
-  devem morar componentes visuais reutilizáveis entre features (botões, cards,
-  inputs com o estilo da marca) - o "component library" interno do app, o
-  paralelo de uma pasta `components/ui` compartilhada entre páginas numa SPA.
-
-## Estrutura de pacotes sugerida (e por quê)
-
-```
-com.project.solaria_mobile/
-├── MainActivity.kt              # composition root: monta tema + NavHost
-├── core/
-│   ├── common/                  # utilitários sem dependência de Android específica
-│   ├── designsystem/
-│   │   ├── theme/               # tokens + ThemeProvider
-│   │   └── components/          # componentes de UI reutilizáveis
-│   └── network/                 # cliente HTTP/config de rede (futuro)
-├── data/                        # repositórios, fontes de dados (API, local) - implementa contratos do domain
-├── domain/                      # casos de uso / regras de negócio puras, sem Android/Compose
-├── di/                          # módulos Hilt (bindings de repositório, network, etc)
-└── presentation/
-    ├── home/                    # uma pasta por feature/tela
-    │   ├── HomeViewModel.kt
-    │   └── HomeScreen.kt
-    └── navigation/
-        └── AppNavHost.kt
-```
-
-Isso é, essencialmente, uma variação do **MVVM** que o próprio Google recomenda
-para Compose, com uma separação adicional `data`/`domain` inspirada em Clean
-Architecture - o equivalente, no mundo Spring, a separar `controller` (~`presentation`),
-`service`/`usecase` (~`domain`) e `repository` (~`data`). Cada feature em
-`presentation/` só depende de `domain` (casos de uso), nunca diretamente de
-`data` - do mesmo jeito que um `@RestController` do Spring não deveria falar
-direto com o driver JDBC, e sim com um `@Service`.
-
-## Dependency Injection (Hilt) - próximos passos
-
-O projeto ainda **não** tem Hilt configurado (não havia nenhuma dependência de
-DI no `libs.versions.toml` antes desta branch, e nenhum `@HiltAndroidApp`).
-Quando `data`/`domain`/`di` começarem a ser implementados de verdade, o padrão
-esperado é:
-
-- `@HiltAndroidApp` na classe `Application` (equivalente ao `@SpringBootApplication`
-  como ponto de entrada que liga o container de DI).
-- `@HiltViewModel` nos ViewModels que passam a ter dependências (ex:
-  `class HomeViewModel @Inject constructor(private val getUserUseCase: GetUserUseCase)`) -
-  o `@Inject constructor` é literalmente o mesmo mecanismo de injeção por
-  construtor que você já usa em `@Service`/`@Component` do Spring.
-  Composables então obtêm o ViewModel via `hiltViewModel()` em vez de `viewModel()`.
-- Módulos em `di/` com `@Module` + `@InstallIn(...)` + `@Provides`/`@Binds` -
-  o equivalente às classes `@Configuration` com métodos `@Bean` do Spring.
-
-Como isso ainda depende de decisões sobre `data`/`network` (marcadas como
-"a confirmar" no `ARCHITECTURE.md`), Hilt não foi adicionado nesta branch para
-não introduzir infraestrutura sem uso real - o `HomeViewModel` de exemplo
-ainda é instanciado sem dependências (`viewModel()` puro), e deve migrar para
-`@HiltViewModel`/`hiltViewModel()` assim que a primeira feature precisar de
-um repositório de verdade.
-
-## O que foi adicionado nesta branch
-
-- `core/designsystem/theme/{Color,Type,Theme}.kt`: tema movido do antigo
-  `ui/theme` (sourceset `java/`) para o pacote/sourceset já esperado pela
-  estrutura descrita no `ARCHITECTURE.md` (sourceset `kotlin/`).
-- `presentation/home/HomeViewModel.kt` e `HomeScreen.kt`: exemplo mínimo e
-  comentado de ViewModel + state hoisting + `LaunchedEffect`, para servir de
-  modelo às próximas telas.
-- `presentation/navigation/AppNavHost.kt`: grafo de navegação mínimo (uma
-  única rota, `home`), para não deixar `MainActivity` acoplada diretamente a
-  uma tela.
-- `MainActivity.kt`: agora só monta o tema e delega para `AppNavHost`.
-- Dependências adicionadas ao `gradle/libs.versions.toml` / `app/build.gradle.kts`:
-  `androidx.navigation:navigation-compose`, `androidx.lifecycle:lifecycle-viewmodel-compose`
-  e `androidx.lifecycle:lifecycle-runtime-compose` (necessárias para
-  `viewModel()`, `collectAsStateWithLifecycle()` e o `NavHost`).
-
-`core/common`, `core/network`, `data`, `domain` e `di` seguem vazios
-(`.gitkeep`) propositalmente - ainda não há integração com APIs nem regra de
-negócio real para justificar código neles (ver "a confirmar" no
-`ARCHITECTURE.md`/`README.md`).
+Referências: [UI layer](https://developer.android.com/topic/architecture/ui-layer), [state hoisting](https://developer.android.com/develop/ui/compose/state-hoisting) e [type-safe Navigation Compose](https://developer.android.com/guide/navigation/design/type-safety).
