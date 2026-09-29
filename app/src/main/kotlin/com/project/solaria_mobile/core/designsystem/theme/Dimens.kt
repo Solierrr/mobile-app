@@ -30,4 +30,13 @@ object SolariaRadius {
     val large = 24.dp
     val sheet = 30.dp
     val pill = 100.dp
+    val companyLogo = 18.dp
+}
+
+object SolariaSize {
+    val compactHeaderControl = 42.dp
+    val compactMapControl = 40.dp
+    val calendarDay = 40.dp
+    val messageAction = 48.dp
+    val companyLogo = 60.dp
 }
