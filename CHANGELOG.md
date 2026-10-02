@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.0](https://github.com/Solierrr/mobile-app/compare/v0.2.0...v0.3.0) (2026-10-02)
+
+
+### Features
+
+* add common mobile primitives ([#18](https://github.com/Solierrr/mobile-app/issues/18)) ([ad6b500](https://github.com/Solierrr/mobile-app/commit/ad6b500657f956254306e9ac217097f6889027ec))
+
 ## [0.2.0](https://github.com/Solierrr/mobile-app/compare/v0.1.0...v0.2.0) (2026-09-30)
 
 
