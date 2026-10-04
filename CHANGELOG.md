@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.3.0](https://github.com/Solierrr/mobile-app/compare/v0.2.0...v0.3.0) (2026-10-04)
+
+
+### Features
+
+* add common mobile primitives ([#18](https://github.com/Solierrr/mobile-app/issues/18)) ([ad6b500](https://github.com/Solierrr/mobile-app/commit/ad6b500657f956254306e9ac217097f6889027ec))
+* add multipart upload request bodies ([#22](https://github.com/Solierrr/mobile-app/issues/22)) ([072a7f1](https://github.com/Solierrr/mobile-app/commit/072a7f17b26af07c9c639a5be197188f43b71949))
+* add network connectivity monitor ([#23](https://github.com/Solierrr/mobile-app/issues/23)) ([3a965c8](https://github.com/Solierrr/mobile-app/commit/3a965c8698cbcd91ed927b164655f8a5453e4855))
+* add REST network foundation ([#21](https://github.com/Solierrr/mobile-app/issues/21)) ([28c1e8a](https://github.com/Solierrr/mobile-app/commit/28c1e8ad8c2cee342be816e27f74452e92a2ca53))
+* add typed REST error contract ([#20](https://github.com/Solierrr/mobile-app/issues/20)) ([0f5efa0](https://github.com/Solierrr/mobile-app/commit/0f5efa09e84cc7f19d54d508a2eaee3880301752))
+
 ## [0.2.0](https://github.com/Solierrr/mobile-app/compare/v0.1.0...v0.2.0) (2026-09-30)
 
 
