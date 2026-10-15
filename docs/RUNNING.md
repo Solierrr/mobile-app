@@ -65,5 +65,5 @@ Use `make help` para ver todos os comandos. A criação inicial de um AVD pode s
 O pipeline de CI roda dois workflows separados em toda Pull Request: testes unitários (`ci.yml`) e lint (`quality.yml`) via `ktlint`. Rode os dois localmente antes de abrir a PR para evitar falhas no CI.
 
 ```bash
-make check
+make ci
 ```
