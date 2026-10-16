@@ -10,12 +10,14 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.ui.Modifier
 import com.project.solaria_mobile.core.designsystem.theme.SolariamobileTheme
 import com.project.solaria_mobile.presentation.navigation.AppNavHost
+import dagger.hilt.android.AndroidEntryPoint
 
 /**
  * Composition root. Equivalent to `index.tsx`/`main.ts` mounting `<App />`
  * inside a theme/router provider tree in a React/Vue SPA: it sets up the
  * theme and hands off all further UI decisions to `AppNavHost`.
  */
+@AndroidEntryPoint
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)

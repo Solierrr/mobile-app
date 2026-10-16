@@ -1,4 +1,6 @@
-package com.project.solaria_mobile.presentation.home
+@file:OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
+
+package com.project.solaria_mobile.feature.home
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -23,6 +25,8 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -30,40 +34,44 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.project.solaria_mobile.R
+import com.composables.icons.lucide.R as LucideR
 import com.project.solaria_mobile.core.designsystem.components.ActionRow
 import com.project.solaria_mobile.core.designsystem.components.RoundIconButton
 import com.project.solaria_mobile.core.designsystem.components.ScreenTitle
 import com.project.solaria_mobile.core.designsystem.components.SectionHeading
 import com.project.solaria_mobile.core.designsystem.components.SolariaAvatar
 import com.project.solaria_mobile.core.designsystem.theme.SolariaInk
+import com.project.solaria_mobile.core.designsystem.theme.SolariaHeaderGray
 import com.project.solaria_mobile.core.designsystem.theme.SolariaOrange
 import com.project.solaria_mobile.core.designsystem.theme.SolariaRadius
 import com.project.solaria_mobile.core.designsystem.theme.SolariaSpace
+import com.project.solaria_mobile.core.designsystem.theme.SolariaSize
 import com.project.solaria_mobile.core.designsystem.theme.SolariaWhite
-import com.project.solaria_mobile.core.designsystem.theme.SolariamobileTheme
-import com.project.solaria_mobile.presentation.communication.CallsBottomSheet
+import com.project.solaria_mobile.feature.communication.CallsBottomSheet
+import com.project.solaria_mobile.presentation.navigation.AppDestination
+import com.project.solaria_mobile.feature.home.data.CompanyLogoId
 import kotlinx.coroutines.launch
 
-private data class CompanyLogo(val name: String, val image: Int)
-
-private val recentCompanies = listOf(
-    CompanyLogo("Google", R.drawable.company_logo_1),
-    CompanyLogo("O Swift", R.drawable.company_logo_2),
-    CompanyLogo("Amazon", R.drawable.company_logo_3),
-    CompanyLogo("Parceiro", R.drawable.company_logo_4),
-    CompanyLogo("Solar", R.drawable.company_logo_5),
-)
+@Composable
+fun HomeRoute(
+    onOpenPage: (AppDestination) -> Unit,
+    modifier: Modifier = Modifier,
+    viewModel: HomeViewModel = hiltViewModel(),
+) {
+    val state by viewModel.uiState.collectAsStateWithLifecycle()
+    HomeScreen(state, viewModel::onCallsQueryChange, onOpenPage, modifier)
+}
 
 @Composable
 fun HomeScreen(
-    onOpenPage: (String) -> Unit,
+    state: HomeUiState,
+    onCallsQueryChange: (String) -> Unit,
+    onOpenPage: (AppDestination) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     var menuOpen by remember { mutableStateOf(false) }
@@ -80,7 +88,7 @@ fun HomeScreen(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .background(Color(0xFFE7E7E7))
+                .background(SolariaHeaderGray)
                 .padding(horizontal = SolariaSpace.screen)
                 .padding(top = SolariaSpace.screenTop, bottom = SolariaSpace.xl),
             verticalArrangement = Arrangement.spacedBy(SolariaSpace.md),
@@ -92,22 +100,23 @@ fun HomeScreen(
             ) {
                 SolariaAvatar(
                     initials = "S",
-                    modifier = Modifier.size(42.dp).clickable { onOpenPage("profile/self") },
-                    size = 42.dp,
+                    modifier = Modifier.size(SolariaSize.compactHeaderControl).clickable { onOpenPage(AppDestination.ProfileSelf) },
+                    size = SolariaSize.compactHeaderControl,
                     color = SolariaOrange,
                 )
                 Row(horizontalArrangement = Arrangement.spacedBy(SolariaSpace.sm)) {
                     RoundIconButton(
-                        icon = R.drawable.lucide_ic_bell,
+                        icon = LucideR.drawable.lucide_ic_bell,
                         contentDescription = "Notificações",
-                        onClick = { onOpenPage("notifications") },
-                        size = 42.dp,
+                        onClick = { onOpenPage(AppDestination.Notifications) },
+                        size = SolariaSize.compactHeaderControl,
+                        badge = "10",
                     )
                     RoundIconButton(
-                        icon = R.drawable.lucide_ic_ellipsis,
+                        icon = LucideR.drawable.lucide_ic_ellipsis,
                         contentDescription = "Mais opções",
                         onClick = { menuOpen = true },
-                        size = 42.dp,
+                        size = SolariaSize.compactHeaderControl,
                     )
                 }
             }
@@ -118,16 +127,22 @@ fun HomeScreen(
                     modifier = Modifier.horizontalScroll(rememberScrollState()),
                     horizontalArrangement = Arrangement.spacedBy(SolariaSpace.sm),
                 ) {
-                    recentCompanies.forEach { company ->
+                    state.recentCompanies.forEach { company ->
                         Surface(
-                            modifier = Modifier.size(60.dp),
-                            onClick = { onOpenPage("enterprise") },
-                            shape = RoundedCornerShape(18.dp),
+                            modifier = Modifier.size(SolariaSize.companyLogo),
+                            onClick = { onOpenPage(AppDestination.Enterprise) },
+                            shape = RoundedCornerShape(SolariaRadius.companyLogo),
                             color = SolariaWhite,
                             shadowElevation = 2.dp,
                         ) {
                             Image(
-                                painter = painterResource(company.image),
+                                painter = painterResource(when (company.logoId) {
+                                    CompanyLogoId.GOOGLE -> R.drawable.company_logo_1
+                                    CompanyLogoId.SWIFT -> R.drawable.company_logo_2
+                                    CompanyLogoId.AMAZON -> R.drawable.company_logo_3
+                                    CompanyLogoId.PARTNER -> R.drawable.company_logo_4
+                                    CompanyLogoId.SOLAR -> R.drawable.company_logo_5
+                                }),
                                 contentDescription = company.name,
                                 contentScale = ContentScale.Crop,
                             )
@@ -141,16 +156,16 @@ fun HomeScreen(
                     text = "Projetos recentes",
                     faded = true,
                     action = "Ver todos",
-                    onAction = { onOpenPage("projects") },
+                    onAction = { onOpenPage(AppDestination.Projects) },
                 )
                 Row(
                     modifier = Modifier.horizontalScroll(rememberScrollState()),
                     horizontalArrangement = Arrangement.spacedBy(SolariaSpace.md),
                 ) {
-                    repeat(4) { index ->
+                    state.recentProjects.forEach { project ->
                         RecentProjectCard(
-                            name = if (index == 0) "Fortech Enterprise" else listOf("Solar Tech", "Residencial Aurora", "Unidade Paraíba")[index - 1],
-                            onClick = { onOpenPage("project") },
+                            name = project.name,
+                            onClick = { onOpenPage(AppDestination.Project) },
                         )
                     }
                 }
@@ -165,13 +180,13 @@ fun HomeScreen(
             verticalArrangement = Arrangement.spacedBy(SolariaSpace.sm),
         ) {
             SectionHeading(text = "Opções", faded = true)
-            ActionRow("Projetos", R.drawable.lucide_ic_folder, { onOpenPage("projects") })
-            ActionRow("Chamados", R.drawable.lucide_ic_phone, { callsOpen = true }, badge = "10")
-            ActionRow("Agenda", R.drawable.lucide_ic_calendar_days, { onOpenPage("schedule") })
-            ActionRow("Conversas", R.drawable.lucide_ic_message_circle, { onOpenPage("chats") }, badge = "10")
-            ActionRow("Conexões", R.drawable.lucide_ic_users, { onOpenPage("connections") })
-            ActionRow("Sua empresa", R.drawable.lucide_ic_building, { onOpenPage("enterprise") })
-            ActionRow("Configurações", R.drawable.lucide_ic_settings, { onOpenPage("settings") })
+            ActionRow("Projetos", LucideR.drawable.lucide_ic_folder, { onOpenPage(AppDestination.Projects) })
+            ActionRow("Chamados", LucideR.drawable.lucide_ic_phone, { callsOpen = true }, badge = "10")
+            ActionRow("Agenda", LucideR.drawable.lucide_ic_calendar_days, { onOpenPage(AppDestination.Schedule) })
+            ActionRow("Conversas", LucideR.drawable.lucide_ic_message_circle, { onOpenPage(AppDestination.Chats) }, badge = "10")
+            ActionRow("Conexões", LucideR.drawable.lucide_ic_users, { onOpenPage(AppDestination.Connections) })
+            ActionRow("Sua empresa", LucideR.drawable.lucide_ic_building, { onOpenPage(AppDestination.Enterprise) })
+            ActionRow("Configurações", LucideR.drawable.lucide_ic_settings, { onOpenPage(AppDestination.Settings) })
         }
     }
 
@@ -192,12 +207,12 @@ fun HomeScreen(
             ) {
                 ScreenTitle("Opções", onBack = { menuOpen = false })
                 Spacer(Modifier.height(SolariaSpace.xs))
-                ActionRow("Listar projetos", R.drawable.lucide_ic_folder, {
-                    scope.launch { sheetState.hide(); menuOpen = false; onOpenPage("projects") }
+                ActionRow("Listar projetos", LucideR.drawable.lucide_ic_folder, {
+                    scope.launch { sheetState.hide(); menuOpen = false; onOpenPage(AppDestination.Projects) }
                 }, trailing = "24 projetos")
-                ActionRow("Novo projeto", R.drawable.lucide_ic_folder_plus, { menuOpen = false })
-                ActionRow("Configurações", R.drawable.lucide_ic_settings, {
-                    scope.launch { sheetState.hide(); menuOpen = false; onOpenPage("settings") }
+                ActionRow("Novo projeto", LucideR.drawable.lucide_ic_folder_plus, { menuOpen = false })
+                ActionRow("Configurações", LucideR.drawable.lucide_ic_settings, {
+                    scope.launch { sheetState.hide(); menuOpen = false; onOpenPage(AppDestination.Settings) }
                 })
                 Spacer(Modifier.height(SolariaSpace.section))
             }
@@ -206,9 +221,12 @@ fun HomeScreen(
 
     if (callsOpen) {
         CallsBottomSheet(
+            calls = state.recentCalls,
+            query = state.callsQuery,
+            onQueryChange = onCallsQueryChange,
             onDismiss = { callsOpen = false },
-            onOpenCall = { callsOpen = false; onOpenPage("call") },
-            onOpenAll = { callsOpen = false; onOpenPage("calls") },
+            onOpenCall = { callsOpen = false; onOpenPage(AppDestination.Call) },
+            onOpenAll = { callsOpen = false; onOpenPage(AppDestination.Calls) },
         )
     }
 }
@@ -247,13 +265,5 @@ private fun RecentProjectCard(name: String, onClick: () -> Unit) {
                 )
             }
         }
-    }
-}
-
-@Preview(showBackground = true)
-@Composable
-private fun HomeScreenPreview() {
-    SolariamobileTheme {
-        HomeScreen(onOpenPage = {})
     }
 }

@@ -1,4 +1,4 @@
-package com.project.solaria_mobile.presentation.home
+package com.project.solaria_mobile.feature.home
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -8,7 +8,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
@@ -19,8 +18,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
-import com.project.solaria_mobile.R
+import com.composables.icons.lucide.R as LucideR
 import com.project.solaria_mobile.core.designsystem.theme.SolariaOrange
+import com.project.solaria_mobile.core.designsystem.theme.SolariaRadius
 import com.project.solaria_mobile.core.designsystem.theme.SolariaSpace
 import com.project.solaria_mobile.core.designsystem.theme.SolariaWhite
 
@@ -33,7 +33,7 @@ fun SplashScreen() {
                 contentAlignment = Alignment.Center,
             ) {
                 Icon(
-                    painter = painterResource(R.drawable.lucide_ic_handshake),
+                    painter = painterResource(LucideR.drawable.lucide_ic_handshake),
                     contentDescription = "Solaria",
                     tint = SolariaWhite,
                     modifier = Modifier.size(82.dp),
@@ -41,7 +41,7 @@ fun SplashScreen() {
             }
             LinearProgressIndicator(
                 progress = { 0.36f },
-                modifier = Modifier.fillMaxWidth(0.58f).height(6.dp).clip(RoundedCornerShape(SolariaSpace.pill)),
+                modifier = Modifier.fillMaxWidth(0.58f).height(6.dp).clip(RoundedCornerShape(SolariaRadius.pill)),
                 color = SolariaOrange,
                 trackColor = SolariaOrange.copy(alpha = 0.08f),
             )

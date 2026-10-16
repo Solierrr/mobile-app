@@ -1,0 +1,63 @@
+@file:OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
+
+package com.project.solaria_mobile.feature.communication
+
+import com.project.solaria_mobile.feature.communication.data.ServiceCall
+import com.project.solaria_mobile.feature.communication.data.ServiceCallIcon
+
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Icon
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
+import com.composables.icons.lucide.R as LucideR
+import com.project.solaria_mobile.core.designsystem.theme.SolariaGreen
+import com.project.solaria_mobile.core.designsystem.theme.SolariaInk
+import com.project.solaria_mobile.core.designsystem.theme.SolariaInkMuted
+import com.project.solaria_mobile.core.designsystem.theme.SolariaInput
+import com.project.solaria_mobile.core.designsystem.theme.SolariaPink
+import com.project.solaria_mobile.core.designsystem.theme.SolariaRadius
+import com.project.solaria_mobile.core.designsystem.theme.SolariaSpace
+
+@Composable
+internal fun CallCard(call: ServiceCall, onClick: () -> Unit) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        onClick = onClick,
+        shape = RoundedCornerShape(SolariaRadius.medium),
+        color = SolariaInput,
+    ) {
+        Row(
+            modifier = Modifier.padding(SolariaSpace.md),
+            horizontalArrangement = Arrangement.spacedBy(SolariaSpace.sm),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            val icon = when (call.icon) {
+                ServiceCallIcon.HASH -> LucideR.drawable.lucide_ic_hash
+                ServiceCallIcon.PHONE -> LucideR.drawable.lucide_ic_phone
+                ServiceCallIcon.SHIELD_ALERT -> LucideR.drawable.lucide_ic_shield_alert
+            }
+            Icon(painter = painterResource(icon), contentDescription = null, tint = SolariaInk, modifier = Modifier.size(SolariaSpace.icon))
+            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                Text(call.title, color = SolariaInk, style = androidx.compose.material3.MaterialTheme.typography.bodyMedium)
+                Text(call.detail, color = SolariaInkMuted, style = androidx.compose.material3.MaterialTheme.typography.labelMedium, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            }
+            if (call.badge != null) {
+                Text(call.badge, color = if (call.badge == "!!") SolariaPink else SolariaGreen, style = androidx.compose.material3.MaterialTheme.typography.labelMedium)
+            }
+        }
+    }
+}
