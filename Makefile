@@ -4,11 +4,19 @@
 
 # ---- especifico deste repositorio ----
 VAULT_FOLDERS ?= /service-urls
+FLAVOR        ?= qa
+ifeq ($(FLAVOR),prod)
+FLAVOR_CAP    := Prod
+APP_ID_SUFFIX :=
+else
+FLAVOR_CAP    := Qa
+APP_ID_SUFFIX := .qa
+endif
 INSTALL_CMD   ?= ./gradlew dependencies
 DEV_CMD       ?= $(MAKE) run
-BUILD_CMD     ?= ./gradlew assembleDebug
-TEST_CMD      ?= ./gradlew testDebugUnitTest
-LINT_CMD      ?= ktlint "app/src/**/*.kt" && ./gradlew lintDebug
+BUILD_CMD     ?= ./gradlew assemble$(FLAVOR_CAP)Debug
+TEST_CMD      ?= ./gradlew testQaDebugUnitTest testProdDebugUnitTest
+LINT_CMD      ?= ktlint "app/src/**/*.kt" && ./gradlew lint$(FLAVOR_CAP)Debug
 FORMAT_CMD    ?= ktlint -F "app/src/**/*.kt"
 CLEAN_PATHS   ?= build app/build .gradle
 DOCTOR_TOOLS  ?= git java adb ktlint
@@ -93,9 +101,9 @@ ci: lint test build ## Run lint, test and build in pipeline order
 GRADLEW := ./gradlew
 ADB ?= adb
 EMULATOR ?= emulator
-APP_ID := com.project.solaria_mobile
+APP_ID := com.project.solaria_mobile$(APP_ID_SUFFIX)
 MAIN_ACTIVITY := $(APP_ID)/.MainActivity
-DEBUG_APK := app/build/outputs/apk/debug/app-debug.apk
+DEBUG_APK := app/build/outputs/apk/$(FLAVOR)/debug/app-$(FLAVOR)-debug.apk
 ADB_DEVICE := $(if $(DEVICE),-s $(DEVICE),)
 
 .PHONY: install-apk run launch devices avds emulator android-lint
@@ -122,4 +130,4 @@ emulator: ## Start an AVD in the foreground (usage: make emulator AVD=name)
 	$(EMULATOR) @$(AVD)
 
 android-lint: ## Run Android lint for the debug variant
-	set -e; $(GRADLEW) lintDebug
+	set -e; $(GRADLEW) lint$(FLAVOR_CAP)Debug
