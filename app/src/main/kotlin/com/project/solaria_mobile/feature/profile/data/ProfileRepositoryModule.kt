@@ -9,5 +9,5 @@ import com.project.solaria_mobile.feature.profile.domain.ProfileRepository
 @Module
 @InstallIn(SingletonComponent::class)
 abstract class ProfileRepositoryModule {
-    @Binds abstract fun bindRepository(repository: FakeProfileRepository): ProfileRepository
+    @Binds abstract fun bindRepository(repository: RemoteProfileRepository): ProfileRepository
 }
