@@ -22,7 +22,10 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             SolariamobileTheme {
-                Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
+                Scaffold(
+                    modifier = Modifier.fillMaxSize(),
+                    containerColor = androidx.compose.material3.MaterialTheme.colorScheme.background,
+                ) { innerPadding ->
                     AppNavHost(modifier = Modifier.padding(innerPadding))
                 }
             }
