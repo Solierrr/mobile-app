@@ -38,6 +38,13 @@ kotlinxCoroutinesTest = "1.11.0"
 # Sessao local
 datastorePreferences = "1.2.1"
 
+# Custom Tabs para o login no web
+browser = "1.9.0"
+
+# Firebase (identificador da instalacao, sem notificacao nesta etapa)
+firebaseBom = "34.0.0"
+googleServices = "4.4.2"
+
 # suporte a TDD
 mockk = "1.14.11"
 
@@ -80,6 +87,13 @@ kotlinx-serialization-json = { group = "org.jetbrains.kotlinx", name = "kotlinx-
 kotlinx-coroutines-android = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-android", version.ref = "kotlinxCoroutinesAndroid" }
 kotlinx-coroutines-test = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-test", version.ref = "kotlinxCoroutinesTest" }
 
+# Firebase
+firebase-bom = { group = "com.google.firebase", name = "firebase-bom", version.ref = "firebaseBom" }
+firebase-installations = { group = "com.google.firebase", name = "firebase-installations" }
+
+# Custom Tabs
+androidx-browser = { group = "androidx.browser", name = "browser", version.ref = "browser" }
+
 # Sessao local
 androidx-datastore-preferences = { group = "androidx.datastore", name = "datastore-preferences", version.ref = "datastorePreferences" }
 
@@ -93,4 +107,5 @@ android-application = { id = "com.android.application", version.ref = "agp" }
 kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
 ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }
 hilt-android = { id = "com.google.dagger.hilt.android", version.ref = "hilt" }
+google-services = { id = "com.google.gms.google-services", version.ref = "googleServices" }
 kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }

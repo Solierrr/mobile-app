@@ -31,18 +31,22 @@ android {
             versionNameSuffix = "-qa"
             resValue("string", "app_name", "Solaria QA")
             buildConfigField("String", "ENVIRONMENT", "\"qa\"")
-            buildConfigField("String", "AUTH_BASE_URL", "\"https://api-auth-xw6o.onrender.com/auth/\"")
-            buildConfigField("String", "CORE_BASE_URL", "\"https://api-core-cqfn.onrender.com/api/\"")
-            buildConfigField("String", "MESSENGER_BASE_URL", "\"https://api-messenger-5g2n.onrender.com/messaging/\"")
+            manifestPlaceholders["authScheme"] = "solaria-qa"
+            buildConfigField("String", "AUTH_REDIRECT_URI", "\"solaria-qa://auth/callback\"")
+            buildConfigField("String", "AUTH_BASE_URL", "\"https://api-auth-xw6o.onrender.com/\"")
+            buildConfigField("String", "CORE_BASE_URL", "\"https://api-core-cqfn.onrender.com/\"")
+            buildConfigField("String", "MESSENGER_BASE_URL", "\"https://api-messenger-5g2n.onrender.com/\"")
             buildConfigField("String", "GOOGLE_REGISTRY_BASE_URL", "\"https://google-registry.onrender.com/\"")
         }
         create("prod") {
             dimension = "environment"
             resValue("string", "app_name", "Solaria")
             buildConfigField("String", "ENVIRONMENT", "\"prod\"")
-            buildConfigField("String", "AUTH_BASE_URL", "\"https://api-auth.solarianetwork.site/auth/\"")
-            buildConfigField("String", "CORE_BASE_URL", "\"https://api-core.solarianetwork.site/api/\"")
-            buildConfigField("String", "MESSENGER_BASE_URL", "\"https://api-messenger.solarianetwork.site/messaging/\"")
+            manifestPlaceholders["authScheme"] = "solaria"
+            buildConfigField("String", "AUTH_REDIRECT_URI", "\"solaria://auth/callback\"")
+            buildConfigField("String", "AUTH_BASE_URL", "\"https://api-auth.solarianetwork.site/\"")
+            buildConfigField("String", "CORE_BASE_URL", "\"https://api-core.solarianetwork.site/\"")
+            buildConfigField("String", "MESSENGER_BASE_URL", "\"https://api-messenger.solarianetwork.site/\"")
             buildConfigField("String", "GOOGLE_REGISTRY_BASE_URL", "\"\"")
         }
     }
@@ -79,6 +83,9 @@ dependencies {
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.androidx.datastore.preferences)
+    implementation(libs.androidx.browser)
+    implementation(platform(libs.firebase.bom))
+    implementation(libs.firebase.installations)
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)
     testImplementation(libs.mockk)
@@ -89,4 +96,8 @@ dependencies {
     androidTestImplementation(libs.androidx.junit)
     debugImplementation(libs.androidx.compose.ui.test.manifest)
     debugImplementation(libs.androidx.compose.ui.tooling)
+}
+
+if (file("google-services.json").exists() || file("src/qa/google-services.json").exists() || file("src/prod/google-services.json").exists()) {
+    apply(plugin = "com.google.gms.google-services")
 }
