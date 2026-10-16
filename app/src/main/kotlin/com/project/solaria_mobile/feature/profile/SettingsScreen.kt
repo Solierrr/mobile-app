@@ -38,7 +38,7 @@ fun SettingsScreen(state: SettingsUiState, onQueryChange: (String) -> Unit, onBa
         SearchField("Procure o que quiser", state.query, onQueryChange, trailingIcon = LucideR.drawable.lucide_ic_sliders_horizontal, onTrailingClick = {})
         state.groups.forEach { group ->
             SectionHeading(group.title, faded = true)
-            group.actions.forEach { action -> ActionRow(action.title, action.icon, if (action.opensProfile) onOpenProfile else {}) }
+            group.actions.forEach { action -> ActionRow(action.title, action.icon, { if (action.opensProfile) onOpenProfile() }) }
         }
         Spacer(Modifier.height(SolariaSpace.xxl))
     }
