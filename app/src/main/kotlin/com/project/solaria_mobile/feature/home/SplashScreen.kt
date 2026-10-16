@@ -20,14 +20,14 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import com.composables.icons.lucide.R as LucideR
 import com.project.solaria_mobile.core.designsystem.theme.SolariaOrange
-import com.project.solaria_mobile.core.designsystem.theme.SolariaRadius
-import com.project.solaria_mobile.core.designsystem.theme.SolariaSpace
+import com.project.solaria_mobile.core.designsystem.theme.Spacing
+import com.project.solaria_mobile.core.designsystem.theme.Radius
 import com.project.solaria_mobile.core.designsystem.theme.SolariaWhite
 
 @Composable
 fun SplashScreen() {
     Box(modifier = Modifier.fillMaxSize().background(SolariaWhite), contentAlignment = Alignment.Center) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(SolariaSpace.xl)) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(Spacing.xl)) {
             Box(
                 modifier = Modifier.size(148.dp).clip(RoundedCornerShape(38.dp)).background(SolariaOrange),
                 contentAlignment = Alignment.Center,
@@ -41,7 +41,7 @@ fun SplashScreen() {
             }
             LinearProgressIndicator(
                 progress = { 0.36f },
-                modifier = Modifier.fillMaxWidth(0.58f).height(6.dp).clip(RoundedCornerShape(SolariaRadius.pill)),
+                modifier = Modifier.fillMaxWidth(0.58f).height(6.dp).clip(RoundedCornerShape(Radius.pill)),
                 color = SolariaOrange,
                 trackColor = SolariaOrange.copy(alpha = 0.08f),
             )

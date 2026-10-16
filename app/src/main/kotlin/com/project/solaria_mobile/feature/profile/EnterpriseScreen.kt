@@ -39,8 +39,8 @@ import com.project.solaria_mobile.core.designsystem.components.ScreenTitle
 import com.project.solaria_mobile.core.designsystem.components.SectionHeading
 import com.project.solaria_mobile.core.designsystem.theme.SolariaInk
 import com.project.solaria_mobile.core.designsystem.theme.SolariaInkMuted
-import com.project.solaria_mobile.core.designsystem.theme.SolariaRadius
-import com.project.solaria_mobile.core.designsystem.theme.SolariaSpace
+import com.project.solaria_mobile.core.designsystem.theme.Spacing
+import com.project.solaria_mobile.core.designsystem.theme.Radius
 import com.project.solaria_mobile.core.designsystem.theme.SolariaWhite
 import kotlinx.coroutines.launch
 
@@ -54,7 +54,7 @@ fun EnterpriseScreen(onBack: () -> Unit) {
         Box(modifier = Modifier.fillMaxWidth().height(255.dp)) {
             Image(painter = painterResource(R.drawable.project_building), contentDescription = "Google", modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
             Row(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = SolariaSpace.screen).padding(top = SolariaSpace.lg),
+                modifier = Modifier.fillMaxWidth().padding(horizontal = Spacing.screen).padding(top = Spacing.lg),
                 horizontalArrangement = Arrangement.SpaceBetween,
             ) {
                 RoundIconButton(LucideR.drawable.lucide_ic_chevron_left, "Voltar", onBack)
@@ -62,11 +62,11 @@ fun EnterpriseScreen(onBack: () -> Unit) {
             }
         }
         Column(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = SolariaSpace.screen).padding(top = SolariaSpace.lg, bottom = SolariaSpace.screenBottom),
-            verticalArrangement = Arrangement.spacedBy(SolariaSpace.md),
+            modifier = Modifier.fillMaxWidth().padding(horizontal = Spacing.screen).padding(top = Spacing.lg, bottom = Spacing.screenBottom),
+            verticalArrangement = Arrangement.spacedBy(Spacing.md),
         ) {
-            Row(horizontalArrangement = Arrangement.spacedBy(SolariaSpace.sm), verticalAlignment = Alignment.CenterVertically) {
-                Surface(modifier = Modifier.size(44.dp), shape = RoundedCornerShape(SolariaRadius.medium), color = SolariaWhite, shadowElevation = 2.dp) {
+            Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm), verticalAlignment = Alignment.CenterVertically) {
+                Surface(modifier = Modifier.size(44.dp), shape = RoundedCornerShape(Radius.medium), color = SolariaWhite, shadowElevation = 2.dp) {
                     Image(painter = painterResource(R.drawable.company_logo_1), contentDescription = null, contentScale = ContentScale.Crop)
                 }
                 Text("Google", color = SolariaInk, style = androidx.compose.material3.MaterialTheme.typography.headlineMedium)
@@ -85,10 +85,10 @@ fun EnterpriseScreen(onBack: () -> Unit) {
             onDismissRequest = { infoOpen = false },
             sheetState = sheetState,
             containerColor = SolariaWhite,
-            shape = RoundedCornerShape(topStart = SolariaRadius.sheet, topEnd = SolariaRadius.sheet),
+            shape = RoundedCornerShape(topStart = Radius.sheet, topEnd = Radius.sheet),
             dragHandle = null,
         ) {
-            Column(modifier = Modifier.fillMaxWidth().padding(horizontal = SolariaSpace.screen).padding(top = SolariaSpace.xxl, bottom = SolariaSpace.screenBottom), verticalArrangement = Arrangement.spacedBy(SolariaSpace.md)) {
+            Column(modifier = Modifier.fillMaxWidth().padding(horizontal = Spacing.screen).padding(top = Spacing.xxl, bottom = Spacing.screenBottom), verticalArrangement = Arrangement.spacedBy(Spacing.md)) {
                 ScreenTitle("Informações", onBack = { scope.launch { sheetState.hide(); infoOpen = false } })
                 Text("Google", color = SolariaInk, style = androidx.compose.material3.MaterialTheme.typography.headlineMedium)
                 Text("Perfil público da empresa", color = SolariaInkMuted, style = androidx.compose.material3.MaterialTheme.typography.bodyMedium)

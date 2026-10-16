@@ -22,7 +22,7 @@ import com.project.solaria_mobile.core.designsystem.components.ActionRow
 import com.project.solaria_mobile.core.designsystem.components.ScreenTitle
 import com.project.solaria_mobile.core.designsystem.components.SearchField
 import com.project.solaria_mobile.core.designsystem.components.SectionHeading
-import com.project.solaria_mobile.core.designsystem.theme.SolariaSpace
+import com.project.solaria_mobile.core.designsystem.theme.Spacing
 import com.project.solaria_mobile.core.designsystem.theme.SolariaWhite
 
 @Composable
@@ -33,13 +33,13 @@ fun SettingsRoute(onBack: () -> Unit, onOpenProfile: () -> Unit, viewModel: Sett
 
 @Composable
 fun SettingsScreen(state: SettingsUiState, onQueryChange: (String) -> Unit, onBack: () -> Unit, onOpenProfile: () -> Unit) {
-    Column(modifier = Modifier.fillMaxSize().background(SolariaWhite).padding(horizontal = SolariaSpace.screen).padding(top = SolariaSpace.lg).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(SolariaSpace.md)) {
+    Column(modifier = Modifier.fillMaxSize().background(SolariaWhite).padding(horizontal = Spacing.screen).padding(top = Spacing.lg).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(Spacing.md)) {
         ScreenTitle("Configurações", onBack, trailingIcon = LucideR.drawable.lucide_ic_circle_question_mark, trailingLabel = "Ajuda", onTrailingClick = {})
         SearchField("Procure o que quiser", state.query, onQueryChange, trailingIcon = LucideR.drawable.lucide_ic_sliders_horizontal, onTrailingClick = {})
         state.groups.forEach { group ->
             SectionHeading(group.title, faded = true)
             group.actions.forEach { action -> ActionRow(action.title, action.icon, { if (action.opensProfile) onOpenProfile() }) }
         }
-        Spacer(Modifier.height(SolariaSpace.xxl))
+        Spacer(Modifier.height(Spacing.xxl))
     }
 }

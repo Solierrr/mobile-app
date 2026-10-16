@@ -36,9 +36,9 @@ import com.project.solaria_mobile.core.designsystem.components.RoundIconButton
 import com.project.solaria_mobile.core.designsystem.components.ScreenTitle
 import com.project.solaria_mobile.core.designsystem.theme.SolariaInk
 import com.project.solaria_mobile.core.designsystem.theme.SolariaInkMuted
-import com.project.solaria_mobile.core.designsystem.theme.SolariaRadius
-import com.project.solaria_mobile.core.designsystem.theme.SolariaSpace
-import com.project.solaria_mobile.core.designsystem.theme.SolariaSize
+import com.project.solaria_mobile.core.designsystem.theme.Spacing
+import com.project.solaria_mobile.core.designsystem.theme.Sizing
+import com.project.solaria_mobile.core.designsystem.theme.Radius
 import com.project.solaria_mobile.core.designsystem.theme.SolariaWhite
 import kotlinx.coroutines.launch
 
@@ -57,32 +57,32 @@ fun MapScreen(state: MapUiState, onToggleSaved: () -> Unit, onBack: () -> Unit) 
     Box(modifier = Modifier.fillMaxSize().background(SolariaWhite)) {
         MapBackdrop(modifier = Modifier.fillMaxSize())
         Row(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = SolariaSpace.screen).padding(top = SolariaSpace.lg),
+            modifier = Modifier.fillMaxWidth().padding(horizontal = Spacing.screen).padding(top = Spacing.lg),
             horizontalArrangement = Arrangement.SpaceBetween,
         ) {
             RoundIconButton(LucideR.drawable.lucide_ic_chevron_left, "Voltar", onBack)
-            Row(horizontalArrangement = Arrangement.spacedBy(SolariaSpace.sm)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
                 RoundIconButton(LucideR.drawable.lucide_ic_search, "Buscar local", {})
                 RoundIconButton(LucideR.drawable.lucide_ic_ellipsis, "Locais salvos", { locationsOpen = true })
             }
         }
         Surface(
-            modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(horizontal = SolariaSpace.screen).padding(bottom = SolariaSpace.screenBottom),
-            shape = RoundedCornerShape(SolariaRadius.sheet),
+            modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(horizontal = Spacing.screen).padding(bottom = Spacing.screenBottom),
+            shape = RoundedCornerShape(Radius.sheet),
             color = SolariaWhite,
             shadowElevation = 8.dp,
         ) {
-            Column(modifier = Modifier.padding(SolariaSpace.xl), verticalArrangement = Arrangement.spacedBy(SolariaSpace.sm)) {
+            Column(modifier = Modifier.padding(Spacing.xl), verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                    RoundIconButton(LucideR.drawable.lucide_ic_chevron_up, "Expandir detalhes", { locationsOpen = true }, size = SolariaSize.compactMapControl)
-                    Row(horizontalArrangement = Arrangement.spacedBy(SolariaSpace.sm)) {
-                        RoundIconButton(LucideR.drawable.lucide_ic_map_pin, "Minha localização", {}, size = SolariaSize.compactMapControl)
-                        RoundIconButton(LucideR.drawable.lucide_ic_maximize, "Expandir mapa", {}, size = SolariaSize.compactMapControl)
+                    RoundIconButton(LucideR.drawable.lucide_ic_chevron_up, "Expandir detalhes", { locationsOpen = true }, size = Sizing.compactMapControl)
+                    Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+                        RoundIconButton(LucideR.drawable.lucide_ic_map_pin, "Minha localização", {}, size = Sizing.compactMapControl)
+                        RoundIconButton(LucideR.drawable.lucide_ic_maximize, "Expandir mapa", {}, size = Sizing.compactMapControl)
                     }
                 }
                 Text("Há 22 km da localização atual", color = SolariaInkMuted, style = androidx.compose.material3.MaterialTheme.typography.bodyMedium)
                 Text("Santana de Parnaíba, SP", color = SolariaInk, style = androidx.compose.material3.MaterialTheme.typography.headlineMedium)
-                Row(horizontalArrangement = Arrangement.spacedBy(SolariaSpace.sm)) {
+                Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
                     ActionRow("Google Maps", LucideR.drawable.lucide_ic_map_pin, {}, compact = true, modifier = Modifier.weight(1f))
                     ActionRow(if (state.saved) "Salvo" else "Salvar", LucideR.drawable.lucide_ic_bookmark, onToggleSaved, compact = true, modifier = Modifier.weight(1f))
                 }
@@ -95,12 +95,12 @@ fun MapScreen(state: MapUiState, onToggleSaved: () -> Unit, onBack: () -> Unit) 
             onDismissRequest = { locationsOpen = false },
             sheetState = sheetState,
             containerColor = SolariaWhite,
-            shape = RoundedCornerShape(topStart = SolariaRadius.sheet, topEnd = SolariaRadius.sheet),
+            shape = RoundedCornerShape(topStart = Radius.sheet, topEnd = Radius.sheet),
             dragHandle = null,
         ) {
-            Column(modifier = Modifier.fillMaxWidth().padding(horizontal = SolariaSpace.screen).padding(top = SolariaSpace.xxl, bottom = SolariaSpace.screenBottom), verticalArrangement = Arrangement.spacedBy(SolariaSpace.md)) {
+            Column(modifier = Modifier.fillMaxWidth().padding(horizontal = Spacing.screen).padding(top = Spacing.xxl, bottom = Spacing.screenBottom), verticalArrangement = Arrangement.spacedBy(Spacing.md)) {
                 ScreenTitle("Locais salvos", onBack = { scope.launch { sheetState.hide(); locationsOpen = false } })
-                LazyColumn(verticalArrangement = Arrangement.spacedBy(SolariaSpace.sm)) {
+                LazyColumn(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
                     items(state.savedLocations) { location ->
                         ActionRow(location, LucideR.drawable.lucide_ic_map_pin, { locationsOpen = false }, trailing = "···")
                     }

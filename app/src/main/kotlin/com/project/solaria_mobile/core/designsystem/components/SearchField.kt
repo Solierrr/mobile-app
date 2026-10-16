@@ -25,8 +25,9 @@ import com.project.solaria_mobile.core.designsystem.theme.SolariaGreen
 import com.project.solaria_mobile.core.designsystem.theme.SolariaInk
 import com.project.solaria_mobile.core.designsystem.theme.SolariaInkMuted
 import com.project.solaria_mobile.core.designsystem.theme.SolariaInput
-import com.project.solaria_mobile.core.designsystem.theme.SolariaRadius
-import com.project.solaria_mobile.core.designsystem.theme.SolariaSpace
+import com.project.solaria_mobile.core.designsystem.theme.Spacing
+import com.project.solaria_mobile.core.designsystem.theme.Sizing
+import com.project.solaria_mobile.core.designsystem.theme.Radius
 
 @Composable
 fun SearchField(
@@ -39,19 +40,19 @@ fun SearchField(
 ) {
     Surface(
         modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(SolariaRadius.pill),
+        shape = RoundedCornerShape(Radius.pill),
         color = SolariaInput,
     ) {
         Row(
-            modifier = Modifier.height(44.dp).padding(horizontal = SolariaSpace.md),
+            modifier = Modifier.height(44.dp).padding(horizontal = Spacing.md),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(SolariaSpace.sm),
+            horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
         ) {
             Icon(
                 painter = painterResource(LucideR.drawable.lucide_ic_search),
                 contentDescription = null,
                 tint = SolariaInkMuted,
-                modifier = Modifier.size(SolariaSpace.iconSmall),
+                modifier = Modifier.size(Sizing.iconSmall),
             )
             BasicTextField(
                 value = value,
@@ -80,7 +81,7 @@ fun SearchField(
                         painter = painterResource(trailingIcon),
                         contentDescription = "Filtrar",
                         tint = SolariaInkMuted,
-                        modifier = Modifier.size(SolariaSpace.iconSmall),
+                        modifier = Modifier.size(Sizing.iconSmall),
                     )
                 }
             }

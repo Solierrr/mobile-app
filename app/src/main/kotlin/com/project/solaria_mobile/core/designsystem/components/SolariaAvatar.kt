@@ -17,14 +17,14 @@ import com.project.solaria_mobile.core.designsystem.theme.SolariaGreen
 import com.project.solaria_mobile.core.designsystem.theme.SolariaBlue
 import com.project.solaria_mobile.core.designsystem.theme.SolariaPink
 import com.project.solaria_mobile.core.designsystem.theme.SolariaOrange
-import com.project.solaria_mobile.core.designsystem.theme.SolariaSpace
+import com.project.solaria_mobile.core.designsystem.theme.Sizing
 import com.project.solaria_mobile.core.designsystem.theme.SolariaWhite
 
 @Composable
 fun SolariaAvatar(
     initials: String,
     modifier: Modifier = Modifier,
-    size: Dp = SolariaSpace.avatar,
+    size: Dp = Sizing.avatar,
     color: Color = SolariaOrange,
     online: Boolean = false,
 ) {

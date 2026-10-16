@@ -19,7 +19,7 @@ import com.composables.icons.lucide.R as LucideR
 import com.project.solaria_mobile.core.designsystem.components.ScreenTitle
 import com.project.solaria_mobile.core.designsystem.components.SearchField
 import com.project.solaria_mobile.core.designsystem.components.SectionHeading
-import com.project.solaria_mobile.core.designsystem.theme.SolariaSpace
+import com.project.solaria_mobile.core.designsystem.theme.Spacing
 import com.project.solaria_mobile.core.designsystem.theme.SolariaWhite
 
 @Composable
@@ -40,12 +40,12 @@ fun CallsScreen(
     onOpenCall: () -> Unit,
 ) {
     Column(
-        modifier = Modifier.fillMaxSize().background(SolariaWhite).padding(horizontal = SolariaSpace.screen).padding(top = SolariaSpace.lg),
-        verticalArrangement = Arrangement.spacedBy(SolariaSpace.md),
+        modifier = Modifier.fillMaxSize().background(SolariaWhite).padding(horizontal = Spacing.screen).padding(top = Spacing.lg),
+        verticalArrangement = Arrangement.spacedBy(Spacing.md),
     ) {
         ScreenTitle("Chamados", onBack, trailingIcon = LucideR.drawable.lucide_ic_sliders_horizontal, trailingLabel = "Filtrar", onTrailingClick = {})
         SearchField("Buscar chamado", state.query, onQueryChange, trailingIcon = LucideR.drawable.lucide_ic_sliders_horizontal, onTrailingClick = {})
-        LazyColumn(verticalArrangement = Arrangement.spacedBy(SolariaSpace.sm)) {
+        LazyColumn(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
             item { SectionHeading("Recentes", faded = true) }
             items(state.calls) { call ->
                 CallCard(call, onClick = onOpenCall)

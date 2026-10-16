@@ -48,9 +48,9 @@ import com.project.solaria_mobile.core.designsystem.components.SolariaAvatar
 import com.project.solaria_mobile.core.designsystem.theme.SolariaInk
 import com.project.solaria_mobile.core.designsystem.theme.SolariaHeaderGray
 import com.project.solaria_mobile.core.designsystem.theme.SolariaOrange
-import com.project.solaria_mobile.core.designsystem.theme.SolariaRadius
-import com.project.solaria_mobile.core.designsystem.theme.SolariaSpace
-import com.project.solaria_mobile.core.designsystem.theme.SolariaSize
+import com.project.solaria_mobile.core.designsystem.theme.Spacing
+import com.project.solaria_mobile.core.designsystem.theme.Sizing
+import com.project.solaria_mobile.core.designsystem.theme.Radius
 import com.project.solaria_mobile.core.designsystem.theme.SolariaWhite
 import com.project.solaria_mobile.feature.communication.CallsBottomSheet
 import com.project.solaria_mobile.presentation.navigation.AppDestination
@@ -89,9 +89,9 @@ fun HomeScreen(
             modifier = Modifier
                 .fillMaxWidth()
                 .background(SolariaHeaderGray)
-                .padding(horizontal = SolariaSpace.screen)
-                .padding(top = SolariaSpace.screenTop, bottom = SolariaSpace.xl),
-            verticalArrangement = Arrangement.spacedBy(SolariaSpace.md),
+                .padding(horizontal = Spacing.screen)
+                .padding(top = Spacing.screenTop, bottom = Spacing.xl),
+            verticalArrangement = Arrangement.spacedBy(Spacing.md),
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -100,38 +100,38 @@ fun HomeScreen(
             ) {
                 SolariaAvatar(
                     initials = "S",
-                    modifier = Modifier.size(SolariaSize.compactHeaderControl).clickable { onOpenPage(AppDestination.ProfileSelf) },
-                    size = SolariaSize.compactHeaderControl,
+                    modifier = Modifier.size(Sizing.compactHeaderControl).clickable { onOpenPage(AppDestination.ProfileSelf) },
+                    size = Sizing.compactHeaderControl,
                     color = SolariaOrange,
                 )
-                Row(horizontalArrangement = Arrangement.spacedBy(SolariaSpace.sm)) {
+                Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
                     RoundIconButton(
                         icon = LucideR.drawable.lucide_ic_bell,
                         contentDescription = "Notificações",
                         onClick = { onOpenPage(AppDestination.Notifications) },
-                        size = SolariaSize.compactHeaderControl,
+                        size = Sizing.compactHeaderControl,
                         badge = "10",
                     )
                     RoundIconButton(
                         icon = LucideR.drawable.lucide_ic_ellipsis,
                         contentDescription = "Mais opções",
                         onClick = { menuOpen = true },
-                        size = SolariaSize.compactHeaderControl,
+                        size = Sizing.compactHeaderControl,
                     )
                 }
             }
 
-            Column(verticalArrangement = Arrangement.spacedBy(SolariaSpace.sm)) {
+            Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
                 SectionHeading(text = "Empresas recentes", faded = true)
                 Row(
                     modifier = Modifier.horizontalScroll(rememberScrollState()),
-                    horizontalArrangement = Arrangement.spacedBy(SolariaSpace.sm),
+                    horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
                 ) {
                     state.recentCompanies.forEach { company ->
                         Surface(
-                            modifier = Modifier.size(SolariaSize.companyLogo),
+                            modifier = Modifier.size(Sizing.companyLogo),
                             onClick = { onOpenPage(AppDestination.Enterprise) },
-                            shape = RoundedCornerShape(SolariaRadius.companyLogo),
+                            shape = RoundedCornerShape(Radius.companyLogo),
                             color = SolariaWhite,
                             shadowElevation = 2.dp,
                         ) {
@@ -151,7 +151,7 @@ fun HomeScreen(
                 }
             }
 
-            Column(verticalArrangement = Arrangement.spacedBy(SolariaSpace.sm)) {
+            Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
                 SectionHeading(
                     text = "Projetos recentes",
                     faded = true,
@@ -160,7 +160,7 @@ fun HomeScreen(
                 )
                 Row(
                     modifier = Modifier.horizontalScroll(rememberScrollState()),
-                    horizontalArrangement = Arrangement.spacedBy(SolariaSpace.md),
+                    horizontalArrangement = Arrangement.spacedBy(Spacing.md),
                 ) {
                     state.recentProjects.forEach { project ->
                         RecentProjectCard(
@@ -175,9 +175,9 @@ fun HomeScreen(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = SolariaSpace.screen)
-                .padding(top = SolariaSpace.xl, bottom = SolariaSpace.screenBottom),
-            verticalArrangement = Arrangement.spacedBy(SolariaSpace.sm),
+                .padding(horizontal = Spacing.screen)
+                .padding(top = Spacing.xl, bottom = Spacing.screenBottom),
+            verticalArrangement = Arrangement.spacedBy(Spacing.sm),
         ) {
             SectionHeading(text = "Opções", faded = true)
             ActionRow("Projetos", LucideR.drawable.lucide_ic_folder, { onOpenPage(AppDestination.Projects) })
@@ -195,18 +195,18 @@ fun HomeScreen(
             onDismissRequest = { menuOpen = false },
             sheetState = sheetState,
             containerColor = SolariaWhite,
-            shape = RoundedCornerShape(topStart = SolariaRadius.sheet, topEnd = SolariaRadius.sheet),
+            shape = RoundedCornerShape(topStart = Radius.sheet, topEnd = Radius.sheet),
             dragHandle = null,
         ) {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = SolariaSpace.screen)
-                    .padding(top = SolariaSpace.xxl, bottom = SolariaSpace.screenBottom),
-                verticalArrangement = Arrangement.spacedBy(SolariaSpace.md),
+                    .padding(horizontal = Spacing.screen)
+                    .padding(top = Spacing.xxl, bottom = Spacing.screenBottom),
+                verticalArrangement = Arrangement.spacedBy(Spacing.md),
             ) {
                 ScreenTitle("Opções", onBack = { menuOpen = false })
-                Spacer(Modifier.height(SolariaSpace.xs))
+                Spacer(Modifier.height(Spacing.xs))
                 ActionRow("Listar projetos", LucideR.drawable.lucide_ic_folder, {
                     scope.launch { sheetState.hide(); menuOpen = false; onOpenPage(AppDestination.Projects) }
                 }, trailing = "24 projetos")
@@ -214,7 +214,7 @@ fun HomeScreen(
                 ActionRow("Configurações", LucideR.drawable.lucide_ic_settings, {
                     scope.launch { sheetState.hide(); menuOpen = false; onOpenPage(AppDestination.Settings) }
                 })
-                Spacer(Modifier.height(SolariaSpace.section))
+                Spacer(Modifier.height(Spacing.section))
             }
         }
     }
@@ -234,9 +234,9 @@ fun HomeScreen(
 @Composable
 private fun RecentProjectCard(name: String, onClick: () -> Unit) {
     Surface(
-        modifier = Modifier.width(SolariaSpace.projectCardWidth).height(SolariaSpace.projectCardHeight),
+        modifier = Modifier.width(Sizing.projectCardWidth).height(Sizing.projectCardHeight),
         onClick = onClick,
-        shape = RoundedCornerShape(SolariaRadius.large),
+        shape = RoundedCornerShape(Radius.large),
         color = SolariaWhite,
         shadowElevation = 2.dp,
     ) {
@@ -250,14 +250,14 @@ private fun RecentProjectCard(name: String, onClick: () -> Unit) {
             Surface(
                 modifier = Modifier
                     .align(Alignment.BottomStart)
-                    .padding(horizontal = SolariaSpace.xs, vertical = SolariaSpace.sm),
-                shape = RoundedCornerShape(SolariaRadius.pill),
+                    .padding(horizontal = Spacing.xs, vertical = Spacing.sm),
+                shape = RoundedCornerShape(Radius.pill),
                 color = SolariaWhite,
                 shadowElevation = 2.dp,
             ) {
                 Text(
                     text = name,
-                    modifier = Modifier.padding(horizontal = SolariaSpace.sm, vertical = SolariaSpace.xs),
+                    modifier = Modifier.padding(horizontal = Spacing.sm, vertical = Spacing.xs),
                     color = SolariaInk,
                     style = androidx.compose.material3.MaterialTheme.typography.labelLarge,
                     maxLines = 1,

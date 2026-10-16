@@ -21,8 +21,9 @@ import androidx.compose.ui.unit.dp
 import com.project.solaria_mobile.core.designsystem.theme.SolariaInk
 import com.project.solaria_mobile.core.designsystem.theme.SolariaInkMuted
 import com.project.solaria_mobile.core.designsystem.theme.SolariaInput
-import com.project.solaria_mobile.core.designsystem.theme.SolariaRadius
-import com.project.solaria_mobile.core.designsystem.theme.SolariaSpace
+import com.project.solaria_mobile.core.designsystem.theme.Spacing
+import com.project.solaria_mobile.core.designsystem.theme.Sizing
+import com.project.solaria_mobile.core.designsystem.theme.Radius
 
 @Composable
 fun ActionRow(
@@ -38,21 +39,21 @@ fun ActionRow(
     Surface(
         modifier = modifier.fillMaxWidth(),
         onClick = onClick,
-        shape = RoundedCornerShape(SolariaRadius.pill),
+        shape = RoundedCornerShape(Radius.pill),
         color = SolariaInput,
     ) {
         Row(
             modifier = Modifier
-                .defaultMinSize(minHeight = if (compact) 42.dp else SolariaSpace.actionHeight)
-                .padding(horizontal = if (compact) SolariaSpace.md else 22.dp, vertical = if (compact) 8.dp else 11.dp),
+                .defaultMinSize(minHeight = if (compact) 42.dp else Sizing.actionHeight)
+                .padding(horizontal = if (compact) Spacing.md else 22.dp, vertical = if (compact) 8.dp else 11.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(SolariaSpace.sm),
+            horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
         ) {
             Icon(
                 painter = painterResource(icon),
                 contentDescription = null,
                 tint = SolariaInk,
-                modifier = Modifier.size(if (compact) SolariaSpace.iconSmall else SolariaSpace.icon),
+                modifier = Modifier.size(if (compact) Sizing.iconSmall else Sizing.icon),
             )
             Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(1.dp)) {
                 Text(

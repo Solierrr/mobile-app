@@ -37,7 +37,7 @@ import com.project.solaria_mobile.core.designsystem.theme.SolariaOrange
 import com.project.solaria_mobile.core.designsystem.theme.SolariaBlue
 import com.project.solaria_mobile.core.designsystem.theme.SolariaGreen
 import com.project.solaria_mobile.core.designsystem.theme.SolariaPink
-import com.project.solaria_mobile.core.designsystem.theme.SolariaSpace
+import com.project.solaria_mobile.core.designsystem.theme.Spacing
 import com.project.solaria_mobile.core.designsystem.theme.SolariaWhite
 
 @Composable
@@ -60,8 +60,8 @@ fun ConversationsScreen(
     onOpenProject: () -> Unit,
 ) {
     Column(
-        modifier = Modifier.fillMaxSize().background(SolariaWhite).padding(horizontal = SolariaSpace.screen).padding(top = SolariaSpace.lg),
-        verticalArrangement = Arrangement.spacedBy(SolariaSpace.md),
+        modifier = Modifier.fillMaxSize().background(SolariaWhite).padding(horizontal = Spacing.screen).padding(top = Spacing.lg),
+        verticalArrangement = Arrangement.spacedBy(Spacing.md),
     ) {
         ScreenTitle("Conversas", onBack, trailingIcon = LucideR.drawable.lucide_ic_at_sign, trailingLabel = "Iniciar conversa", onTrailingClick = onOpenChat)
         SectionHeading("Opções", faded = true)
@@ -69,7 +69,7 @@ fun ConversationsScreen(
         ActionRow("Conversas de projetos", LucideR.drawable.lucide_ic_folder, onOpenProject, compact = true)
         SectionHeading("Todas as conversas", faded = true)
         SearchField("Busque uma mensagem", state.query, onQueryChange, trailingIcon = LucideR.drawable.lucide_ic_sliders_horizontal, onTrailingClick = {})
-        LazyColumn(verticalArrangement = Arrangement.spacedBy(SolariaSpace.xs)) {
+        LazyColumn(verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
             items(state.conversations) { item ->
                 ConversationRow(item = item, onClick = onOpenChat)
             }
@@ -81,8 +81,8 @@ fun ConversationsScreen(
 private fun ConversationRow(item: Conversation, onClick: () -> Unit) {
     Surface(modifier = Modifier.fillMaxWidth(), onClick = onClick, color = SolariaWhite) {
         Row(
-            modifier = Modifier.padding(vertical = SolariaSpace.xs),
-            horizontalArrangement = Arrangement.spacedBy(SolariaSpace.sm),
+            modifier = Modifier.padding(vertical = Spacing.xs),
+            horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             SolariaAvatar(item.initials, color = when (item.tone) {

@@ -26,7 +26,7 @@ import com.project.solaria_mobile.core.designsystem.components.SectionHeading
 import com.project.solaria_mobile.core.designsystem.theme.SolariaInk
 import com.project.solaria_mobile.core.designsystem.theme.SolariaInkMuted
 import com.project.solaria_mobile.core.designsystem.theme.SolariaMapPlaceholder
-import com.project.solaria_mobile.core.designsystem.theme.SolariaSpace
+import com.project.solaria_mobile.core.designsystem.theme.Spacing
 import com.project.solaria_mobile.core.designsystem.theme.SolariaWhite
 
 @Composable
@@ -40,16 +40,16 @@ fun CallDetailsScreen(onBack: () -> Unit) {
                 icon = LucideR.drawable.lucide_ic_chevron_left,
                 contentDescription = "Voltar",
                 onClick = onBack,
-                modifier = Modifier.align(Alignment.TopStart).padding(start = SolariaSpace.screen, top = SolariaSpace.lg),
+                modifier = Modifier.align(Alignment.TopStart).padding(start = Spacing.screen, top = Spacing.lg),
             )
         }
         Column(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = SolariaSpace.screen).padding(top = SolariaSpace.lg, bottom = SolariaSpace.screenBottom),
-            verticalArrangement = Arrangement.spacedBy(SolariaSpace.md),
+            modifier = Modifier.fillMaxWidth().padding(horizontal = Spacing.screen).padding(top = Spacing.lg, bottom = Spacing.screenBottom),
+            verticalArrangement = Arrangement.spacedBy(Spacing.md),
         ) {
             Text("Há 22 km da localização atual", color = SolariaInkMuted, style = androidx.compose.material3.MaterialTheme.typography.bodyMedium)
             Text("Google América Latina", color = SolariaInk, style = androidx.compose.material3.MaterialTheme.typography.headlineMedium)
-            Row(horizontalArrangement = Arrangement.spacedBy(SolariaSpace.sm)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
                 ActionRow("Google Maps", LucideR.drawable.lucide_ic_map_pin, {}, compact = true, modifier = Modifier.weight(1f))
                 ActionRow("Copiar", LucideR.drawable.lucide_ic_copy, {}, compact = true, modifier = Modifier.weight(1f))
             }

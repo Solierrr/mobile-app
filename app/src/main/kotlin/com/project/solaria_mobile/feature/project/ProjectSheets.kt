@@ -34,8 +34,9 @@ import com.project.solaria_mobile.core.designsystem.components.SectionHeading
 import com.project.solaria_mobile.core.designsystem.components.SolariaAvatar
 import com.project.solaria_mobile.core.designsystem.theme.SolariaInk
 import com.project.solaria_mobile.core.designsystem.theme.SolariaInkMuted
-import com.project.solaria_mobile.core.designsystem.theme.SolariaRadius
-import com.project.solaria_mobile.core.designsystem.theme.SolariaSpace
+import com.project.solaria_mobile.core.designsystem.theme.Spacing
+import com.project.solaria_mobile.core.designsystem.theme.Sizing
+import com.project.solaria_mobile.core.designsystem.theme.Radius
 import com.project.solaria_mobile.presentation.navigation.AppDestination
 
 internal enum class ProjectSheet(val title: String) {
@@ -56,14 +57,14 @@ internal fun ProjectSheetContent(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = SolariaSpace.screen)
-            .padding(top = SolariaSpace.xxl, bottom = SolariaSpace.screenBottom),
-        verticalArrangement = Arrangement.spacedBy(SolariaSpace.md),
+            .padding(horizontal = Spacing.screen)
+            .padding(top = Spacing.xxl, bottom = Spacing.screenBottom),
+        verticalArrangement = Arrangement.spacedBy(Spacing.md),
     ) {
         ScreenTitle(sheet.title, onBack)
         when (sheet) {
             ProjectSheet.LOCATION -> {
-                Spacer(Modifier.height(SolariaSpace.xs))
+                Spacer(Modifier.height(Spacing.xs))
                 Text("Local do projeto", color = SolariaInkMuted, style = androidx.compose.material3.MaterialTheme.typography.bodyMedium)
                 Text("Fortech Enterprise", color = SolariaInk, style = androidx.compose.material3.MaterialTheme.typography.headlineMedium)
                 Text("Av. das Nações Unidas, 12901 · São Paulo, SP", color = SolariaInkMuted, style = androidx.compose.material3.MaterialTheme.typography.bodyMedium)
@@ -74,7 +75,7 @@ internal fun ProjectSheetContent(
                 Image(
                     painter = painterResource(R.drawable.project_building),
                     contentDescription = "Imagem do projeto",
-                    modifier = Modifier.fillMaxWidth().height(240.dp).clip(RoundedCornerShape(SolariaRadius.large)),
+                    modifier = Modifier.fillMaxWidth().height(240.dp).clip(RoundedCornerShape(Radius.large)),
                     contentScale = ContentScale.Crop,
                 )
                 Text("Local do projeto · 1 de 8 imagens", color = SolariaInkMuted, style = androidx.compose.material3.MaterialTheme.typography.bodyMedium)
@@ -116,8 +117,8 @@ internal fun ProjectSheetContent(
 @Composable
 private fun TimelineEntry(title: String, detail: String) {
     Row(
-        modifier = Modifier.fillMaxWidth().padding(vertical = SolariaSpace.xs),
-        horizontalArrangement = Arrangement.spacedBy(SolariaSpace.md),
+        modifier = Modifier.fillMaxWidth().padding(vertical = Spacing.xs),
+        horizontalArrangement = Arrangement.spacedBy(Spacing.md),
         verticalAlignment = Alignment.Top,
     ) {
         Box(modifier = Modifier.padding(top = 7.dp).size(9.dp).clip(androidx.compose.foundation.shape.CircleShape).background(com.project.solaria_mobile.core.designsystem.theme.SolariaOrange))
@@ -131,8 +132,8 @@ private fun TimelineEntry(title: String, detail: String) {
 @Composable
 private fun TeamEntry(initials: String, name: String, role: String, index: Int, onClick: () -> Unit = {}) {
     Row(
-        modifier = Modifier.fillMaxWidth().clickable(onClick = onClick).padding(vertical = SolariaSpace.xs),
-        horizontalArrangement = Arrangement.spacedBy(SolariaSpace.md),
+        modifier = Modifier.fillMaxWidth().clickable(onClick = onClick).padding(vertical = Spacing.xs),
+        horizontalArrangement = Arrangement.spacedBy(Spacing.md),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         SolariaAvatar(initials = initials, color = com.project.solaria_mobile.core.designsystem.components.AvatarPalette(index))
@@ -140,6 +141,6 @@ private fun TeamEntry(initials: String, name: String, role: String, index: Int, 
             Text(name, color = SolariaInk, style = androidx.compose.material3.MaterialTheme.typography.titleMedium)
             Text(role, color = SolariaInkMuted, style = androidx.compose.material3.MaterialTheme.typography.bodyMedium)
         }
-        Icon(painter = painterResource(LucideR.drawable.lucide_ic_ellipsis), contentDescription = "Mais opções de $name", tint = SolariaInkMuted, modifier = Modifier.size(SolariaSpace.icon))
+        Icon(painter = painterResource(LucideR.drawable.lucide_ic_ellipsis), contentDescription = "Mais opções de $name", tint = SolariaInkMuted, modifier = Modifier.size(Sizing.icon))
     }
 }

@@ -39,9 +39,9 @@ import com.project.solaria_mobile.core.designsystem.theme.SolariaInput
 import com.project.solaria_mobile.core.designsystem.theme.SolariaLine
 import com.project.solaria_mobile.core.designsystem.theme.SolariaMessageOwn
 import com.project.solaria_mobile.core.designsystem.theme.SolariaOrange
-import com.project.solaria_mobile.core.designsystem.theme.SolariaRadius
-import com.project.solaria_mobile.core.designsystem.theme.SolariaSpace
-import com.project.solaria_mobile.core.designsystem.theme.SolariaSize
+import com.project.solaria_mobile.core.designsystem.theme.Spacing
+import com.project.solaria_mobile.core.designsystem.theme.Sizing
+import com.project.solaria_mobile.core.designsystem.theme.Radius
 import com.project.solaria_mobile.core.designsystem.theme.SolariaWhite
 
 @Composable
@@ -59,23 +59,23 @@ fun ChatScreen(
 ) {
     Column(modifier = Modifier.fillMaxSize().background(SolariaWhite)) {
         Row(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = SolariaSpace.screen).padding(top = SolariaSpace.md, bottom = SolariaSpace.md),
+            modifier = Modifier.fillMaxWidth().padding(horizontal = Spacing.screen).padding(top = Spacing.md, bottom = Spacing.md),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(SolariaSpace.sm),
+            horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
         ) {
-            RoundIconButton(LucideR.drawable.lucide_ic_chevron_left, "Voltar", onBack, size = SolariaSize.compactHeaderControl)
-            SolariaAvatar("RD", size = SolariaSize.compactHeaderControl, color = SolariaOrange, online = true)
+            RoundIconButton(LucideR.drawable.lucide_ic_chevron_left, "Voltar", onBack, size = Sizing.compactHeaderControl)
+            SolariaAvatar("RD", size = Sizing.compactHeaderControl, color = SolariaOrange, online = true)
             Column(modifier = Modifier.weight(1f)) {
                 Text("Ricardo Dostoiévski", color = SolariaInk, style = androidx.compose.material3.MaterialTheme.typography.titleMedium)
                 Text("Disponível", color = SolariaGreen, style = androidx.compose.material3.MaterialTheme.typography.labelMedium)
             }
-            RoundIconButton(LucideR.drawable.lucide_ic_phone, "Ligar", {}, size = SolariaSize.compactHeaderControl)
-            RoundIconButton(LucideR.drawable.lucide_ic_ellipsis, "Mais opções", {}, size = SolariaSize.compactHeaderControl)
+            RoundIconButton(LucideR.drawable.lucide_ic_phone, "Ligar", {}, size = Sizing.compactHeaderControl)
+            RoundIconButton(LucideR.drawable.lucide_ic_ellipsis, "Mais opções", {}, size = Sizing.compactHeaderControl)
         }
         Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(SolariaLine))
         Column(
-            modifier = Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = SolariaSpace.screen).padding(vertical = SolariaSpace.lg),
-            verticalArrangement = Arrangement.spacedBy(SolariaSpace.md),
+            modifier = Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = Spacing.screen).padding(vertical = Spacing.lg),
+            verticalArrangement = Arrangement.spacedBy(Spacing.md),
         ) {
             Text("Hoje", modifier = Modifier.align(Alignment.CenterHorizontally), color = SolariaInkMuted, style = androidx.compose.material3.MaterialTheme.typography.labelMedium)
             state.messages.forEach { message ->
@@ -83,16 +83,16 @@ fun ChatScreen(
             }
         }
         Row(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = SolariaSpace.screen).padding(top = SolariaSpace.sm, bottom = SolariaSpace.md),
-            horizontalArrangement = Arrangement.spacedBy(SolariaSpace.sm),
+            modifier = Modifier.fillMaxWidth().padding(horizontal = Spacing.screen).padding(top = Spacing.sm, bottom = Spacing.md),
+            horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            RoundIconButton(LucideR.drawable.lucide_ic_link, "Anexar arquivo", {}, size = SolariaSize.messageAction)
-            Surface(shape = RoundedCornerShape(SolariaRadius.pill), color = SolariaInput, modifier = Modifier.weight(1f)) {
+            RoundIconButton(LucideR.drawable.lucide_ic_link, "Anexar arquivo", {}, size = Sizing.messageAction)
+            Surface(shape = RoundedCornerShape(Radius.pill), color = SolariaInput, modifier = Modifier.weight(1f)) {
                 BasicTextField(
                     value = state.draft,
                     onValueChange = onDraftChange,
-                    modifier = Modifier.padding(horizontal = SolariaSpace.lg, vertical = 14.dp),
+                    modifier = Modifier.padding(horizontal = Spacing.lg, vertical = 14.dp),
                     textStyle = androidx.compose.material3.MaterialTheme.typography.bodyMedium.copy(color = SolariaInk),
                     decorationBox = { inner ->
                         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -101,20 +101,20 @@ fun ChatScreen(
                                 inner()
                             }
                             if (state.draft.isEmpty()) {
-                                Icon(painter = painterResource(LucideR.drawable.lucide_ic_mic), contentDescription = "Mensagem de áudio", tint = SolariaInkMuted, modifier = Modifier.size(SolariaSpace.iconSmall))
+                                Icon(painter = painterResource(LucideR.drawable.lucide_ic_mic), contentDescription = "Mensagem de áudio", tint = SolariaInkMuted, modifier = Modifier.size(Sizing.iconSmall))
                             }
                         }
                     },
                 )
             }
             Surface(
-                modifier = Modifier.size(SolariaSize.messageAction),
+                modifier = Modifier.size(Sizing.messageAction),
                 onClick = onSend,
                 shape = CircleShape,
                 color = SolariaGreen,
             ) {
                 Box(contentAlignment = Alignment.Center) {
-                    Icon(painter = painterResource(LucideR.drawable.lucide_ic_send), contentDescription = "Enviar mensagem", tint = SolariaWhite, modifier = Modifier.size(SolariaSpace.icon))
+                    Icon(painter = painterResource(LucideR.drawable.lucide_ic_send), contentDescription = "Enviar mensagem", tint = SolariaWhite, modifier = Modifier.size(Sizing.icon))
                 }
             }
         }
@@ -131,7 +131,7 @@ private fun MessageBubble(message: String, mine: Boolean, time: String) {
             color = if (mine) SolariaMessageOwn else SolariaInput,
             shape = RoundedCornerShape(topStart = 18.dp, topEnd = 18.dp, bottomStart = if (mine) 18.dp else 4.dp, bottomEnd = if (mine) 4.dp else 18.dp),
         ) {
-            Text(message, modifier = Modifier.padding(horizontal = SolariaSpace.md, vertical = SolariaSpace.sm), color = SolariaInk, style = androidx.compose.material3.MaterialTheme.typography.bodyMedium)
+            Text(message, modifier = Modifier.padding(horizontal = Spacing.md, vertical = Spacing.sm), color = SolariaInk, style = androidx.compose.material3.MaterialTheme.typography.bodyMedium)
         }
         Text(time, modifier = Modifier.padding(top = 3.dp), color = SolariaInkMuted, style = androidx.compose.material3.MaterialTheme.typography.labelMedium)
     }

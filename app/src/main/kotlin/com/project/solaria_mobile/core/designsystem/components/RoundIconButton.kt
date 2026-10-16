@@ -19,7 +19,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.project.solaria_mobile.core.designsystem.theme.SolariaInk
 import com.project.solaria_mobile.core.designsystem.theme.SolariaPink
-import com.project.solaria_mobile.core.designsystem.theme.SolariaSpace
+import com.project.solaria_mobile.core.designsystem.theme.Sizing
 import com.project.solaria_mobile.core.designsystem.theme.SolariaWhite
 
 @Composable
@@ -28,7 +28,7 @@ fun RoundIconButton(
     contentDescription: String,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
-    size: Dp = SolariaSpace.headerButton,
+    size: Dp = Sizing.headerButton,
     tint: Color = SolariaInk,
     background: Color = SolariaWhite,
     badge: String? = null,
@@ -46,7 +46,7 @@ fun RoundIconButton(
                     painter = painterResource(icon),
                     contentDescription = contentDescription,
                     tint = tint,
-                    modifier = Modifier.size(SolariaSpace.icon),
+                    modifier = Modifier.size(Sizing.icon),
                 )
             }
         }

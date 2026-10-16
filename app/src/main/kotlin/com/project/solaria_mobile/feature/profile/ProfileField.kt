@@ -20,11 +20,11 @@ import androidx.compose.ui.unit.dp
 import com.project.solaria_mobile.core.designsystem.theme.SolariaInk
 import com.project.solaria_mobile.core.designsystem.theme.SolariaInkMuted
 import com.project.solaria_mobile.core.designsystem.theme.SolariaLine
-import com.project.solaria_mobile.core.designsystem.theme.SolariaSpace
+import com.project.solaria_mobile.core.designsystem.theme.Spacing
 
 @Composable
 internal fun ProfileField(label: String, value: String) {
-    Row(modifier = Modifier.fillMaxWidth().padding(vertical = SolariaSpace.xs), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+    Row(modifier = Modifier.fillMaxWidth().padding(vertical = Spacing.xs), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
         Text(label, color = SolariaInkMuted, style = androidx.compose.material3.MaterialTheme.typography.bodyLarge)
         Text(value, color = SolariaInk, style = androidx.compose.material3.MaterialTheme.typography.bodyLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
     }

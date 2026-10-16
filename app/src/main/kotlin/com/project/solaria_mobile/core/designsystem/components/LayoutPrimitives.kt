@@ -9,14 +9,15 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.Dp
 import com.project.solaria_mobile.core.designsystem.theme.SolariaDividerSoft
-import com.project.solaria_mobile.core.designsystem.theme.SolariaSpace
+import com.project.solaria_mobile.core.designsystem.theme.Spacing
+import com.project.solaria_mobile.core.designsystem.theme.Sizing
 
 @Composable
 fun ListItemDivider(modifier: Modifier = Modifier) {
-    Spacer(modifier = modifier.fillMaxWidth().height(SolariaSpace.hairline).background(SolariaDividerSoft))
+    Spacer(modifier = modifier.fillMaxWidth().height(Sizing.hairline).background(SolariaDividerSoft))
 }
 
 @Composable
-fun RowSpacer(width: Dp = SolariaSpace.md) {
+fun RowSpacer(width: Dp = Spacing.md) {
     Spacer(modifier = Modifier.width(width))
 }

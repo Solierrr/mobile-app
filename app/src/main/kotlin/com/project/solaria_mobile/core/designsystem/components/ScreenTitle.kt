@@ -11,7 +11,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextOverflow
 import com.composables.icons.lucide.R as LucideR
 import com.project.solaria_mobile.core.designsystem.theme.SolariaInk
-import com.project.solaria_mobile.core.designsystem.theme.SolariaSpace
+import com.project.solaria_mobile.core.designsystem.theme.Spacing
 
 @Composable
 fun ScreenTitle(
@@ -25,7 +25,7 @@ fun ScreenTitle(
     Row(
         modifier = modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(SolariaSpace.md),
+        horizontalArrangement = Arrangement.spacedBy(Spacing.md),
     ) {
         RoundIconButton(
             icon = LucideR.drawable.lucide_ic_chevron_left,

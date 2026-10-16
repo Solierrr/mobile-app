@@ -40,9 +40,9 @@ import com.project.solaria_mobile.core.designsystem.components.SectionHeading
 import com.project.solaria_mobile.core.designsystem.theme.SolariaInk
 import com.project.solaria_mobile.core.designsystem.theme.SolariaInkMuted
 import com.project.solaria_mobile.core.designsystem.theme.SolariaOrange
-import com.project.solaria_mobile.core.designsystem.theme.SolariaRadius
-import com.project.solaria_mobile.core.designsystem.theme.SolariaSpace
-import com.project.solaria_mobile.core.designsystem.theme.SolariaSize
+import com.project.solaria_mobile.core.designsystem.theme.Spacing
+import com.project.solaria_mobile.core.designsystem.theme.Sizing
+import com.project.solaria_mobile.core.designsystem.theme.Radius
 import com.project.solaria_mobile.core.designsystem.theme.SolariaWhite
 
 @Composable
@@ -66,8 +66,8 @@ fun ScheduleScreen(
     onToday: () -> Unit,
 ) {
     Column(
-        modifier = Modifier.fillMaxSize().background(SolariaWhite).verticalScroll(rememberScrollState()).padding(horizontal = SolariaSpace.screen).padding(top = SolariaSpace.lg, bottom = SolariaSpace.screenBottom),
-        verticalArrangement = Arrangement.spacedBy(SolariaSpace.lg),
+        modifier = Modifier.fillMaxSize().background(SolariaWhite).verticalScroll(rememberScrollState()).padding(horizontal = Spacing.screen).padding(top = Spacing.lg, bottom = Spacing.screenBottom),
+        verticalArrangement = Arrangement.spacedBy(Spacing.lg),
     ) {
         ScreenTitle("Agenda", onBack, trailingIcon = LucideR.drawable.lucide_ic_ellipsis, trailingLabel = "Mais opções", onTrailingClick = onOpenSettings)
         CalendarCard(
@@ -108,18 +108,18 @@ private fun CalendarCard(
 ) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(SolariaRadius.large),
+        shape = RoundedCornerShape(Radius.large),
         color = SolariaWhite,
         shadowElevation = 2.dp,
     ) {
         Column(
-            modifier = Modifier.padding(SolariaSpace.md),
-            verticalArrangement = Arrangement.spacedBy(SolariaSpace.md),
+            modifier = Modifier.padding(Spacing.md),
+            verticalArrangement = Arrangement.spacedBy(Spacing.md),
         ) {
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                RoundIconButton(LucideR.drawable.lucide_ic_chevron_left, "Mês anterior", onPrevious, size = SolariaSize.compactMapControl)
+                RoundIconButton(LucideR.drawable.lucide_ic_chevron_left, "Mês anterior", onPrevious, size = Sizing.compactMapControl)
                 Text(month, color = SolariaInk, style = androidx.compose.material3.MaterialTheme.typography.headlineMedium)
-                RoundIconButton(LucideR.drawable.lucide_ic_chevron_right, "Próximo mês", onNext, size = SolariaSize.compactMapControl)
+                RoundIconButton(LucideR.drawable.lucide_ic_chevron_right, "Próximo mês", onNext, size = Sizing.compactMapControl)
             }
             Row(modifier = Modifier.fillMaxWidth()) {
                 listOf("Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb").forEach { day ->
@@ -132,7 +132,7 @@ private fun CalendarCard(
                         Box(
                             modifier = Modifier
                                 .weight(1f)
-                                .height(SolariaSize.calendarDay)
+                                .height(Sizing.calendarDay)
                                 .then(if (day.inCurrentMonth) Modifier.clickable { onSelectDay(day.number) } else Modifier),
                             contentAlignment = Alignment.Center,
                         ) {
@@ -153,7 +153,7 @@ private fun CalendarCard(
 
 @Composable
 private fun ScheduleEventRow(event: ScheduleEvent) {
-    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(SolariaSpace.md), verticalAlignment = Alignment.CenterVertically) {
+    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(Spacing.md), verticalAlignment = Alignment.CenterVertically) {
         Text(event.time, color = SolariaInkMuted, style = androidx.compose.material3.MaterialTheme.typography.labelLarge)
         Box(modifier = Modifier.width(2.dp).height(34.dp).background(SolariaOrange))
         Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {

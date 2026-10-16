@@ -20,8 +20,8 @@ import com.composables.icons.lucide.R as LucideR
 import com.project.solaria_mobile.core.designsystem.components.ScreenTitle
 import com.project.solaria_mobile.core.designsystem.components.SearchField
 import com.project.solaria_mobile.core.designsystem.components.SectionHeading
-import com.project.solaria_mobile.core.designsystem.theme.SolariaRadius
-import com.project.solaria_mobile.core.designsystem.theme.SolariaSpace
+import com.project.solaria_mobile.core.designsystem.theme.Spacing
+import com.project.solaria_mobile.core.designsystem.theme.Radius
 import com.project.solaria_mobile.core.designsystem.theme.SolariaWhite
 
 @Composable
@@ -38,12 +38,12 @@ fun CallsBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
         containerColor = SolariaWhite,
-        shape = RoundedCornerShape(topStart = SolariaRadius.sheet, topEnd = SolariaRadius.sheet),
+        shape = RoundedCornerShape(topStart = Radius.sheet, topEnd = Radius.sheet),
         dragHandle = null,
     ) {
         Column(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = SolariaSpace.screen).padding(top = SolariaSpace.xxl, bottom = SolariaSpace.screenBottom),
-            verticalArrangement = Arrangement.spacedBy(SolariaSpace.md),
+            modifier = Modifier.fillMaxWidth().padding(horizontal = Spacing.screen).padding(top = Spacing.xxl, bottom = Spacing.screenBottom),
+            verticalArrangement = Arrangement.spacedBy(Spacing.md),
         ) {
             ScreenTitle("Chamados", onBack = onDismiss, trailingIcon = LucideR.drawable.lucide_ic_sliders_horizontal, trailingLabel = "Filtrar", onTrailingClick = {})
             SearchField("Buscar chamado", query, onQueryChange, trailingIcon = LucideR.drawable.lucide_ic_sliders_horizontal, onTrailingClick = {})
@@ -51,7 +51,7 @@ fun CallsBottomSheet(
             calls.forEach { call ->
                 CallCard(call, onClick = onOpenCall)
             }
-            Spacer(Modifier.height(SolariaSpace.lg))
+            Spacer(Modifier.height(Spacing.lg))
         }
     }
 }

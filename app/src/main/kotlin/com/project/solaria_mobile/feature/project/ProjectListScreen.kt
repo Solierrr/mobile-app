@@ -35,8 +35,8 @@ import com.project.solaria_mobile.core.designsystem.components.ScreenTitle
 import com.project.solaria_mobile.core.designsystem.components.SectionHeading
 import com.project.solaria_mobile.core.designsystem.theme.SolariaInk
 import com.project.solaria_mobile.core.designsystem.theme.SolariaInkMuted
-import com.project.solaria_mobile.core.designsystem.theme.SolariaRadius
-import com.project.solaria_mobile.core.designsystem.theme.SolariaSpace
+import com.project.solaria_mobile.core.designsystem.theme.Spacing
+import com.project.solaria_mobile.core.designsystem.theme.Radius
 import com.project.solaria_mobile.core.designsystem.theme.SolariaWhite
 
 @Composable
@@ -62,9 +62,9 @@ fun ProjectListScreen(
             .fillMaxSize()
             .background(SolariaWhite)
             .verticalScroll(rememberScrollState())
-            .padding(horizontal = SolariaSpace.screen)
-            .padding(top = SolariaSpace.lg, bottom = SolariaSpace.screenBottom),
-        verticalArrangement = Arrangement.spacedBy(SolariaSpace.lg),
+            .padding(horizontal = Spacing.screen)
+            .padding(top = Spacing.lg, bottom = Spacing.screenBottom),
+        verticalArrangement = Arrangement.spacedBy(Spacing.lg),
     ) {
         ScreenTitle("Projetos", onBack, trailingIcon = LucideR.drawable.lucide_ic_map_pin, trailingLabel = "Mapa", onTrailingClick = onOpenMap)
         SectionHeading("Seus projetos", faded = true)
@@ -80,7 +80,7 @@ private fun ProjectListCard(project: ProjectSummary, index: Int, onClick: () -> 
     Surface(
         modifier = Modifier.fillMaxWidth(),
         onClick = onClick,
-        shape = RoundedCornerShape(SolariaRadius.large),
+        shape = RoundedCornerShape(Radius.large),
         color = SolariaWhite,
         shadowElevation = 3.dp,
     ) {
@@ -92,12 +92,12 @@ private fun ProjectListCard(project: ProjectSummary, index: Int, onClick: () -> 
                 contentScale = ContentScale.Crop,
             )
             Column(
-                modifier = Modifier.padding(SolariaSpace.md),
-                verticalArrangement = Arrangement.spacedBy(SolariaSpace.xs),
+                modifier = Modifier.padding(Spacing.md),
+                verticalArrangement = Arrangement.spacedBy(Spacing.xs),
             ) {
                 Text(project.place, color = SolariaInkMuted, style = androidx.compose.material3.MaterialTheme.typography.labelLarge)
                 Text(project.name, color = SolariaInk, style = androidx.compose.material3.MaterialTheme.typography.titleLarge)
-                Row(horizontalArrangement = Arrangement.spacedBy(SolariaSpace.xs), verticalAlignment = Alignment.CenterVertically) {
+                Row(horizontalArrangement = Arrangement.spacedBy(Spacing.xs), verticalAlignment = Alignment.CenterVertically) {
                     Text(project.status, color = com.project.solaria_mobile.core.designsystem.theme.SolariaGreen, style = androidx.compose.material3.MaterialTheme.typography.labelMedium)
                     Text("·", color = SolariaInkMuted)
                     Text(project.people, color = SolariaInkMuted, style = androidx.compose.material3.MaterialTheme.typography.labelMedium)

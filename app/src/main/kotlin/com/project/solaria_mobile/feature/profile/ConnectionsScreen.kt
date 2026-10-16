@@ -38,8 +38,9 @@ import com.project.solaria_mobile.core.designsystem.components.SearchField
 import com.project.solaria_mobile.core.designsystem.components.SolariaAvatar
 import com.project.solaria_mobile.core.designsystem.theme.SolariaInk
 import com.project.solaria_mobile.core.designsystem.theme.SolariaInkMuted
-import com.project.solaria_mobile.core.designsystem.theme.SolariaRadius
-import com.project.solaria_mobile.core.designsystem.theme.SolariaSpace
+import com.project.solaria_mobile.core.designsystem.theme.Spacing
+import com.project.solaria_mobile.core.designsystem.theme.Sizing
+import com.project.solaria_mobile.core.designsystem.theme.Radius
 import com.project.solaria_mobile.core.designsystem.theme.SolariaWhite
 
 @Composable
@@ -62,12 +63,12 @@ fun ConnectionsScreen(
     var filterOpen by remember { mutableStateOf(false) }
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
-    Column(modifier = Modifier.fillMaxSize().background(SolariaWhite).padding(horizontal = SolariaSpace.screen).padding(top = SolariaSpace.lg)) {
+    Column(modifier = Modifier.fillMaxSize().background(SolariaWhite).padding(horizontal = Spacing.screen).padding(top = Spacing.lg)) {
         ScreenTitle("Conexões", onBack, trailingIcon = LucideR.drawable.lucide_ic_ellipsis, trailingLabel = "Opções", onTrailingClick = { filterOpen = true })
-        Row(modifier = Modifier.padding(top = SolariaSpace.md), horizontalArrangement = Arrangement.spacedBy(SolariaSpace.sm)) {
+        Row(modifier = Modifier.padding(top = Spacing.md), horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
             SearchField("Busque um usuário", state.query, onQueryChange, modifier = Modifier.weight(1f), trailingIcon = LucideR.drawable.lucide_ic_sliders_horizontal, onTrailingClick = { filterOpen = true })
         }
-        LazyColumn(modifier = Modifier.padding(top = SolariaSpace.md), verticalArrangement = Arrangement.spacedBy(SolariaSpace.sm)) {
+        LazyColumn(modifier = Modifier.padding(top = Spacing.md), verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
             items(state.connections) { user ->
                 ConnectionRow(user, onClick = onOpenProfile)
             }
@@ -77,9 +78,9 @@ fun ConnectionsScreen(
     if (filterOpen) {
         ModalBottomSheet(
             onDismissRequest = { filterOpen = false }, sheetState = sheetState, containerColor = SolariaWhite,
-            shape = RoundedCornerShape(topStart = SolariaRadius.sheet, topEnd = SolariaRadius.sheet), dragHandle = null,
+            shape = RoundedCornerShape(topStart = Radius.sheet, topEnd = Radius.sheet), dragHandle = null,
         ) {
-            Column(modifier = Modifier.fillMaxWidth().padding(horizontal = SolariaSpace.screen).padding(top = SolariaSpace.xxl, bottom = SolariaSpace.screenBottom), verticalArrangement = Arrangement.spacedBy(SolariaSpace.md)) {
+            Column(modifier = Modifier.fillMaxWidth().padding(horizontal = Spacing.screen).padding(top = Spacing.xxl, bottom = Spacing.screenBottom), verticalArrangement = Arrangement.spacedBy(Spacing.md)) {
                 ScreenTitle("Conexões", onBack = { filterOpen = false })
                 ActionRow("Aguardando aprovação", LucideR.drawable.lucide_ic_user_round_check, { filterOpen = false })
                 ActionRow("Convidar pessoa", LucideR.drawable.lucide_ic_user_round_plus, { filterOpen = false })
@@ -92,13 +93,13 @@ fun ConnectionsScreen(
 @Composable
 private fun ConnectionRow(connection: Connection, onClick: () -> Unit) {
     Surface(modifier = Modifier.fillMaxWidth(), onClick = onClick, color = SolariaWhite) {
-        Row(modifier = Modifier.padding(vertical = SolariaSpace.xs), horizontalArrangement = Arrangement.spacedBy(SolariaSpace.sm), verticalAlignment = Alignment.CenterVertically) {
+        Row(modifier = Modifier.padding(vertical = Spacing.xs), horizontalArrangement = Arrangement.spacedBy(Spacing.sm), verticalAlignment = Alignment.CenterVertically) {
             SolariaAvatar(connection.initials, color = AvatarPalette(connection.name.length))
             Column(modifier = Modifier.weight(1f)) {
                 Text(connection.name, color = SolariaInk, style = androidx.compose.material3.MaterialTheme.typography.titleMedium)
                 Text(connection.handle, color = SolariaInkMuted, style = androidx.compose.material3.MaterialTheme.typography.bodyMedium)
             }
-            Icon(painter = painterResource(LucideR.drawable.lucide_ic_ellipsis), contentDescription = "Opções de ${connection.name}", tint = SolariaInkMuted, modifier = Modifier.size(SolariaSpace.icon))
+            Icon(painter = painterResource(LucideR.drawable.lucide_ic_ellipsis), contentDescription = "Opções de ${connection.name}", tint = SolariaInkMuted, modifier = Modifier.size(Sizing.icon))
         }
     }
 }

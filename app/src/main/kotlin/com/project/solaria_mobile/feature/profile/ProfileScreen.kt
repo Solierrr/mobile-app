@@ -46,8 +46,8 @@ import com.project.solaria_mobile.core.designsystem.components.SectionHeading
 import com.project.solaria_mobile.core.designsystem.components.SolariaAvatar
 import com.project.solaria_mobile.core.designsystem.theme.SolariaInk
 import com.project.solaria_mobile.core.designsystem.theme.SolariaInkMuted
-import com.project.solaria_mobile.core.designsystem.theme.SolariaRadius
-import com.project.solaria_mobile.core.designsystem.theme.SolariaSpace
+import com.project.solaria_mobile.core.designsystem.theme.Spacing
+import com.project.solaria_mobile.core.designsystem.theme.Radius
 import com.project.solaria_mobile.core.designsystem.theme.SolariaWhite
 import com.project.solaria_mobile.presentation.navigation.AppDestination
 import kotlinx.coroutines.launch
@@ -81,7 +81,7 @@ fun ProfileScreen(
         Box(modifier = Modifier.fillMaxWidth().height(280.dp)) {
             Image(painter = painterResource(banner), contentDescription = null, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
             Row(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = SolariaSpace.screen).padding(top = SolariaSpace.lg),
+                modifier = Modifier.fillMaxWidth().padding(horizontal = Spacing.screen).padding(top = Spacing.lg),
                 horizontalArrangement = Arrangement.SpaceBetween,
             ) {
                 RoundIconButton(LucideR.drawable.lucide_ic_chevron_left, "Voltar", onBack)
@@ -93,17 +93,17 @@ fun ProfileScreen(
             }
         }
         Column(
-            modifier = Modifier.fillMaxWidth().offset(y = -SolariaSpace.xxl).clip(RoundedCornerShape(topStart = SolariaRadius.sheet, topEnd = SolariaRadius.sheet)).background(SolariaWhite).padding(horizontal = SolariaSpace.screen).padding(top = SolariaSpace.xl, bottom = SolariaSpace.screenBottom),
-            verticalArrangement = Arrangement.spacedBy(SolariaSpace.md),
+            modifier = Modifier.fillMaxWidth().offset(y = -Spacing.xxl).clip(RoundedCornerShape(topStart = Radius.sheet, topEnd = Radius.sheet)).background(SolariaWhite).padding(horizontal = Spacing.screen).padding(top = Spacing.xl, bottom = Spacing.screenBottom),
+            verticalArrangement = Arrangement.spacedBy(Spacing.md),
         ) {
-            Row(horizontalArrangement = Arrangement.spacedBy(SolariaSpace.sm), verticalAlignment = Alignment.CenterVertically) {
+            Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm), verticalAlignment = Alignment.CenterVertically) {
                 SolariaAvatar(profile.initials, size = 52.dp, color = AvatarPalette(if (self) 0 else 1), online = !self)
                 Column(modifier = Modifier.weight(1f)) {
                     Text(profile.name, color = SolariaInk, style = androidx.compose.material3.MaterialTheme.typography.headlineMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     Text(profile.handle, color = SolariaInkMuted, style = androidx.compose.material3.MaterialTheme.typography.bodyMedium)
                 }
             }
-            Spacer(Modifier.height(SolariaSpace.sm))
+            Spacer(Modifier.height(Spacing.sm))
             ProfileField("Estado", profile.state)
             ProfileField("Profissão", profile.occupation)
             ProfileField("Telefone", profile.phone)
@@ -128,10 +128,10 @@ fun ProfileScreen(
             onDismissRequest = { infoOpen = false },
             sheetState = sheetState,
             containerColor = SolariaWhite,
-            shape = RoundedCornerShape(topStart = SolariaRadius.sheet, topEnd = SolariaRadius.sheet),
+            shape = RoundedCornerShape(topStart = Radius.sheet, topEnd = Radius.sheet),
             dragHandle = null,
         ) {
-            Column(modifier = Modifier.fillMaxWidth().padding(horizontal = SolariaSpace.screen).padding(top = SolariaSpace.xxl, bottom = SolariaSpace.screenBottom), verticalArrangement = Arrangement.spacedBy(SolariaSpace.md)) {
+            Column(modifier = Modifier.fillMaxWidth().padding(horizontal = Spacing.screen).padding(top = Spacing.xxl, bottom = Spacing.screenBottom), verticalArrangement = Arrangement.spacedBy(Spacing.md)) {
                 ScreenTitle("Informações", onBack = { scope.launch { sheetState.hide(); infoOpen = false } })
                 Text(profile.name, color = SolariaInk, style = androidx.compose.material3.MaterialTheme.typography.headlineMedium)
                 Text("Perfil público", color = SolariaInkMuted, style = androidx.compose.material3.MaterialTheme.typography.bodyMedium)

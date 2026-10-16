@@ -38,8 +38,8 @@ import com.project.solaria_mobile.core.designsystem.components.RoundIconButton
 import com.project.solaria_mobile.core.designsystem.components.ScreenTitle
 import com.project.solaria_mobile.core.designsystem.theme.SolariaInk
 import com.project.solaria_mobile.core.designsystem.theme.SolariaInkMuted
-import com.project.solaria_mobile.core.designsystem.theme.SolariaRadius
-import com.project.solaria_mobile.core.designsystem.theme.SolariaSpace
+import com.project.solaria_mobile.core.designsystem.theme.Spacing
+import com.project.solaria_mobile.core.designsystem.theme.Radius
 import com.project.solaria_mobile.core.designsystem.theme.SolariaWhite
 import com.project.solaria_mobile.presentation.navigation.AppDestination
 import kotlinx.coroutines.launch
@@ -70,8 +70,8 @@ fun ProjectDetailScreen(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = SolariaSpace.screen)
-                    .padding(top = SolariaSpace.lg),
+                    .padding(horizontal = Spacing.screen)
+                    .padding(top = Spacing.lg),
                 horizontalArrangement = Arrangement.SpaceBetween,
             ) {
                 RoundIconButton(LucideR.drawable.lucide_ic_chevron_left, "Voltar", onBack)
@@ -81,16 +81,16 @@ fun ProjectDetailScreen(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .offset(y = -SolariaSpace.xxl)
-                .clip(RoundedCornerShape(topStart = SolariaRadius.sheet, topEnd = SolariaRadius.sheet))
+                .offset(y = -Spacing.xxl)
+                .clip(RoundedCornerShape(topStart = Radius.sheet, topEnd = Radius.sheet))
                 .background(SolariaWhite)
-                .padding(horizontal = SolariaSpace.screen)
-                .padding(top = SolariaSpace.xxl, bottom = SolariaSpace.screenBottom),
-            verticalArrangement = Arrangement.spacedBy(SolariaSpace.sm),
+                .padding(horizontal = Spacing.screen)
+                .padding(top = Spacing.xxl, bottom = Spacing.screenBottom),
+            verticalArrangement = Arrangement.spacedBy(Spacing.sm),
         ) {
             Text("São Paulo", color = SolariaInkMuted, style = androidx.compose.material3.MaterialTheme.typography.bodyMedium)
             Text("Fortech Enterprise", color = SolariaInk, style = androidx.compose.material3.MaterialTheme.typography.headlineMedium)
-            Spacer(Modifier.height(SolariaSpace.xs))
+            Spacer(Modifier.height(Spacing.xs))
             ActionRow("Informações do local", LucideR.drawable.lucide_ic_map_pin, { activeSheet = ProjectSheet.LOCATION })
             ActionRow("Imagens do local", LucideR.drawable.lucide_ic_images, { activeSheet = ProjectSheet.GALLERY })
             ActionRow("Agenda do projeto", LucideR.drawable.lucide_ic_calendar_days, { activeSheet = ProjectSheet.AGENDA }, badge = "10")
@@ -108,7 +108,7 @@ fun ProjectDetailScreen(
             onDismissRequest = { activeSheet = null },
             sheetState = sheetState,
             containerColor = SolariaWhite,
-            shape = RoundedCornerShape(topStart = SolariaRadius.sheet, topEnd = SolariaRadius.sheet),
+            shape = RoundedCornerShape(topStart = Radius.sheet, topEnd = Radius.sheet),
             dragHandle = null,
         ) {
             ProjectSheetContent(
@@ -124,12 +124,12 @@ fun ProjectDetailScreen(
             onDismissRequest = { menuOpen = false },
             sheetState = sheetState,
             containerColor = SolariaWhite,
-            shape = RoundedCornerShape(topStart = SolariaRadius.sheet, topEnd = SolariaRadius.sheet),
+            shape = RoundedCornerShape(topStart = Radius.sheet, topEnd = Radius.sheet),
             dragHandle = null,
         ) {
             Column(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = SolariaSpace.screen).padding(top = SolariaSpace.xxl, bottom = SolariaSpace.screenBottom),
-                verticalArrangement = Arrangement.spacedBy(SolariaSpace.md),
+                modifier = Modifier.fillMaxWidth().padding(horizontal = Spacing.screen).padding(top = Spacing.xxl, bottom = Spacing.screenBottom),
+                verticalArrangement = Arrangement.spacedBy(Spacing.md),
             ) {
                 ScreenTitle("Opções", onBack = { menuOpen = false })
                 ActionRow("Listar projetos", LucideR.drawable.lucide_ic_folder, { scope.launch { sheetState.hide(); menuOpen = false; onNavigate(AppDestination.Projects) } }, trailing = "24 projetos")

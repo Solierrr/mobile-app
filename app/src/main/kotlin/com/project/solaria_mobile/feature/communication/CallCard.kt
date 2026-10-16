@@ -29,20 +29,21 @@ import com.project.solaria_mobile.core.designsystem.theme.SolariaInk
 import com.project.solaria_mobile.core.designsystem.theme.SolariaInkMuted
 import com.project.solaria_mobile.core.designsystem.theme.SolariaInput
 import com.project.solaria_mobile.core.designsystem.theme.SolariaPink
-import com.project.solaria_mobile.core.designsystem.theme.SolariaRadius
-import com.project.solaria_mobile.core.designsystem.theme.SolariaSpace
+import com.project.solaria_mobile.core.designsystem.theme.Spacing
+import com.project.solaria_mobile.core.designsystem.theme.Sizing
+import com.project.solaria_mobile.core.designsystem.theme.Radius
 
 @Composable
 internal fun CallCard(call: ServiceCall, onClick: () -> Unit) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
         onClick = onClick,
-        shape = RoundedCornerShape(SolariaRadius.medium),
+        shape = RoundedCornerShape(Radius.medium),
         color = SolariaInput,
     ) {
         Row(
-            modifier = Modifier.padding(SolariaSpace.md),
-            horizontalArrangement = Arrangement.spacedBy(SolariaSpace.sm),
+            modifier = Modifier.padding(Spacing.md),
+            horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             val icon = when (call.icon) {
@@ -50,7 +51,7 @@ internal fun CallCard(call: ServiceCall, onClick: () -> Unit) {
                 ServiceCallIcon.PHONE -> LucideR.drawable.lucide_ic_phone
                 ServiceCallIcon.SHIELD_ALERT -> LucideR.drawable.lucide_ic_shield_alert
             }
-            Icon(painter = painterResource(icon), contentDescription = null, tint = SolariaInk, modifier = Modifier.size(SolariaSpace.icon))
+            Icon(painter = painterResource(icon), contentDescription = null, tint = SolariaInk, modifier = Modifier.size(Sizing.icon))
             Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
                 Text(call.title, color = SolariaInk, style = androidx.compose.material3.MaterialTheme.typography.bodyMedium)
                 Text(call.detail, color = SolariaInkMuted, style = androidx.compose.material3.MaterialTheme.typography.labelMedium, maxLines = 2, overflow = TextOverflow.Ellipsis)
