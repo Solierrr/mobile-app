@@ -43,6 +43,15 @@ cd ./mobile-app
 
 Use o `Makefile` para verificar o ambiente, listar ou iniciar um emulador e executar o app. Se houver mais de um dispositivo conectado, informe o serial com `DEVICE` (por exemplo, `make run DEVICE=emulator-5554`).
 
+## Ambientes (flavors)
+
+O app tem dois flavors, escolhidos com `FLAVOR` (padrão `qa`):
+
+- `qa`: pacote `com.project.solaria_mobile.qa`, nome Solaria QA, APIs dos serviços do Render e o google-registry do Render. Como o Render gratuito dorme sem tráfego, a primeira chamada pode levar cerca de 30 segundos.
+- `prod`: pacote `com.project.solaria_mobile`, nome Solaria, APIs em `solarianetwork.site`, sem google-registry.
+
+Exemplos: `make run`, `make run FLAVOR=prod` e `make build FLAVOR=prod`. As URLs ficam em `BuildConfig` (`AUTH_BASE_URL`, `CORE_BASE_URL`, `MESSENGER_BASE_URL`, `GOOGLE_REGISTRY_BASE_URL`) e são definidas por flavor em `app/build.gradle.kts`. Não há flavor local: ninguém executa o backend para o mobile.
+
 ```bash
 make doctor
 make avds
