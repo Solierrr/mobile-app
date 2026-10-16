@@ -21,10 +21,30 @@ android {
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
-        // URLs de APIs do backend | valores de debug
-        buildConfigField("String", "AUTH_BASE_URL", "\"http://10.0.2.2:8081/auth/\"")
-        buildConfigField("String", "PERSISTENCE_BASE_URL", "\"http://10.0.2.2:8080/api/\"")
+    }
 
+    flavorDimensions += "environment"
+    productFlavors {
+        create("qa") {
+            dimension = "environment"
+            applicationIdSuffix = ".qa"
+            versionNameSuffix = "-qa"
+            resValue("string", "app_name", "Solaria QA")
+            buildConfigField("String", "ENVIRONMENT", "\"qa\"")
+            buildConfigField("String", "AUTH_BASE_URL", "\"https://api-auth-xw6o.onrender.com/auth/\"")
+            buildConfigField("String", "CORE_BASE_URL", "\"https://api-core-cqfn.onrender.com/api/\"")
+            buildConfigField("String", "MESSENGER_BASE_URL", "\"https://api-messenger-5g2n.onrender.com/messaging/\"")
+            buildConfigField("String", "GOOGLE_REGISTRY_BASE_URL", "\"https://google-registry.onrender.com/\"")
+        }
+        create("prod") {
+            dimension = "environment"
+            resValue("string", "app_name", "Solaria")
+            buildConfigField("String", "ENVIRONMENT", "\"prod\"")
+            buildConfigField("String", "AUTH_BASE_URL", "\"https://api-auth.solarianetwork.site/auth/\"")
+            buildConfigField("String", "CORE_BASE_URL", "\"https://api-core.solarianetwork.site/api/\"")
+            buildConfigField("String", "MESSENGER_BASE_URL", "\"https://api-messenger.solarianetwork.site/messaging/\"")
+            buildConfigField("String", "GOOGLE_REGISTRY_BASE_URL", "\"\"")
+        }
     }
 
     compileOptions {
@@ -34,6 +54,7 @@ android {
     buildFeatures {
         compose = true
         buildConfig = true
+        resValues = true
     }
 }
 
