@@ -43,7 +43,7 @@ import com.project.solaria_mobile.core.designsystem.components.AvatarPalette
 import com.project.solaria_mobile.core.designsystem.components.RoundIconButton
 import com.project.solaria_mobile.core.designsystem.components.ScreenTitle
 import com.project.solaria_mobile.core.designsystem.components.SectionHeading
-import com.project.solaria_mobile.core.designsystem.components.SolariaAvatar
+import com.project.solaria_mobile.core.designsystem.components.Avatar
 import com.project.solaria_mobile.core.designsystem.theme.AppTheme
 import com.project.solaria_mobile.core.designsystem.theme.Spacing
 import com.project.solaria_mobile.core.designsystem.theme.Radius
@@ -95,7 +95,7 @@ fun ProfileScreen(
             verticalArrangement = Arrangement.spacedBy(Spacing.md),
         ) {
             Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm), verticalAlignment = Alignment.CenterVertically) {
-                SolariaAvatar(profile.initials, size = 52.dp, color = AvatarPalette(if (self) 0 else 1), online = !self)
+                Avatar(profile.initials, size = 52.dp, color = AvatarPalette(if (self) 0 else 1), online = !self)
                 Column(modifier = Modifier.weight(1f)) {
                     Text(profile.name, color = AppTheme.colors.onSurface, style = androidx.compose.material3.MaterialTheme.typography.headlineMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     Text(profile.handle, color = AppTheme.colors.onSurfaceMuted, style = androidx.compose.material3.MaterialTheme.typography.bodyMedium)

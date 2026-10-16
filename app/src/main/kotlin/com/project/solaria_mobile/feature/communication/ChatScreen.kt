@@ -31,7 +31,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import com.composables.icons.lucide.R as LucideR
 import com.project.solaria_mobile.core.designsystem.components.RoundIconButton
-import com.project.solaria_mobile.core.designsystem.components.SolariaAvatar
+import com.project.solaria_mobile.core.designsystem.components.Avatar
 import com.project.solaria_mobile.core.designsystem.theme.AppTheme
 import com.project.solaria_mobile.core.designsystem.theme.Spacing
 import com.project.solaria_mobile.core.designsystem.theme.Sizing
@@ -57,7 +57,7 @@ fun ChatScreen(
             horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
         ) {
             RoundIconButton(LucideR.drawable.lucide_ic_chevron_left, "Voltar", onBack, size = Sizing.compactHeaderControl)
-            SolariaAvatar("RD", size = Sizing.compactHeaderControl, color = AppTheme.colors.secondary, online = true)
+            Avatar("RD", size = Sizing.compactHeaderControl, color = AppTheme.colors.secondary, online = true)
             Column(modifier = Modifier.weight(1f)) {
                 Text("Ricardo Dostoiévski", color = AppTheme.colors.onSurface, style = androidx.compose.material3.MaterialTheme.typography.titleMedium)
                 Text("Disponível", color = AppTheme.colors.primary, style = androidx.compose.material3.MaterialTheme.typography.labelMedium)

@@ -35,7 +35,7 @@ import com.project.solaria_mobile.core.designsystem.components.ActionRow
 import com.project.solaria_mobile.core.designsystem.components.AvatarPalette
 import com.project.solaria_mobile.core.designsystem.components.ScreenTitle
 import com.project.solaria_mobile.core.designsystem.components.SearchField
-import com.project.solaria_mobile.core.designsystem.components.SolariaAvatar
+import com.project.solaria_mobile.core.designsystem.components.Avatar
 import com.project.solaria_mobile.core.designsystem.theme.AppTheme
 import com.project.solaria_mobile.core.designsystem.theme.Spacing
 import com.project.solaria_mobile.core.designsystem.theme.Sizing
@@ -92,7 +92,7 @@ fun ConnectionsScreen(
 private fun ConnectionRow(connection: Connection, onClick: () -> Unit) {
     Surface(modifier = Modifier.fillMaxWidth(), onClick = onClick, color = AppTheme.colors.surface) {
         Row(modifier = Modifier.padding(vertical = Spacing.xs), horizontalArrangement = Arrangement.spacedBy(Spacing.sm), verticalAlignment = Alignment.CenterVertically) {
-            SolariaAvatar(connection.initials, color = AvatarPalette(connection.name.length))
+            Avatar(connection.initials, color = AvatarPalette(connection.name.length))
             Column(modifier = Modifier.weight(1f)) {
                 Text(connection.name, color = AppTheme.colors.onSurface, style = androidx.compose.material3.MaterialTheme.typography.titleMedium)
                 Text(connection.handle, color = AppTheme.colors.onSurfaceMuted, style = androidx.compose.material3.MaterialTheme.typography.bodyMedium)

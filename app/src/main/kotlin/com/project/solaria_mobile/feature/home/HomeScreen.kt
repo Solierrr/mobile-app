@@ -44,7 +44,7 @@ import com.project.solaria_mobile.core.designsystem.components.ActionRow
 import com.project.solaria_mobile.core.designsystem.components.RoundIconButton
 import com.project.solaria_mobile.core.designsystem.components.ScreenTitle
 import com.project.solaria_mobile.core.designsystem.components.SectionHeading
-import com.project.solaria_mobile.core.designsystem.components.SolariaAvatar
+import com.project.solaria_mobile.core.designsystem.components.Avatar
 import com.project.solaria_mobile.core.designsystem.theme.AppTheme
 import com.project.solaria_mobile.core.designsystem.theme.Spacing
 import com.project.solaria_mobile.core.designsystem.theme.Sizing
@@ -95,7 +95,7 @@ fun HomeScreen(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween,
             ) {
-                SolariaAvatar(
+                Avatar(
                     initials = "S",
                     modifier = Modifier.size(Sizing.compactHeaderControl).clickable { onOpenPage(AppDestination.ProfileSelf) },
                     size = Sizing.compactHeaderControl,

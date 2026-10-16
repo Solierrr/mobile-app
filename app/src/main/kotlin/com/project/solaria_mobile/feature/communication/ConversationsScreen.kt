@@ -30,7 +30,7 @@ import com.project.solaria_mobile.core.designsystem.components.ActionRow
 import com.project.solaria_mobile.core.designsystem.components.ScreenTitle
 import com.project.solaria_mobile.core.designsystem.components.SearchField
 import com.project.solaria_mobile.core.designsystem.components.SectionHeading
-import com.project.solaria_mobile.core.designsystem.components.SolariaAvatar
+import com.project.solaria_mobile.core.designsystem.components.Avatar
 import com.project.solaria_mobile.core.designsystem.theme.AppTheme
 import com.project.solaria_mobile.core.designsystem.theme.Spacing
 
@@ -79,7 +79,7 @@ private fun ConversationRow(item: Conversation, onClick: () -> Unit) {
             horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            SolariaAvatar(item.initials, color = when (item.tone) {
+            Avatar(item.initials, color = when (item.tone) {
                 AvatarTone.ORANGE -> AppTheme.colors.secondary
                 AvatarTone.BLUE -> AppTheme.colors.info
                 AvatarTone.GREEN -> AppTheme.colors.primary

@@ -31,7 +31,7 @@ import com.composables.icons.lucide.R as LucideR
 import com.project.solaria_mobile.core.designsystem.components.ActionRow
 import com.project.solaria_mobile.core.designsystem.components.ScreenTitle
 import com.project.solaria_mobile.core.designsystem.components.SectionHeading
-import com.project.solaria_mobile.core.designsystem.components.SolariaAvatar
+import com.project.solaria_mobile.core.designsystem.components.Avatar
 import com.project.solaria_mobile.core.designsystem.theme.AppTheme
 import com.project.solaria_mobile.core.designsystem.theme.Spacing
 import com.project.solaria_mobile.core.designsystem.theme.Sizing
@@ -135,7 +135,7 @@ private fun TeamEntry(initials: String, name: String, role: String, index: Int, 
         horizontalArrangement = Arrangement.spacedBy(Spacing.md),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        SolariaAvatar(initials = initials, color = com.project.solaria_mobile.core.designsystem.components.AvatarPalette(index))
+        Avatar(initials = initials, color = com.project.solaria_mobile.core.designsystem.components.AvatarPalette(index))
         Column(modifier = Modifier.weight(1f)) {
             Text(name, color = AppTheme.colors.onSurface, style = androidx.compose.material3.MaterialTheme.typography.titleMedium)
             Text(role, color = AppTheme.colors.onSurfaceMuted, style = androidx.compose.material3.MaterialTheme.typography.bodyMedium)

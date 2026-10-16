@@ -17,7 +17,7 @@ import com.project.solaria_mobile.core.designsystem.theme.AppTheme
 import com.project.solaria_mobile.core.designsystem.theme.Sizing
 
 @Composable
-fun SolariaAvatar(
+fun Avatar(
     initials: String,
     modifier: Modifier = Modifier,
     size: Dp = Sizing.avatar,
