@@ -8,11 +8,11 @@ O frontend mobile segue os artboards da página `Segundo Ano` do arquivo Solaria
 |---|---|
 | `core/designsystem/theme` | Cores, tipografia, espaçamento, raios e tema Solaria |
 | `core/designsystem/components` | Cabeçalho, botões, linhas de ação, busca, avatar e mapa |
-| `presentation/home` | Splash e Home com empresas, projetos recentes e atalhos |
-| `presentation/project` | Lista e detalhe do projeto; localização, imagens, agenda, histórico, envolvidos e conversas em bottom sheets |
-| `presentation/communication` | Conversas, chat, chamados, detalhe do chamado e notificações |
-| `presentation/discovery` | Agenda/calendário e mapa com locais salvos |
-| `presentation/profile` | Perfil próprio/terceiro, conexões, empresa e configurações |
+| `feature/home` | Splash e Home com empresas, projetos recentes e atalhos |
+| `feature/project` | Lista e detalhe do projeto; localização, imagens, agenda, histórico, envolvidos e conversas em bottom sheets |
+| `feature/communication` | Conversas, chat, chamados, detalhe do chamado e notificações |
+| `feature/discovery` | Agenda/calendário e mapa com locais salvos |
+| `feature/profile` | Perfil próprio/terceiro, conexões, empresa e configurações |
 | `presentation/navigation` | Rotas e ligações entre os fluxos |
 
 ## Tokens visuais
@@ -25,4 +25,4 @@ Os PNGs de fotos, logos e fundos de perfil estão em `app/src/main/res/drawable-
 
 A Home dá acesso a projetos, chamados, agenda, conversas, conexões, empresa, notificações, perfil e configurações. Chamados e as ações de detalhe de projeto, perfil e mapa usam `ModalBottomSheet`, que abre pela borda inferior e pode ser fechado pelo gesto, toque fora ou botão de voltar.
 
-O próximo passo pode substituir as coleções locais por ViewModels e repositórios quando os contratos das APIs e regras de negócio forem conectados.
+As coleções demonstrativas ficam em repositórios fake por feature, compartilhados durante a sessão. Rotas com dados ou lógica observam ViewModels; telas de detalhe ainda exibem o conteúdo genérico original. A futura integração com APIs substitui esses repositórios sem exigir lógica de busca ou mutação dentro dos Composables.

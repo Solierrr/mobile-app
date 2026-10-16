@@ -1,6 +1,6 @@
 # Finalidade do repositório
 
-O `mobile-app` é o cliente Android oficial do ecossistema Solaria, escrito em Kotlin com Jetpack Compose e buildado via Gradle Kotlin DSL. O repositório está em estágio inicial: a estrutura de projeto, o pipeline de CI (testes unitários e lint via ktlint) e a configuração de análise estática no SonarQube já estão no lugar, mas as telas e a integração com as APIs da organização ({a confirmar} — quais serviços consumidos, ex: `api-core`, `api-auth`) ainda não foram implementadas além da tela padrão gerada pelo Android Studio. O objetivo é servir como base para o time mobile evoluir o app de forma consistente com o padrão de código e arquitetura adotado nos demais repositórios da Solierrr.
+O `mobile-app` é o cliente Android do ecossistema Solaria, escrito em Kotlin com Jetpack Compose e Gradle Kotlin DSL. A interface demonstrativa já inclui Home, projetos, conversas, chamados, agenda, mapa, perfis e configurações. O frontend é organizado por feature com MVVM, navegação tipada, Hilt, design system e repositórios fake em memória. A integração com as APIs da organização ainda não foi feita; detalhes continuam demonstrativos/genéricos. O objetivo é evoluir a UI sem misturar responsabilidades de apresentação, estado e dados.
 
 <p>
 
@@ -36,6 +36,7 @@ O `mobile-app` é o cliente Android oficial do ecossistema Solaria, escrito em K
 ## Aprofunde-se no Projeto!
 
 - [ARCHITECTURE.md](./ARCHITECTURE.md), arquitetura e estrutura de pastas do projeto.
+- [docs/FRONTEND_ARCHITECTURE.md](./docs/FRONTEND_ARCHITECTURE.md), responsabilidades de Route, Screen, ViewModel e repositórios.
 - [RUNNING.md](./RUNNING.md), como rodar o app localmente.
 
 ## Contribuindo
