@@ -76,3 +76,9 @@ O pipeline de CI roda dois workflows separados em toda Pull Request: testes unit
 ```bash
 make ci
 ```
+
+## Login e diagnóstico (QA)
+
+O app não tem tela de login: sem sessão, ele abre o login do web em Custom Tabs e volta pelo deeplink `solaria-qa://auth/callback` (qa) ou `solaria://auth/callback` (prod). O `api-auth` precisa de `MOBILE_REDIRECT_URIS` com esse endereço e de `MOBILE_WEB_AUTHORIZE_URL` apontando para a página `/pt-BR/auth/mobile` do web.
+
+No flavor `qa`, Configurações → Desenvolvimento → Diagnóstico mostra o ambiente, as URLs, o FID da instalação (copie e cadastre na página Dispositivos QA do web-sandbox) e o teste do google-registry. O FID só aparece com o `google-services.json` do app `.qa` em `app/src/qa/` (fora do git).
