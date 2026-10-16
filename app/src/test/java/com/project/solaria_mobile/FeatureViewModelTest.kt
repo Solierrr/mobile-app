@@ -1,17 +1,26 @@
 package com.project.solaria_mobile
 
+import androidx.lifecycle.SavedStateHandle
+import app.cash.turbine.ReceiveTurbine
 import app.cash.turbine.test
+import com.project.solaria_mobile.core.common.ApiResult
+import com.project.solaria_mobile.core.common.ErrorKind
+import com.project.solaria_mobile.core.common.UiState
 import com.project.solaria_mobile.feature.communication.ChatViewModel
 import com.project.solaria_mobile.feature.communication.ConversationsViewModel
 import com.project.solaria_mobile.feature.communication.data.FakeCommunicationRepository
-import com.project.solaria_mobile.feature.discovery.data.FakeDiscoveryRepository
-import com.project.solaria_mobile.feature.discovery.ScheduleViewModel
 import com.project.solaria_mobile.feature.discovery.MapViewModel
+import com.project.solaria_mobile.feature.discovery.ScheduleViewModel
+import com.project.solaria_mobile.feature.discovery.data.FakeDiscoveryRepository
 import com.project.solaria_mobile.feature.home.HomeViewModel
 import com.project.solaria_mobile.feature.home.data.FakeHomeRepository
-import com.project.solaria_mobile.feature.project.data.FakeProjectRepository
 import com.project.solaria_mobile.feature.profile.ConnectionsViewModel
 import com.project.solaria_mobile.feature.profile.data.FakeProfileRepository
+import com.project.solaria_mobile.feature.project.ProjectDetailViewModel
+import com.project.solaria_mobile.feature.project.ProjectListViewModel
+import com.project.solaria_mobile.feature.project.data.FakeProjectRepository
+import com.project.solaria_mobile.feature.project.domain.ProjectRepository
+import com.project.solaria_mobile.feature.project.domain.ProjectSummary
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
@@ -24,19 +33,44 @@ import org.junit.Test
 class FeatureViewModelTest {
     @get:Rule val mainDispatcher = MainDispatcherRule()
 
+    private suspend fun <T> ReceiveTurbine<UiState<T>>.awaitContent(): T {
+        while (true) {
+            val item = awaitItem()
+            if (item is UiState.Content) return item.data
+        }
+    }
+
+    private fun <T> ReceiveTurbine<UiState<T>>.latestContent(): T =
+        (expectMostRecentItem() as UiState.Content).data
+
+    private fun handleOf(id: String) = SavedStateHandle(mapOf("id" to id))
+
+    private class FailingProjectRepository : ProjectRepository {
+        override suspend fun projects(): ApiResult<List<ProjectSummary>> = ApiResult.Failure(ErrorKind.CONNECTIVITY)
+        override suspend fun project(id: String): ApiResult<ProjectSummary> = ApiResult.Failure(ErrorKind.CONNECTIVITY)
+    }
+
     @Test fun sendingMessageUpdatesRepositoryAndClearsDraft() = runTest {
-        val repository = FakeCommunicationRepository()
-        val viewModel = ChatViewModel(repository)
+        val viewModel = ChatViewModel(handleOf("c1"), FakeCommunicationRepository())
         viewModel.uiState.test {
-            awaitItem()
+            assertEquals("Ricardo Dostoiévski", awaitContent().conversation.name)
             viewModel.onDraftChange("Nova mensagem")
             advanceUntilIdle()
-            assertEquals("Nova mensagem", awaitItem().draft)
+            assertEquals("Nova mensagem", latestContent().draft)
             viewModel.send()
             advanceUntilIdle()
-            val state = expectMostRecentItem()
+            val state = latestContent()
             assertEquals("", state.draft)
             assertEquals("Nova mensagem", state.messages.last().text)
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test fun unknownConversationShowsNotFound() = runTest {
+        val viewModel = ChatViewModel(handleOf("missing"), FakeCommunicationRepository())
+        viewModel.uiState.test {
+            advanceUntilIdle()
+            assertEquals(UiState.Error(ErrorKind.NOT_FOUND), expectMostRecentItem())
             cancelAndIgnoreRemainingEvents()
         }
     }
@@ -44,10 +78,10 @@ class FeatureViewModelTest {
     @Test fun conversationsAreFilteredOutsideTheComposable() = runTest {
         val viewModel = ConversationsViewModel(FakeCommunicationRepository())
         viewModel.uiState.test {
-            awaitItem()
+            awaitContent()
             viewModel.onQueryChange("Bruce")
             advanceUntilIdle()
-            val state = expectMostRecentItem()
+            val state = latestContent()
             assertEquals(2, state.conversations.size)
             assertTrue(state.conversations.all { it.name.contains("Bruce") })
             cancelAndIgnoreRemainingEvents()
@@ -57,10 +91,10 @@ class FeatureViewModelTest {
     @Test fun scheduleSelectionChangesEvents() = runTest {
         val viewModel = ScheduleViewModel(FakeDiscoveryRepository())
         viewModel.uiState.test {
-            assertEquals(3, awaitItem().selectedEvents.size)
+            assertEquals(3, awaitContent().selectedEvents.size)
             viewModel.selectDay(5)
             advanceUntilIdle()
-            assertTrue(expectMostRecentItem().selectedEvents.isEmpty())
+            assertTrue(latestContent().selectedEvents.isEmpty())
             cancelAndIgnoreRemainingEvents()
         }
     }
@@ -68,10 +102,10 @@ class FeatureViewModelTest {
     @Test fun connectionsSearchChangesVisibleList() = runTest {
         val viewModel = ConnectionsViewModel(FakeProfileRepository())
         viewModel.uiState.test {
-            awaitItem()
+            awaitContent()
             viewModel.onQueryChange("Ana")
             advanceUntilIdle()
-            assertEquals(2, expectMostRecentItem().connections.map { it.name }.distinct().size)
+            assertEquals(2, latestContent().connections.map { it.name }.distinct().size)
             cancelAndIgnoreRemainingEvents()
         }
     }
@@ -79,12 +113,12 @@ class FeatureViewModelTest {
     @Test fun homeUsesSharedProjectAndCallSources() = runTest {
         val viewModel = HomeViewModel(FakeHomeRepository(), FakeProjectRepository(), FakeCommunicationRepository())
         viewModel.uiState.test {
-            val initial = awaitItem()
+            val initial = awaitContent()
             assertEquals(4, initial.recentProjects.size)
             assertEquals(4, initial.recentCalls.size)
             viewModel.onCallsQueryChange("segurança")
             advanceUntilIdle()
-            assertEquals(1, expectMostRecentItem().recentCalls.size)
+            assertEquals(1, latestContent().recentCalls.size)
             cancelAndIgnoreRemainingEvents()
         }
     }
@@ -92,7 +126,21 @@ class FeatureViewModelTest {
     @Test fun savedLocationSurvivesNewViewModelWithinSession() = runTest {
         val repository = FakeDiscoveryRepository()
         MapViewModel(repository).toggleSaved()
+        advanceUntilIdle()
         val reopened = MapViewModel(repository)
-        assertTrue(reopened.uiState.value.saved)
+        advanceUntilIdle()
+        assertTrue((reopened.uiState.value as UiState.Content).data.saved)
+    }
+
+    @Test fun projectListShowsLoadFailure() = runTest {
+        val viewModel = ProjectListViewModel(FailingProjectRepository())
+        advanceUntilIdle()
+        assertEquals(UiState.Error(ErrorKind.CONNECTIVITY), viewModel.uiState.value)
+    }
+
+    @Test fun projectDetailLoadsTheProjectFromTheRouteId() = runTest {
+        val viewModel = ProjectDetailViewModel(handleOf("2"), FakeProjectRepository())
+        advanceUntilIdle()
+        assertEquals("Solar Tech", (viewModel.uiState.value as UiState.Content).data.name)
     }
 }

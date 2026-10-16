@@ -30,7 +30,7 @@ fun CallsBottomSheet(
     query: String,
     onQueryChange: (String) -> Unit,
     onDismiss: () -> Unit,
-    onOpenCall: () -> Unit,
+    onOpenCall: (String) -> Unit,
     onOpenAll: () -> Unit,
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -49,7 +49,7 @@ fun CallsBottomSheet(
             SearchField("Buscar chamado", query, onQueryChange, trailingIcon = LucideR.drawable.lucide_ic_sliders_horizontal, onTrailingClick = {})
             SectionHeading("Recentes", faded = true, action = "Ver todos", onAction = onOpenAll)
             calls.forEach { call ->
-                CallCard(call, onClick = onOpenCall)
+                CallCard(call, onClick = { onOpenCall(call.id) })
             }
             Spacer(Modifier.height(Spacing.lg))
         }

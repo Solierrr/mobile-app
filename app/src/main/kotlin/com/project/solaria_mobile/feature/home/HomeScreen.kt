@@ -53,6 +53,7 @@ import com.project.solaria_mobile.feature.communication.CallsBottomSheet
 import com.project.solaria_mobile.presentation.navigation.AppDestination
 import com.project.solaria_mobile.feature.home.domain.CompanyLogoId
 import kotlinx.coroutines.launch
+import com.project.solaria_mobile.core.designsystem.components.UiStateHost
 
 @Composable
 fun HomeRoute(
@@ -61,7 +62,7 @@ fun HomeRoute(
     viewModel: HomeViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
-    HomeScreen(state, viewModel::onCallsQueryChange, onOpenPage, modifier)
+    UiStateHost(state, viewModel::load, modifier) { content -> HomeScreen(content, viewModel::onCallsQueryChange, onOpenPage, modifier) }
 }
 
 @Composable
@@ -162,7 +163,7 @@ fun HomeScreen(
                     state.recentProjects.forEach { project ->
                         RecentProjectCard(
                             name = project.name,
-                            onClick = { onOpenPage(AppDestination.Project) },
+                            onClick = { onOpenPage(AppDestination.Project(project.id)) },
                         )
                     }
                 }
@@ -222,7 +223,7 @@ fun HomeScreen(
             query = state.callsQuery,
             onQueryChange = onCallsQueryChange,
             onDismiss = { callsOpen = false },
-            onOpenCall = { callsOpen = false; onOpenPage(AppDestination.Call) },
+            onOpenCall = { id -> callsOpen = false; onOpenPage(AppDestination.Call(id)) },
             onOpenAll = { callsOpen = false; onOpenPage(AppDestination.Calls) },
         )
     }

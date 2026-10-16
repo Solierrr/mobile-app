@@ -15,6 +15,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -25,9 +26,19 @@ import com.project.solaria_mobile.core.designsystem.components.RoundIconButton
 import com.project.solaria_mobile.core.designsystem.components.SectionHeading
 import com.project.solaria_mobile.core.designsystem.theme.AppTheme
 import com.project.solaria_mobile.core.designsystem.theme.Spacing
+import com.project.solaria_mobile.core.designsystem.components.UiStateHost
+import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.project.solaria_mobile.feature.communication.domain.ServiceCall
 
 @Composable
-fun CallDetailsScreen(onBack: () -> Unit) {
+fun CallDetailsRoute(onBack: () -> Unit, viewModel: CallDetailsViewModel = hiltViewModel()) {
+    val state by viewModel.uiState.collectAsStateWithLifecycle()
+    UiStateHost(state, viewModel::load) { call -> CallDetailsScreen(call, onBack) }
+}
+
+@Composable
+fun CallDetailsScreen(call: ServiceCall, onBack: () -> Unit) {
     Column(
         modifier = Modifier.fillMaxSize().background(AppTheme.colors.surface).verticalScroll(rememberScrollState()),
     ) {
@@ -45,7 +56,7 @@ fun CallDetailsScreen(onBack: () -> Unit) {
             verticalArrangement = Arrangement.spacedBy(Spacing.md),
         ) {
             Text("Há 22 km da localização atual", color = AppTheme.colors.onSurfaceMuted, style = androidx.compose.material3.MaterialTheme.typography.bodyMedium)
-            Text("Google América Latina", color = AppTheme.colors.onSurface, style = androidx.compose.material3.MaterialTheme.typography.headlineMedium)
+            Text(call.title, color = AppTheme.colors.onSurface, style = androidx.compose.material3.MaterialTheme.typography.headlineMedium)
             Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
                 ActionRow("Google Maps", LucideR.drawable.lucide_ic_map_pin, {}, compact = true, modifier = Modifier.weight(1f))
                 ActionRow("Copiar", LucideR.drawable.lucide_ic_copy, {}, compact = true, modifier = Modifier.weight(1f))

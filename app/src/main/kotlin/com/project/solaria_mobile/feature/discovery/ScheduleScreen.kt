@@ -41,6 +41,7 @@ import com.project.solaria_mobile.core.designsystem.theme.AppTheme
 import com.project.solaria_mobile.core.designsystem.theme.Spacing
 import com.project.solaria_mobile.core.designsystem.theme.Sizing
 import com.project.solaria_mobile.core.designsystem.theme.Radius
+import com.project.solaria_mobile.core.designsystem.components.UiStateHost
 
 @Composable
 fun ScheduleRoute(
@@ -49,7 +50,9 @@ fun ScheduleRoute(
     viewModel: ScheduleViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
-    ScheduleScreen(state, onBack, onOpenSettings, viewModel::selectDay, viewModel::previousMonth, viewModel::nextMonth, viewModel::resetToDemoToday)
+    UiStateHost(state, viewModel::load) { content ->
+        ScheduleScreen(content, onBack, onOpenSettings, viewModel::selectDay, viewModel::previousMonth, viewModel::nextMonth, viewModel::resetToDemoToday)
+    }
 }
 
 @Composable

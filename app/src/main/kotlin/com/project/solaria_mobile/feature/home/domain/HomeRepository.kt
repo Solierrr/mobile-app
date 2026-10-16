@@ -1,7 +1,7 @@
 package com.project.solaria_mobile.feature.home.domain
 
-import kotlinx.coroutines.flow.StateFlow
+import com.project.solaria_mobile.core.common.ApiResult
 
 interface HomeRepository {
-    val recentCompanies: StateFlow<List<CompanyLogo>>
+    suspend fun recentCompanies(): ApiResult<List<CompanyLogo>>
 }

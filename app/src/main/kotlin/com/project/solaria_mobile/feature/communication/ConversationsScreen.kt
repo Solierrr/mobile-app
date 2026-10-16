@@ -3,7 +3,6 @@
 package com.project.solaria_mobile.feature.communication
 
 import com.project.solaria_mobile.feature.communication.domain.Conversation
-import com.project.solaria_mobile.feature.communication.domain.AvatarTone
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -33,16 +32,20 @@ import com.project.solaria_mobile.core.designsystem.components.SectionHeading
 import com.project.solaria_mobile.core.designsystem.components.Avatar
 import com.project.solaria_mobile.core.designsystem.theme.AppTheme
 import com.project.solaria_mobile.core.designsystem.theme.Spacing
+import com.project.solaria_mobile.core.designsystem.components.UiStateHost
 
 @Composable
 fun ConversationsRoute(
     onBack: () -> Unit,
-    onOpenChat: () -> Unit,
+    onOpenChat: (String) -> Unit,
+    onStartChat: () -> Unit,
     onOpenProject: () -> Unit,
     viewModel: ConversationsViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
-    ConversationsScreen(state, viewModel::onQueryChange, onBack, onOpenChat, onOpenProject)
+    UiStateHost(state, viewModel::load) { content ->
+        ConversationsScreen(content, viewModel::onQueryChange, onBack, onOpenChat, onStartChat, onOpenProject)
+    }
 }
 
 @Composable
@@ -50,22 +53,23 @@ fun ConversationsScreen(
     state: ConversationsUiState,
     onQueryChange: (String) -> Unit,
     onBack: () -> Unit,
-    onOpenChat: () -> Unit,
+    onOpenChat: (String) -> Unit,
+    onStartChat: () -> Unit,
     onOpenProject: () -> Unit,
 ) {
     Column(
         modifier = Modifier.fillMaxSize().background(AppTheme.colors.surface).padding(horizontal = Spacing.screen).padding(top = Spacing.lg),
         verticalArrangement = Arrangement.spacedBy(Spacing.md),
     ) {
-        ScreenTitle("Conversas", onBack, trailingIcon = LucideR.drawable.lucide_ic_at_sign, trailingLabel = "Iniciar conversa", onTrailingClick = onOpenChat)
+        ScreenTitle("Conversas", onBack, trailingIcon = LucideR.drawable.lucide_ic_at_sign, trailingLabel = "Iniciar conversa", onTrailingClick = onStartChat)
         SectionHeading("Opções", faded = true)
-        ActionRow("Iniciar conversa", LucideR.drawable.lucide_ic_message_circle, onOpenChat, compact = true)
+        ActionRow("Iniciar conversa", LucideR.drawable.lucide_ic_message_circle, onStartChat, compact = true)
         ActionRow("Conversas de projetos", LucideR.drawable.lucide_ic_folder, onOpenProject, compact = true)
         SectionHeading("Todas as conversas", faded = true)
         SearchField("Busque uma mensagem", state.query, onQueryChange, trailingIcon = LucideR.drawable.lucide_ic_sliders_horizontal, onTrailingClick = {})
         LazyColumn(verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
             items(state.conversations) { item ->
-                ConversationRow(item = item, onClick = onOpenChat)
+                ConversationRow(item = item, onClick = { onOpenChat(item.id) })
             }
         }
     }
@@ -79,12 +83,7 @@ private fun ConversationRow(item: Conversation, onClick: () -> Unit) {
             horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Avatar(item.initials, color = when (item.tone) {
-                AvatarTone.ORANGE -> AppTheme.colors.secondary
-                AvatarTone.BLUE -> AppTheme.colors.info
-                AvatarTone.GREEN -> AppTheme.colors.primary
-                AvatarTone.PINK -> AppTheme.colors.danger
-            })
+            Avatar(item.initials, color = item.tone.toColor())
             Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 Text(item.name, color = AppTheme.colors.onSurface, style = androidx.compose.material3.MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 Text(item.preview, color = AppTheme.colors.onSurfaceMuted, style = androidx.compose.material3.MaterialTheme.typography.labelMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)

@@ -1,19 +1,22 @@
 package com.project.solaria_mobile.feature.discovery
 
-import com.project.solaria_mobile.feature.discovery.domain.ScheduleEvent
-import com.project.solaria_mobile.feature.discovery.domain.CalendarDay
-import com.project.solaria_mobile.feature.discovery.domain.DiscoveryRepository
-
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.project.solaria_mobile.core.common.UiState
+import com.project.solaria_mobile.core.common.load
+import com.project.solaria_mobile.core.common.map
+import com.project.solaria_mobile.feature.discovery.domain.CalendarDay
+import com.project.solaria_mobile.feature.discovery.domain.DiscoveryRepository
+import com.project.solaria_mobile.feature.discovery.domain.ScheduleEvent
 import dagger.hilt.android.lifecycle.HiltViewModel
+import java.util.Calendar
 import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
-import java.util.Calendar
+import kotlinx.coroutines.launch
 
 data class ScheduleUiState(
     val monthOffset: Int = 0,
@@ -25,14 +28,22 @@ data class ScheduleUiState(
 )
 
 @HiltViewModel
-class ScheduleViewModel @Inject constructor(repository: DiscoveryRepository) : ViewModel() {
+class ScheduleViewModel @Inject constructor(private val repository: DiscoveryRepository) : ViewModel() {
     private data class Selection(val monthOffset: Int = 0, val selectedDay: Int = 4)
+
     private val selection = MutableStateFlow(Selection())
+    private val source = MutableStateFlow<UiState<List<ScheduleEvent>>>(UiState.Loading)
     private val months = listOf("Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro")
 
-    val uiState: StateFlow<ScheduleUiState> = combine(repository.events, selection) { events, current ->
-        buildState(events, current.monthOffset, current.selectedDay)
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), buildState(repository.events.value, 0, 4))
+    val uiState: StateFlow<UiState<ScheduleUiState>> = combine(source, selection) { loaded, current ->
+        loaded.map { events -> buildState(events, current.monthOffset, current.selectedDay) }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), UiState.Loading)
+
+    init { load() }
+
+    fun load() {
+        viewModelScope.launch { source.load { repository.events() } }
+    }
 
     fun selectDay(day: Int) { selection.value = selection.value.copy(selectedDay = day) }
     fun previousMonth() { selection.value = Selection(selection.value.monthOffset - 1, 1) }

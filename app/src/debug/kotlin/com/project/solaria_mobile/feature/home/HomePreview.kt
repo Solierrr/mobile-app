@@ -9,7 +9,7 @@ import com.project.solaria_mobile.feature.project.domain.ProjectSummary
 
 private val previewState = HomeUiState(
     recentCompanies = listOf(CompanyLogo("Google", CompanyLogoId.GOOGLE), CompanyLogo("Amazon", CompanyLogoId.AMAZON)),
-    recentProjects = listOf(ProjectSummary("Fortech Enterprise", "São Paulo, SP", "Em andamento", "12 envolvidos")),
+    recentProjects = listOf(ProjectSummary("1", "Fortech Enterprise", "São Paulo, SP", "Em andamento", "12 envolvidos")),
 )
 
 @Preview(showBackground = true)

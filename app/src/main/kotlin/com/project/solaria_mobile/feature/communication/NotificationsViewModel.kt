@@ -1,19 +1,25 @@
 package com.project.solaria_mobile.feature.communication
 
-import com.project.solaria_mobile.feature.communication.domain.ServiceCall
-import com.project.solaria_mobile.feature.communication.domain.CommunicationRepository
-
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.project.solaria_mobile.core.common.UiState
+import com.project.solaria_mobile.core.common.load
+import com.project.solaria_mobile.feature.communication.domain.CommunicationRepository
+import com.project.solaria_mobile.feature.communication.domain.NotificationGroup
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
-import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.launch
 
 @HiltViewModel
-class NotificationsViewModel @Inject constructor(repository: CommunicationRepository) : ViewModel() {
-    val groups: StateFlow<List<Pair<String, List<ServiceCall>>>> = repository.notifications.stateIn(
-        viewModelScope, SharingStarted.WhileSubscribed(5_000), repository.notifications.value
-    )
+class NotificationsViewModel @Inject constructor(private val repository: CommunicationRepository) : ViewModel() {
+    private val mutableState = MutableStateFlow<UiState<List<NotificationGroup>>>(UiState.Loading)
+    val uiState: StateFlow<UiState<List<NotificationGroup>>> = mutableState
+
+    init { load() }
+
+    fun load() {
+        viewModelScope.launch { mutableState.load(isEmpty = { it.isEmpty() }) { repository.notifications() } }
+    }
 }

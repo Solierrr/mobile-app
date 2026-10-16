@@ -1,7 +1,7 @@
 package com.project.solaria_mobile.feature.profile.domain
 
-
 data class UserProfile(
+    val id: String,
     val initials: String,
     val name: String,
     val handle: String,
@@ -10,4 +10,4 @@ data class UserProfile(
     val phone: String,
 )
 
-data class Connection(val initials: String, val name: String, val handle: String)
+data class Connection(val id: String, val initials: String, val name: String, val handle: String)

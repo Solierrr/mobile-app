@@ -49,16 +49,16 @@ import com.project.solaria_mobile.core.designsystem.theme.Spacing
 import com.project.solaria_mobile.core.designsystem.theme.Radius
 import com.project.solaria_mobile.presentation.navigation.AppDestination
 import kotlinx.coroutines.launch
+import com.project.solaria_mobile.core.designsystem.components.UiStateHost
 
 @Composable
 fun ProfileRoute(
-    self: Boolean,
     onBack: () -> Unit,
     onNavigate: (AppDestination) -> Unit,
     viewModel: ProfileViewModel = hiltViewModel(),
 ) {
-    val state by (if (self) viewModel.ownState else viewModel.otherState).collectAsStateWithLifecycle()
-    ProfileScreen(state, onBack, onNavigate, viewModel::toggleConnection)
+    val state by viewModel.uiState.collectAsStateWithLifecycle()
+    UiStateHost(state, viewModel::load) { content -> ProfileScreen(content, onBack, onNavigate, viewModel::toggleConnection) }
 }
 
 @Composable
@@ -115,7 +115,7 @@ fun ProfileScreen(
                 ActionRow("Informações", LucideR.drawable.lucide_ic_info, { infoOpen = true })
                 ActionRow("Ver agenda", LucideR.drawable.lucide_ic_calendar_days, { onNavigate(AppDestination.Schedule) })
                 ActionRow(if (state.connected) "Conectado" else "Adicionar conexão", LucideR.drawable.lucide_ic_link, onToggleConnection)
-                ActionRow("Conversar", LucideR.drawable.lucide_ic_message_circle, { onNavigate(AppDestination.Chat) })
+                ActionRow("Conversar", LucideR.drawable.lucide_ic_message_circle, { onNavigate(AppDestination.Chat("c1")) })
                 ActionRow("Compartilhar", LucideR.drawable.lucide_ic_share, {})
             }
         }

@@ -83,15 +83,15 @@ internal fun ProjectSheetContent(
             ProjectSheet.AGENDA -> {
                 SectionHeading("Janeiro, 2026", faded = true)
                 ActionRow("Visita técnica", LucideR.drawable.lucide_ic_map_pin, { onNavigate(AppDestination.Map) }, trailing = "09:30", subtitle = "4 jan · Fortech Enterprise")
-                ActionRow("Alinhamento do projeto", LucideR.drawable.lucide_ic_message_circle, { onNavigate(AppDestination.Chat) }, trailing = "13:00", subtitle = "4 jan · Conversa com equipe")
+                ActionRow("Alinhamento do projeto", LucideR.drawable.lucide_ic_message_circle, { onNavigate(AppDestination.Chat("c1")) }, trailing = "13:00", subtitle = "4 jan · Conversa com equipe")
                 ActionRow("Revisar proposta", LucideR.drawable.lucide_ic_file_text, {}, trailing = "16:15", subtitle = "4 jan · Solar Tech")
                 ActionRow("Abrir agenda completa", LucideR.drawable.lucide_ic_calendar_days, { onNavigate(AppDestination.Schedule) })
             }
             ProjectSheet.CONVERSATIONS -> {
                 SectionHeading("Conversas recentes", faded = true)
-                TeamEntry("RC", "Ricardo Dostoiévski", "O Will Smith, aquela lá do holiud", 0, { onNavigate(AppDestination.Chat) })
-                TeamEntry("AM", "Alexandre de Moraes", "Tu vai apagar agora aquela mensagem?", 1, { onNavigate(AppDestination.Chat) })
-                TeamEntry("BB", "Bruce Banner", "Cara, minha mão deu até hoje slk", 2, { onNavigate(AppDestination.Chat) })
+                TeamEntry("RC", "Ricardo Dostoiévski", "O Will Smith, aquela lá do holiud", 0, { onNavigate(AppDestination.Chat("c1")) })
+                TeamEntry("AM", "Alexandre de Moraes", "Tu vai apagar agora aquela mensagem?", 1, { onNavigate(AppDestination.Chat("c2")) })
+                TeamEntry("BB", "Bruce Banner", "Cara, minha mão deu até hoje slk", 2, { onNavigate(AppDestination.Chat("c3")) })
                 ActionRow("Ver todas as conversas", LucideR.drawable.lucide_ic_messages_square, { onNavigate(AppDestination.Chats) })
             }
             ProjectSheet.HISTORY -> {
@@ -103,10 +103,10 @@ internal fun ProjectSheetContent(
             }
             ProjectSheet.TEAM -> {
                 SectionHeading("Pessoas envolvidas", faded = true, action = "Ver conexões", onAction = { onNavigate(AppDestination.Connections) })
-                TeamEntry("RC", "Ronaldo Chagas", "Responsável pelo projeto", 0, { onNavigate(AppDestination.ProfileOther) })
-                TeamEntry("ML", "Mariana Lima", "Engenheira elétrica", 1, { onNavigate(AppDestination.ProfileOther) })
-                TeamEntry("FS", "Felipe Santos", "Instalação", 2, { onNavigate(AppDestination.ProfileOther) })
-                TeamEntry("GC", "Gabriela Costa", "Fornecedor", 3, { onNavigate(AppDestination.ProfileOther) })
+                TeamEntry("RC", "Ronaldo Chagas", "Responsável pelo projeto", 0, { onNavigate(AppDestination.ProfileOther("u1")) })
+                TeamEntry("ML", "Mariana Lima", "Engenheira elétrica", 1, { onNavigate(AppDestination.ProfileOther("u5")) })
+                TeamEntry("FS", "Felipe Santos", "Instalação", 2, { onNavigate(AppDestination.ProfileOther("u6")) })
+                TeamEntry("GC", "Gabriela Costa", "Fornecedor", 3, { onNavigate(AppDestination.ProfileOther("u9")) })
                 ActionRow("Convidar pessoa", LucideR.drawable.lucide_ic_user_plus, {})
             }
         }

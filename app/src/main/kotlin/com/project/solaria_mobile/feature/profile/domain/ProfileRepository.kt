@@ -1,11 +1,11 @@
 package com.project.solaria_mobile.feature.profile.domain
 
-import kotlinx.coroutines.flow.StateFlow
+import com.project.solaria_mobile.core.common.ApiResult
 
 interface ProfileRepository {
-    val ownProfile: StateFlow<UserProfile>
-    val otherProfile: StateFlow<UserProfile>
-    val connections: StateFlow<List<Connection>>
-    val connected: StateFlow<Boolean>
-    fun toggleConnection()
+    suspend fun ownProfile(): ApiResult<UserProfile>
+    suspend fun profile(id: String): ApiResult<UserProfile>
+    suspend fun connections(): ApiResult<List<Connection>>
+    suspend fun isConnected(profileId: String): ApiResult<Boolean>
+    suspend fun toggleConnection(profileId: String): ApiResult<Boolean>
 }

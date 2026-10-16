@@ -39,11 +39,12 @@ import com.project.solaria_mobile.core.designsystem.theme.Spacing
 import com.project.solaria_mobile.core.designsystem.theme.Sizing
 import com.project.solaria_mobile.core.designsystem.theme.Radius
 import kotlinx.coroutines.launch
+import com.project.solaria_mobile.core.designsystem.components.UiStateHost
 
 @Composable
 fun MapRoute(onBack: () -> Unit, viewModel: MapViewModel = hiltViewModel()) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
-    MapScreen(state, viewModel::toggleSaved, onBack)
+    UiStateHost(state, viewModel::load) { content -> MapScreen(content, viewModel::toggleSaved, onBack) }
 }
 
 @Composable

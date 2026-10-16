@@ -1,19 +1,25 @@
 package com.project.solaria_mobile.feature.project
 
-import com.project.solaria_mobile.feature.project.domain.ProjectSummary
-import com.project.solaria_mobile.feature.project.domain.ProjectRepository
-
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.project.solaria_mobile.core.common.UiState
+import com.project.solaria_mobile.core.common.load
+import com.project.solaria_mobile.feature.project.domain.ProjectRepository
+import com.project.solaria_mobile.feature.project.domain.ProjectSummary
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
-import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.launch
 
 @HiltViewModel
-class ProjectListViewModel @Inject constructor(repository: ProjectRepository) : ViewModel() {
-    val projects: StateFlow<List<ProjectSummary>> = repository.projects.stateIn(
-        viewModelScope, SharingStarted.WhileSubscribed(5_000), repository.projects.value
-    )
+class ProjectListViewModel @Inject constructor(private val repository: ProjectRepository) : ViewModel() {
+    private val mutableState = MutableStateFlow<UiState<List<ProjectSummary>>>(UiState.Loading)
+    val uiState: StateFlow<UiState<List<ProjectSummary>>> = mutableState
+
+    init { load() }
+
+    fun load() {
+        viewModelScope.launch { mutableState.load(isEmpty = { it.isEmpty() }) { repository.projects() } }
+    }
 }

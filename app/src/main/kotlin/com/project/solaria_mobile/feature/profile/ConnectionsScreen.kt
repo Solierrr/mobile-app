@@ -40,15 +40,16 @@ import com.project.solaria_mobile.core.designsystem.theme.AppTheme
 import com.project.solaria_mobile.core.designsystem.theme.Spacing
 import com.project.solaria_mobile.core.designsystem.theme.Sizing
 import com.project.solaria_mobile.core.designsystem.theme.Radius
+import com.project.solaria_mobile.core.designsystem.components.UiStateHost
 
 @Composable
 fun ConnectionsRoute(
     onBack: () -> Unit,
-    onOpenProfile: () -> Unit,
+    onOpenProfile: (String) -> Unit,
     viewModel: ConnectionsViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
-    ConnectionsScreen(state, viewModel::onQueryChange, onBack, onOpenProfile)
+    UiStateHost(state, viewModel::load) { content -> ConnectionsScreen(content, viewModel::onQueryChange, onBack, onOpenProfile) }
 }
 
 @Composable
@@ -56,7 +57,7 @@ fun ConnectionsScreen(
     state: ConnectionsUiState,
     onQueryChange: (String) -> Unit,
     onBack: () -> Unit,
-    onOpenProfile: () -> Unit,
+    onOpenProfile: (String) -> Unit,
 ) {
     var filterOpen by remember { mutableStateOf(false) }
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -68,7 +69,7 @@ fun ConnectionsScreen(
         }
         LazyColumn(modifier = Modifier.padding(top = Spacing.md), verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
             items(state.connections) { user ->
-                ConnectionRow(user, onClick = onOpenProfile)
+                ConnectionRow(user, onClick = { onOpenProfile(user.id) })
             }
         }
     }

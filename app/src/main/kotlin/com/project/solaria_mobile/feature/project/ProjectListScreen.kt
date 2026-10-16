@@ -36,23 +36,24 @@ import com.project.solaria_mobile.core.designsystem.components.SectionHeading
 import com.project.solaria_mobile.core.designsystem.theme.AppTheme
 import com.project.solaria_mobile.core.designsystem.theme.Spacing
 import com.project.solaria_mobile.core.designsystem.theme.Radius
+import com.project.solaria_mobile.core.designsystem.components.UiStateHost
 
 @Composable
 fun ProjectListRoute(
     onBack: () -> Unit,
-    onOpenProject: () -> Unit,
+    onOpenProject: (String) -> Unit,
     onOpenMap: () -> Unit,
     viewModel: ProjectListViewModel = hiltViewModel(),
 ) {
-    val projects by viewModel.projects.collectAsStateWithLifecycle()
-    ProjectListScreen(projects, onBack, onOpenProject, onOpenMap)
+    val state by viewModel.uiState.collectAsStateWithLifecycle()
+    UiStateHost(state, viewModel::load) { projects -> ProjectListScreen(projects, onBack, onOpenProject, onOpenMap) }
 }
 
 @Composable
 fun ProjectListScreen(
     projects: List<ProjectSummary>,
     onBack: () -> Unit,
-    onOpenProject: () -> Unit,
+    onOpenProject: (String) -> Unit,
     onOpenMap: () -> Unit,
 ) {
     Column(
@@ -67,7 +68,7 @@ fun ProjectListScreen(
         ScreenTitle("Projetos", onBack, trailingIcon = LucideR.drawable.lucide_ic_map_pin, trailingLabel = "Mapa", onTrailingClick = onOpenMap)
         SectionHeading("Seus projetos", faded = true)
         projects.forEachIndexed { index, project ->
-            ProjectListCard(project = project, index = index, onClick = onOpenProject)
+            ProjectListCard(project = project, index = index, onClick = { onOpenProject(project.id) })
         }
         ActionRow("Criar projeto", LucideR.drawable.lucide_ic_folder_plus, onClick = {})
     }

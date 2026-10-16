@@ -36,11 +36,12 @@ import com.project.solaria_mobile.core.designsystem.theme.AppTheme
 import com.project.solaria_mobile.core.designsystem.theme.Spacing
 import com.project.solaria_mobile.core.designsystem.theme.Sizing
 import com.project.solaria_mobile.core.designsystem.theme.Radius
+import com.project.solaria_mobile.core.designsystem.components.UiStateHost
 
 @Composable
 fun ChatRoute(onBack: () -> Unit, viewModel: ChatViewModel = hiltViewModel()) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
-    ChatScreen(state, viewModel::onDraftChange, viewModel::send, onBack)
+    UiStateHost(state, viewModel::load) { content -> ChatScreen(content, viewModel::onDraftChange, viewModel::send, onBack) }
 }
 
 @Composable
@@ -57,9 +58,9 @@ fun ChatScreen(
             horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
         ) {
             RoundIconButton(LucideR.drawable.lucide_ic_chevron_left, "Voltar", onBack, size = Sizing.compactHeaderControl)
-            Avatar("RD", size = Sizing.compactHeaderControl, color = AppTheme.colors.secondary, online = true)
+            Avatar(state.conversation.initials, size = Sizing.compactHeaderControl, color = state.conversation.tone.toColor(), online = true)
             Column(modifier = Modifier.weight(1f)) {
-                Text("Ricardo Dostoiévski", color = AppTheme.colors.onSurface, style = androidx.compose.material3.MaterialTheme.typography.titleMedium)
+                Text(state.conversation.name, color = AppTheme.colors.onSurface, style = androidx.compose.material3.MaterialTheme.typography.titleMedium)
                 Text("Disponível", color = AppTheme.colors.primary, style = androidx.compose.material3.MaterialTheme.typography.labelMedium)
             }
             RoundIconButton(LucideR.drawable.lucide_ic_phone, "Ligar", {}, size = Sizing.compactHeaderControl)

@@ -41,9 +41,24 @@ import com.project.solaria_mobile.core.designsystem.theme.Spacing
 import com.project.solaria_mobile.core.designsystem.theme.Radius
 import com.project.solaria_mobile.presentation.navigation.AppDestination
 import kotlinx.coroutines.launch
+import com.project.solaria_mobile.core.designsystem.components.UiStateHost
+import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.project.solaria_mobile.feature.project.domain.ProjectSummary
+
+@Composable
+fun ProjectDetailRoute(
+    onBack: () -> Unit,
+    onNavigate: (AppDestination) -> Unit,
+    viewModel: ProjectDetailViewModel = hiltViewModel(),
+) {
+    val state by viewModel.uiState.collectAsStateWithLifecycle()
+    UiStateHost(state, viewModel::load) { project -> ProjectDetailScreen(project, onBack, onNavigate) }
+}
 
 @Composable
 fun ProjectDetailScreen(
+    project: ProjectSummary,
     onBack: () -> Unit,
     onNavigate: (AppDestination) -> Unit,
 ) {
@@ -61,7 +76,7 @@ fun ProjectDetailScreen(
         Box(modifier = Modifier.fillMaxWidth().height(345.dp)) {
             Image(
                 painter = painterResource(R.drawable.project_building),
-                contentDescription = "Fortech Enterprise",
+                contentDescription = project.name,
                 modifier = Modifier.fillMaxSize(),
                 contentScale = ContentScale.Crop,
             )
@@ -86,8 +101,8 @@ fun ProjectDetailScreen(
                 .padding(top = Spacing.xxl, bottom = Spacing.screenBottom),
             verticalArrangement = Arrangement.spacedBy(Spacing.sm),
         ) {
-            Text("São Paulo", color = AppTheme.colors.onSurfaceMuted, style = androidx.compose.material3.MaterialTheme.typography.bodyMedium)
-            Text("Fortech Enterprise", color = AppTheme.colors.onSurface, style = androidx.compose.material3.MaterialTheme.typography.headlineMedium)
+            Text(project.place, color = AppTheme.colors.onSurfaceMuted, style = androidx.compose.material3.MaterialTheme.typography.bodyMedium)
+            Text(project.name, color = AppTheme.colors.onSurface, style = androidx.compose.material3.MaterialTheme.typography.headlineMedium)
             Spacer(Modifier.height(Spacing.xs))
             ActionRow("Informações do local", LucideR.drawable.lucide_ic_map_pin, { activeSheet = ProjectSheet.LOCATION })
             ActionRow("Imagens do local", LucideR.drawable.lucide_ic_images, { activeSheet = ProjectSheet.GALLERY })

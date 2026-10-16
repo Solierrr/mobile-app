@@ -21,15 +21,16 @@ import com.project.solaria_mobile.core.designsystem.components.SearchField
 import com.project.solaria_mobile.core.designsystem.components.SectionHeading
 import com.project.solaria_mobile.core.designsystem.theme.Spacing
 import com.project.solaria_mobile.core.designsystem.theme.AppTheme
+import com.project.solaria_mobile.core.designsystem.components.UiStateHost
 
 @Composable
 fun CallsRoute(
     onBack: () -> Unit,
-    onOpenCall: () -> Unit,
+    onOpenCall: (String) -> Unit,
     viewModel: CallsViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
-    CallsScreen(state, viewModel::onQueryChange, onBack, onOpenCall)
+    UiStateHost(state, viewModel::load) { content -> CallsScreen(content, viewModel::onQueryChange, onBack, onOpenCall) }
 }
 
 @Composable
@@ -37,7 +38,7 @@ fun CallsScreen(
     state: CallsUiState,
     onQueryChange: (String) -> Unit,
     onBack: () -> Unit,
-    onOpenCall: () -> Unit,
+    onOpenCall: (String) -> Unit,
 ) {
     Column(
         modifier = Modifier.fillMaxSize().background(AppTheme.colors.surface).padding(horizontal = Spacing.screen).padding(top = Spacing.lg),
@@ -48,7 +49,7 @@ fun CallsScreen(
         LazyColumn(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
             item { SectionHeading("Recentes", faded = true) }
             items(state.calls) { call ->
-                CallCard(call, onClick = onOpenCall)
+                CallCard(call, onClick = { onOpenCall(call.id) })
             }
         }
     }

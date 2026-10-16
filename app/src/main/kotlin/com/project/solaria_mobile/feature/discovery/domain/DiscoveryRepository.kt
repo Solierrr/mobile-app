@@ -1,10 +1,10 @@
 package com.project.solaria_mobile.feature.discovery.domain
 
-import kotlinx.coroutines.flow.StateFlow
+import com.project.solaria_mobile.core.common.ApiResult
 
 interface DiscoveryRepository {
-    val events: StateFlow<List<ScheduleEvent>>
-    val savedLocations: StateFlow<List<String>>
-    val locationSaved: StateFlow<Boolean>
-    fun toggleLocationSaved()
+    suspend fun events(): ApiResult<List<ScheduleEvent>>
+    suspend fun savedLocations(): ApiResult<List<String>>
+    suspend fun isLocationSaved(): ApiResult<Boolean>
+    suspend fun toggleLocationSaved(): ApiResult<Boolean>
 }

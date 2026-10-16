@@ -1,7 +1,8 @@
 package com.project.solaria_mobile.feature.project.domain
 
-import kotlinx.coroutines.flow.StateFlow
+import com.project.solaria_mobile.core.common.ApiResult
 
 interface ProjectRepository {
-    val projects: StateFlow<List<ProjectSummary>>
+    suspend fun projects(): ApiResult<List<ProjectSummary>>
+    suspend fun project(id: String): ApiResult<ProjectSummary>
 }
