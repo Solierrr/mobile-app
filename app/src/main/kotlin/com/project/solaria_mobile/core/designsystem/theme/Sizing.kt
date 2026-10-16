@@ -16,4 +16,6 @@ object Sizing {
     val calendarDay = 40.dp
     val messageAction = 48.dp
     val companyLogo = 60.dp
+    val loadingIndicator = 56.dp
+    val avatarLarge = 72.dp
 }

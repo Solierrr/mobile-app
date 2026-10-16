@@ -84,6 +84,7 @@ dependencies {
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.androidx.datastore.preferences)
     implementation(libs.androidx.browser)
+    implementation(libs.androidx.graphics.shapes)
     implementation(platform(libs.firebase.bom))
     implementation(libs.firebase.installations)
     testImplementation(libs.junit)

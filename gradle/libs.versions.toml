@@ -41,6 +41,9 @@ datastorePreferences = "1.2.1"
 # Custom Tabs para o login no web
 browser = "1.9.0"
 
+# Formas e morph do Material 3 Expressive
+graphicsShapes = "1.1.0"
+
 # Firebase (identificador da instalacao, sem notificacao nesta etapa)
 firebaseBom = "34.0.0"
 googleServices = "4.4.2"
@@ -90,6 +93,9 @@ kotlinx-coroutines-test = { group = "org.jetbrains.kotlinx", name = "kotlinx-cor
 # Firebase
 firebase-bom = { group = "com.google.firebase", name = "firebase-bom", version.ref = "firebaseBom" }
 firebase-installations = { group = "com.google.firebase", name = "firebase-installations" }
+
+# Formas
+androidx-graphics-shapes = { group = "androidx.graphics", name = "graphics-shapes", version.ref = "graphicsShapes" }
 
 # Custom Tabs
 androidx-browser = { group = "androidx.browser", name = "browser", version.ref = "browser" }
