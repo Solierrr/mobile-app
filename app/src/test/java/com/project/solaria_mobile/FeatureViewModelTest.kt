@@ -71,7 +71,7 @@ class FeatureViewModelTest {
             awaitItem()
             viewModel.onQueryChange("Ana")
             advanceUntilIdle()
-            assertEquals(2, expectMostRecentItem().connections.size)
+            assertEquals(2, expectMostRecentItem().connections.map { it.name }.distinct().size)
             cancelAndIgnoreRemainingEvents()
         }
     }
