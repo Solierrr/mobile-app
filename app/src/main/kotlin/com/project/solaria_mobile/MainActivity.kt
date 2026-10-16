@@ -6,11 +6,14 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
+import androidx.compose.runtime.CompositionLocalProvider
+import com.project.solaria_mobile.BuildConfig
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Scaffold
 import androidx.compose.ui.Modifier
 import com.project.solaria_mobile.core.designsystem.theme.AppTheme
+import com.project.solaria_mobile.core.designsystem.components.LocalSlowLoadingHint
 import com.project.solaria_mobile.feature.auth.AuthViewModel
 import com.project.solaria_mobile.presentation.navigation.AppNavHost
 import dagger.hilt.android.AndroidEntryPoint
@@ -29,16 +32,21 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         handleLoginCallback(intent)
         setContent {
-            AppTheme {
-                Scaffold(
-                    modifier = Modifier.fillMaxSize(),
-                    containerColor = androidx.compose.material3.MaterialTheme.colorScheme.background,
-                ) { innerPadding ->
-                    AppNavHost(authViewModel = authViewModel, modifier = Modifier.padding(innerPadding))
+            CompositionLocalProvider(LocalSlowLoadingHint provides slowLoadingHint()) {
+                AppTheme {
+                    Scaffold(
+                        modifier = Modifier.fillMaxSize(),
+                        containerColor = androidx.compose.material3.MaterialTheme.colorScheme.background,
+                    ) { innerPadding ->
+                        AppNavHost(authViewModel = authViewModel, modifier = Modifier.padding(innerPadding))
+                    }
                 }
             }
         }
     }
+
+    private fun slowLoadingHint(): String? =
+        if (BuildConfig.ENVIRONMENT == "qa") "Acordando o servidor de QA, isso pode levar até 1 minuto." else null
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)

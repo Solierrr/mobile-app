@@ -11,7 +11,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -21,7 +20,9 @@ import androidx.compose.ui.unit.dp
 import com.composables.icons.lucide.R as LucideR
 import com.project.solaria_mobile.core.designsystem.theme.AppTheme
 import com.project.solaria_mobile.core.designsystem.theme.Spacing
+import com.project.solaria_mobile.core.designsystem.components.MorphingHexagon
 import com.project.solaria_mobile.core.designsystem.theme.Radius
+import com.project.solaria_mobile.core.designsystem.theme.Sizing
 
 @Composable
 fun SplashScreen() {
@@ -38,12 +39,7 @@ fun SplashScreen() {
                     modifier = Modifier.size(82.dp),
                 )
             }
-            LinearProgressIndicator(
-                progress = { 0.36f },
-                modifier = Modifier.fillMaxWidth(0.58f).height(6.dp).clip(RoundedCornerShape(Radius.pill)),
-                color = AppTheme.colors.secondary,
-                trackColor = AppTheme.colors.secondary.copy(alpha = 0.08f),
-            )
+            MorphingHexagon(Modifier.size(Sizing.loadingIndicator))
             Spacer(Modifier.height(80.dp))
         }
     }

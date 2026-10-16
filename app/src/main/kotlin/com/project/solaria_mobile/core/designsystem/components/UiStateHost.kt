@@ -5,18 +5,30 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
 import com.project.solaria_mobile.core.common.ErrorKind
 import com.project.solaria_mobile.core.common.UiState
 import com.project.solaria_mobile.core.designsystem.theme.AppTheme
+import com.project.solaria_mobile.core.designsystem.theme.Sizing
 import com.project.solaria_mobile.core.designsystem.theme.Spacing
+import kotlinx.coroutines.delay
+
+val LocalSlowLoadingHint = staticCompositionLocalOf<String?> { null }
+
+private const val SLOW_LOADING_DELAY_MILLIS = 4_000L
 
 @Composable
 fun <T> UiStateHost(
@@ -29,7 +41,8 @@ fun <T> UiStateHost(
     when (state) {
         is UiState.Content -> content(state.data)
         UiState.Loading -> CenteredMessage(modifier) {
-            CircularProgressIndicator(color = AppTheme.colors.primary)
+            MorphingHexagon(Modifier.size(Sizing.loadingIndicator))
+            SlowLoadingHint()
         }
         UiState.Empty -> CenteredMessage(modifier) {
             MessageText(emptyMessage)
@@ -74,4 +87,15 @@ private fun ErrorKind.userMessage(): String = when (this) {
     ErrorKind.SERVER -> "O servidor está com problemas."
     ErrorKind.SERIALIZATION -> "Resposta inesperada do servidor."
     ErrorKind.UNKNOWN -> "Algo deu errado."
+}
+
+@Composable
+private fun SlowLoadingHint() {
+    val hint = LocalSlowLoadingHint.current ?: return
+    var visible by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        delay(SLOW_LOADING_DELAY_MILLIS)
+        visible = true
+    }
+    if (visible) MessageText(hint)
 }

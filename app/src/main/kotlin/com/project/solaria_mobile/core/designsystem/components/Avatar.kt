@@ -11,6 +11,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.project.solaria_mobile.core.designsystem.theme.AppTheme
@@ -23,12 +24,13 @@ fun Avatar(
     size: Dp = Sizing.avatar,
     color: Color = AppTheme.colors.secondary,
     online: Boolean = false,
+    shape: Shape = CircleShape,
 ) {
     Box(modifier = modifier.size(size)) {
         Box(
             modifier = Modifier
                 .matchParentSize()
-                .clip(CircleShape)
+                .clip(shape)
                 .background(color),
             contentAlignment = Alignment.Center,
         ) {

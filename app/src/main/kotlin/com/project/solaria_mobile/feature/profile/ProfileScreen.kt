@@ -40,6 +40,8 @@ import com.project.solaria_mobile.R
 import com.composables.icons.lucide.R as LucideR
 import com.project.solaria_mobile.core.designsystem.components.ActionRow
 import com.project.solaria_mobile.core.designsystem.components.AvatarPalette
+import com.project.solaria_mobile.core.designsystem.components.ExpressiveShapes
+import com.project.solaria_mobile.core.designsystem.theme.Sizing
 import com.project.solaria_mobile.core.designsystem.components.RoundIconButton
 import com.project.solaria_mobile.core.designsystem.components.ScreenTitle
 import com.project.solaria_mobile.core.designsystem.components.SectionHeading
@@ -95,7 +97,7 @@ fun ProfileScreen(
             verticalArrangement = Arrangement.spacedBy(Spacing.md),
         ) {
             Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm), verticalAlignment = Alignment.CenterVertically) {
-                Avatar(profile.initials, size = 52.dp, color = AvatarPalette(if (self) 0 else 1), online = !self)
+                Avatar(profile.initials, size = Sizing.avatarLarge, color = AvatarPalette(if (self) 0 else 1), online = !self, shape = if (self) ExpressiveShapes.cookie else ExpressiveShapes.clover)
                 Column(modifier = Modifier.weight(1f)) {
                     Text(profile.name, color = AppTheme.colors.onSurface, style = androidx.compose.material3.MaterialTheme.typography.headlineMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     Text(profile.handle, color = AppTheme.colors.onSurfaceMuted, style = androidx.compose.material3.MaterialTheme.typography.bodyMedium)
