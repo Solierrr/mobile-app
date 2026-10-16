@@ -10,7 +10,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextOverflow
 import com.composables.icons.lucide.R as LucideR
-import com.project.solaria_mobile.core.designsystem.theme.SolariaInk
+import com.project.solaria_mobile.core.designsystem.theme.AppTheme
 import com.project.solaria_mobile.core.designsystem.theme.Spacing
 
 @Composable
@@ -36,7 +36,7 @@ fun ScreenTitle(
             text = title,
             modifier = Modifier.weight(1f),
             style = androidx.compose.material3.MaterialTheme.typography.titleLarge,
-            color = SolariaInk,
+            color = AppTheme.colors.onSurface,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )

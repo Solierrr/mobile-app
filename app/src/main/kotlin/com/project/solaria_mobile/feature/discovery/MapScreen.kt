@@ -34,12 +34,10 @@ import com.project.solaria_mobile.core.designsystem.components.ActionRow
 import com.project.solaria_mobile.core.designsystem.components.MapBackdrop
 import com.project.solaria_mobile.core.designsystem.components.RoundIconButton
 import com.project.solaria_mobile.core.designsystem.components.ScreenTitle
-import com.project.solaria_mobile.core.designsystem.theme.SolariaInk
-import com.project.solaria_mobile.core.designsystem.theme.SolariaInkMuted
+import com.project.solaria_mobile.core.designsystem.theme.AppTheme
 import com.project.solaria_mobile.core.designsystem.theme.Spacing
 import com.project.solaria_mobile.core.designsystem.theme.Sizing
 import com.project.solaria_mobile.core.designsystem.theme.Radius
-import com.project.solaria_mobile.core.designsystem.theme.SolariaWhite
 import kotlinx.coroutines.launch
 
 @Composable
@@ -54,7 +52,7 @@ fun MapScreen(state: MapUiState, onToggleSaved: () -> Unit, onBack: () -> Unit) 
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val scope = rememberCoroutineScope()
 
-    Box(modifier = Modifier.fillMaxSize().background(SolariaWhite)) {
+    Box(modifier = Modifier.fillMaxSize().background(AppTheme.colors.surface)) {
         MapBackdrop(modifier = Modifier.fillMaxSize())
         Row(
             modifier = Modifier.fillMaxWidth().padding(horizontal = Spacing.screen).padding(top = Spacing.lg),
@@ -69,7 +67,7 @@ fun MapScreen(state: MapUiState, onToggleSaved: () -> Unit, onBack: () -> Unit) 
         Surface(
             modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(horizontal = Spacing.screen).padding(bottom = Spacing.screenBottom),
             shape = RoundedCornerShape(Radius.sheet),
-            color = SolariaWhite,
+            color = AppTheme.colors.surface,
             shadowElevation = 8.dp,
         ) {
             Column(modifier = Modifier.padding(Spacing.xl), verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
@@ -80,8 +78,8 @@ fun MapScreen(state: MapUiState, onToggleSaved: () -> Unit, onBack: () -> Unit) 
                         RoundIconButton(LucideR.drawable.lucide_ic_maximize, "Expandir mapa", {}, size = Sizing.compactMapControl)
                     }
                 }
-                Text("Há 22 km da localização atual", color = SolariaInkMuted, style = androidx.compose.material3.MaterialTheme.typography.bodyMedium)
-                Text("Santana de Parnaíba, SP", color = SolariaInk, style = androidx.compose.material3.MaterialTheme.typography.headlineMedium)
+                Text("Há 22 km da localização atual", color = AppTheme.colors.onSurfaceMuted, style = androidx.compose.material3.MaterialTheme.typography.bodyMedium)
+                Text("Santana de Parnaíba, SP", color = AppTheme.colors.onSurface, style = androidx.compose.material3.MaterialTheme.typography.headlineMedium)
                 Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
                     ActionRow("Google Maps", LucideR.drawable.lucide_ic_map_pin, {}, compact = true, modifier = Modifier.weight(1f))
                     ActionRow(if (state.saved) "Salvo" else "Salvar", LucideR.drawable.lucide_ic_bookmark, onToggleSaved, compact = true, modifier = Modifier.weight(1f))
@@ -94,7 +92,7 @@ fun MapScreen(state: MapUiState, onToggleSaved: () -> Unit, onBack: () -> Unit) 
         ModalBottomSheet(
             onDismissRequest = { locationsOpen = false },
             sheetState = sheetState,
-            containerColor = SolariaWhite,
+            containerColor = AppTheme.colors.surface,
             shape = RoundedCornerShape(topStart = Radius.sheet, topEnd = Radius.sheet),
             dragHandle = null,
         ) {

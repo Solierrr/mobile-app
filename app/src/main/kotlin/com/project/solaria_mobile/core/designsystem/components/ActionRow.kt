@@ -18,9 +18,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import com.project.solaria_mobile.core.designsystem.theme.SolariaInk
-import com.project.solaria_mobile.core.designsystem.theme.SolariaInkMuted
-import com.project.solaria_mobile.core.designsystem.theme.SolariaInput
+import com.project.solaria_mobile.core.designsystem.theme.AppTheme
 import com.project.solaria_mobile.core.designsystem.theme.Spacing
 import com.project.solaria_mobile.core.designsystem.theme.Sizing
 import com.project.solaria_mobile.core.designsystem.theme.Radius
@@ -40,7 +38,7 @@ fun ActionRow(
         modifier = modifier.fillMaxWidth(),
         onClick = onClick,
         shape = RoundedCornerShape(Radius.pill),
-        color = SolariaInput,
+        color = AppTheme.colors.inputFill,
     ) {
         Row(
             modifier = Modifier
@@ -52,13 +50,13 @@ fun ActionRow(
             Icon(
                 painter = painterResource(icon),
                 contentDescription = null,
-                tint = SolariaInk,
+                tint = AppTheme.colors.onSurface,
                 modifier = Modifier.size(if (compact) Sizing.iconSmall else Sizing.icon),
             )
             Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(1.dp)) {
                 Text(
                     text = title,
-                    color = SolariaInk,
+                    color = AppTheme.colors.onSurface,
                     style = if (compact) androidx.compose.material3.MaterialTheme.typography.bodyMedium
                     else androidx.compose.material3.MaterialTheme.typography.bodyLarge,
                     maxLines = 1,
@@ -67,7 +65,7 @@ fun ActionRow(
                 if (subtitle != null) {
                     Text(
                         text = subtitle,
-                        color = SolariaInkMuted,
+                        color = AppTheme.colors.onSurfaceMuted,
                         style = androidx.compose.material3.MaterialTheme.typography.labelMedium,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
@@ -78,7 +76,7 @@ fun ActionRow(
                 badge != null -> CountBadge(value = badge)
                 trailing != null -> Text(
                     text = trailing,
-                    color = SolariaInkMuted,
+                    color = AppTheme.colors.onSurfaceMuted,
                     style = androidx.compose.material3.MaterialTheme.typography.bodyMedium,
                 )
             }

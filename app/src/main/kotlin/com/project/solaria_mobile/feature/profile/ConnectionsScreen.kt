@@ -36,12 +36,10 @@ import com.project.solaria_mobile.core.designsystem.components.AvatarPalette
 import com.project.solaria_mobile.core.designsystem.components.ScreenTitle
 import com.project.solaria_mobile.core.designsystem.components.SearchField
 import com.project.solaria_mobile.core.designsystem.components.SolariaAvatar
-import com.project.solaria_mobile.core.designsystem.theme.SolariaInk
-import com.project.solaria_mobile.core.designsystem.theme.SolariaInkMuted
+import com.project.solaria_mobile.core.designsystem.theme.AppTheme
 import com.project.solaria_mobile.core.designsystem.theme.Spacing
 import com.project.solaria_mobile.core.designsystem.theme.Sizing
 import com.project.solaria_mobile.core.designsystem.theme.Radius
-import com.project.solaria_mobile.core.designsystem.theme.SolariaWhite
 
 @Composable
 fun ConnectionsRoute(
@@ -63,7 +61,7 @@ fun ConnectionsScreen(
     var filterOpen by remember { mutableStateOf(false) }
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
-    Column(modifier = Modifier.fillMaxSize().background(SolariaWhite).padding(horizontal = Spacing.screen).padding(top = Spacing.lg)) {
+    Column(modifier = Modifier.fillMaxSize().background(AppTheme.colors.surface).padding(horizontal = Spacing.screen).padding(top = Spacing.lg)) {
         ScreenTitle("Conexões", onBack, trailingIcon = LucideR.drawable.lucide_ic_ellipsis, trailingLabel = "Opções", onTrailingClick = { filterOpen = true })
         Row(modifier = Modifier.padding(top = Spacing.md), horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
             SearchField("Busque um usuário", state.query, onQueryChange, modifier = Modifier.weight(1f), trailingIcon = LucideR.drawable.lucide_ic_sliders_horizontal, onTrailingClick = { filterOpen = true })
@@ -77,7 +75,7 @@ fun ConnectionsScreen(
 
     if (filterOpen) {
         ModalBottomSheet(
-            onDismissRequest = { filterOpen = false }, sheetState = sheetState, containerColor = SolariaWhite,
+            onDismissRequest = { filterOpen = false }, sheetState = sheetState, containerColor = AppTheme.colors.surface,
             shape = RoundedCornerShape(topStart = Radius.sheet, topEnd = Radius.sheet), dragHandle = null,
         ) {
             Column(modifier = Modifier.fillMaxWidth().padding(horizontal = Spacing.screen).padding(top = Spacing.xxl, bottom = Spacing.screenBottom), verticalArrangement = Arrangement.spacedBy(Spacing.md)) {
@@ -92,14 +90,14 @@ fun ConnectionsScreen(
 
 @Composable
 private fun ConnectionRow(connection: Connection, onClick: () -> Unit) {
-    Surface(modifier = Modifier.fillMaxWidth(), onClick = onClick, color = SolariaWhite) {
+    Surface(modifier = Modifier.fillMaxWidth(), onClick = onClick, color = AppTheme.colors.surface) {
         Row(modifier = Modifier.padding(vertical = Spacing.xs), horizontalArrangement = Arrangement.spacedBy(Spacing.sm), verticalAlignment = Alignment.CenterVertically) {
             SolariaAvatar(connection.initials, color = AvatarPalette(connection.name.length))
             Column(modifier = Modifier.weight(1f)) {
-                Text(connection.name, color = SolariaInk, style = androidx.compose.material3.MaterialTheme.typography.titleMedium)
-                Text(connection.handle, color = SolariaInkMuted, style = androidx.compose.material3.MaterialTheme.typography.bodyMedium)
+                Text(connection.name, color = AppTheme.colors.onSurface, style = androidx.compose.material3.MaterialTheme.typography.titleMedium)
+                Text(connection.handle, color = AppTheme.colors.onSurfaceMuted, style = androidx.compose.material3.MaterialTheme.typography.bodyMedium)
             }
-            Icon(painter = painterResource(LucideR.drawable.lucide_ic_ellipsis), contentDescription = "Opções de ${connection.name}", tint = SolariaInkMuted, modifier = Modifier.size(Sizing.icon))
+            Icon(painter = painterResource(LucideR.drawable.lucide_ic_ellipsis), contentDescription = "Opções de ${connection.name}", tint = AppTheme.colors.onSurfaceMuted, modifier = Modifier.size(Sizing.icon))
         }
     }
 }

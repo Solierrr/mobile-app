@@ -22,7 +22,7 @@ import com.project.solaria_mobile.core.designsystem.components.SearchField
 import com.project.solaria_mobile.core.designsystem.components.SectionHeading
 import com.project.solaria_mobile.core.designsystem.theme.Spacing
 import com.project.solaria_mobile.core.designsystem.theme.Radius
-import com.project.solaria_mobile.core.designsystem.theme.SolariaWhite
+import com.project.solaria_mobile.core.designsystem.theme.AppTheme
 
 @Composable
 fun CallsBottomSheet(
@@ -37,7 +37,7 @@ fun CallsBottomSheet(
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
-        containerColor = SolariaWhite,
+        containerColor = AppTheme.colors.surface,
         shape = RoundedCornerShape(topStart = Radius.sheet, topEnd = Radius.sheet),
         dragHandle = null,
     ) {

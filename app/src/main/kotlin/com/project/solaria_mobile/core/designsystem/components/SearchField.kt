@@ -21,10 +21,7 @@ import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import com.composables.icons.lucide.R as LucideR
-import com.project.solaria_mobile.core.designsystem.theme.SolariaGreen
-import com.project.solaria_mobile.core.designsystem.theme.SolariaInk
-import com.project.solaria_mobile.core.designsystem.theme.SolariaInkMuted
-import com.project.solaria_mobile.core.designsystem.theme.SolariaInput
+import com.project.solaria_mobile.core.designsystem.theme.AppTheme
 import com.project.solaria_mobile.core.designsystem.theme.Spacing
 import com.project.solaria_mobile.core.designsystem.theme.Sizing
 import com.project.solaria_mobile.core.designsystem.theme.Radius
@@ -41,7 +38,7 @@ fun SearchField(
     Surface(
         modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(Radius.pill),
-        color = SolariaInput,
+        color = AppTheme.colors.inputFill,
     ) {
         Row(
             modifier = Modifier.height(44.dp).padding(horizontal = Spacing.md),
@@ -51,7 +48,7 @@ fun SearchField(
             Icon(
                 painter = painterResource(LucideR.drawable.lucide_ic_search),
                 contentDescription = null,
-                tint = SolariaInkMuted,
+                tint = AppTheme.colors.onSurfaceMuted,
                 modifier = Modifier.size(Sizing.iconSmall),
             )
             BasicTextField(
@@ -59,14 +56,14 @@ fun SearchField(
                 onValueChange = onValueChange,
                 modifier = Modifier.weight(1f),
                 singleLine = true,
-                textStyle = androidx.compose.material3.MaterialTheme.typography.bodyMedium.copy(color = SolariaInk),
-                cursorBrush = SolidColor(SolariaGreen),
+                textStyle = androidx.compose.material3.MaterialTheme.typography.bodyMedium.copy(color = AppTheme.colors.onSurface),
+                cursorBrush = SolidColor(AppTheme.colors.primary),
                 decorationBox = { innerTextField ->
                     Box {
                         if (value.isEmpty()) {
                             Text(
                                 text = placeholder,
-                                color = SolariaInkMuted,
+                                color = AppTheme.colors.onSurfaceMuted,
                                 style = androidx.compose.material3.MaterialTheme.typography.bodyMedium,
                                 maxLines = 1,
                             )
@@ -80,7 +77,7 @@ fun SearchField(
                     Icon(
                         painter = painterResource(trailingIcon),
                         contentDescription = "Filtrar",
-                        tint = SolariaInkMuted,
+                        tint = AppTheme.colors.onSurfaceMuted,
                         modifier = Modifier.size(Sizing.iconSmall),
                     )
                 }

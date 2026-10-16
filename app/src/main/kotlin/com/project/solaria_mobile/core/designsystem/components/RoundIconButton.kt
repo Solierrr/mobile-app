@@ -17,10 +17,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import com.project.solaria_mobile.core.designsystem.theme.SolariaInk
-import com.project.solaria_mobile.core.designsystem.theme.SolariaPink
+import com.project.solaria_mobile.core.designsystem.theme.AppTheme
 import com.project.solaria_mobile.core.designsystem.theme.Sizing
-import com.project.solaria_mobile.core.designsystem.theme.SolariaWhite
 
 @Composable
 fun RoundIconButton(
@@ -29,8 +27,8 @@ fun RoundIconButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     size: Dp = Sizing.headerButton,
-    tint: Color = SolariaInk,
-    background: Color = SolariaWhite,
+    tint: Color = AppTheme.colors.onSurface,
+    background: Color = AppTheme.colors.surface,
     badge: String? = null,
 ) {
     Box(modifier = modifier.size(size)) {
@@ -54,13 +52,13 @@ fun RoundIconButton(
             Surface(
                 modifier = Modifier.align(Alignment.BottomEnd).defaultMinSize(minWidth = 18.dp, minHeight = 18.dp),
                 shape = CircleShape,
-                color = SolariaPink,
+                color = AppTheme.colors.danger,
             ) {
                 Box(contentAlignment = Alignment.Center) {
                     Text(
                         text = badge,
                         modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp),
-                        color = SolariaWhite,
+                        color = AppTheme.colors.onAccent,
                         style = androidx.compose.material3.MaterialTheme.typography.labelMedium,
                     )
                 }

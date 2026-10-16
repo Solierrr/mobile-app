@@ -44,11 +44,9 @@ import com.project.solaria_mobile.core.designsystem.components.RoundIconButton
 import com.project.solaria_mobile.core.designsystem.components.ScreenTitle
 import com.project.solaria_mobile.core.designsystem.components.SectionHeading
 import com.project.solaria_mobile.core.designsystem.components.SolariaAvatar
-import com.project.solaria_mobile.core.designsystem.theme.SolariaInk
-import com.project.solaria_mobile.core.designsystem.theme.SolariaInkMuted
+import com.project.solaria_mobile.core.designsystem.theme.AppTheme
 import com.project.solaria_mobile.core.designsystem.theme.Spacing
 import com.project.solaria_mobile.core.designsystem.theme.Radius
-import com.project.solaria_mobile.core.designsystem.theme.SolariaWhite
 import com.project.solaria_mobile.presentation.navigation.AppDestination
 import kotlinx.coroutines.launch
 
@@ -77,7 +75,7 @@ fun ProfileScreen(
     val scope = rememberCoroutineScope()
     val banner = if (self) R.drawable.profile_waterfall else R.drawable.profile_night_sky
 
-    Column(modifier = Modifier.fillMaxSize().background(SolariaWhite).verticalScroll(rememberScrollState())) {
+    Column(modifier = Modifier.fillMaxSize().background(AppTheme.colors.surface).verticalScroll(rememberScrollState())) {
         Box(modifier = Modifier.fillMaxWidth().height(280.dp)) {
             Image(painter = painterResource(banner), contentDescription = null, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
             Row(
@@ -93,14 +91,14 @@ fun ProfileScreen(
             }
         }
         Column(
-            modifier = Modifier.fillMaxWidth().offset(y = -Spacing.xxl).clip(RoundedCornerShape(topStart = Radius.sheet, topEnd = Radius.sheet)).background(SolariaWhite).padding(horizontal = Spacing.screen).padding(top = Spacing.xl, bottom = Spacing.screenBottom),
+            modifier = Modifier.fillMaxWidth().offset(y = -Spacing.xxl).clip(RoundedCornerShape(topStart = Radius.sheet, topEnd = Radius.sheet)).background(AppTheme.colors.surface).padding(horizontal = Spacing.screen).padding(top = Spacing.xl, bottom = Spacing.screenBottom),
             verticalArrangement = Arrangement.spacedBy(Spacing.md),
         ) {
             Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm), verticalAlignment = Alignment.CenterVertically) {
                 SolariaAvatar(profile.initials, size = 52.dp, color = AvatarPalette(if (self) 0 else 1), online = !self)
                 Column(modifier = Modifier.weight(1f)) {
-                    Text(profile.name, color = SolariaInk, style = androidx.compose.material3.MaterialTheme.typography.headlineMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    Text(profile.handle, color = SolariaInkMuted, style = androidx.compose.material3.MaterialTheme.typography.bodyMedium)
+                    Text(profile.name, color = AppTheme.colors.onSurface, style = androidx.compose.material3.MaterialTheme.typography.headlineMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text(profile.handle, color = AppTheme.colors.onSurfaceMuted, style = androidx.compose.material3.MaterialTheme.typography.bodyMedium)
                 }
             }
             Spacer(Modifier.height(Spacing.sm))
@@ -127,14 +125,14 @@ fun ProfileScreen(
         ModalBottomSheet(
             onDismissRequest = { infoOpen = false },
             sheetState = sheetState,
-            containerColor = SolariaWhite,
+            containerColor = AppTheme.colors.surface,
             shape = RoundedCornerShape(topStart = Radius.sheet, topEnd = Radius.sheet),
             dragHandle = null,
         ) {
             Column(modifier = Modifier.fillMaxWidth().padding(horizontal = Spacing.screen).padding(top = Spacing.xxl, bottom = Spacing.screenBottom), verticalArrangement = Arrangement.spacedBy(Spacing.md)) {
                 ScreenTitle("Informações", onBack = { scope.launch { sheetState.hide(); infoOpen = false } })
-                Text(profile.name, color = SolariaInk, style = androidx.compose.material3.MaterialTheme.typography.headlineMedium)
-                Text("Perfil público", color = SolariaInkMuted, style = androidx.compose.material3.MaterialTheme.typography.bodyMedium)
+                Text(profile.name, color = AppTheme.colors.onSurface, style = androidx.compose.material3.MaterialTheme.typography.headlineMedium)
+                Text("Perfil público", color = AppTheme.colors.onSurfaceMuted, style = androidx.compose.material3.MaterialTheme.typography.bodyMedium)
                 ProfileField("Estado", profile.state)
                 ProfileField("Profissão", profile.occupation)
                 ProfileField("Telefone", profile.phone)

@@ -22,9 +22,8 @@ import androidx.compose.ui.Modifier
 import com.composables.icons.lucide.R as LucideR
 import com.project.solaria_mobile.core.designsystem.components.ScreenTitle
 import com.project.solaria_mobile.core.designsystem.components.SectionHeading
-import com.project.solaria_mobile.core.designsystem.theme.SolariaInkMuted
+import com.project.solaria_mobile.core.designsystem.theme.AppTheme
 import com.project.solaria_mobile.core.designsystem.theme.Spacing
-import com.project.solaria_mobile.core.designsystem.theme.SolariaWhite
 
 @Composable
 fun NotificationsRoute(onBack: () -> Unit, viewModel: NotificationsViewModel = hiltViewModel()) {
@@ -34,7 +33,7 @@ fun NotificationsRoute(onBack: () -> Unit, viewModel: NotificationsViewModel = h
 
 @Composable
 fun NotificationsScreen(groups: List<Pair<String, List<ServiceCall>>>, onBack: () -> Unit) {
-    Column(modifier = Modifier.fillMaxSize().background(SolariaWhite).padding(horizontal = Spacing.screen).padding(top = Spacing.lg)) {
+    Column(modifier = Modifier.fillMaxSize().background(AppTheme.colors.surface).padding(horizontal = Spacing.screen).padding(top = Spacing.lg)) {
         ScreenTitle("Notificações", onBack, trailingIcon = LucideR.drawable.lucide_ic_bell_dot, trailingLabel = "Marcar tudo como lido", onTrailingClick = {})
         LazyColumn(modifier = Modifier.padding(top = Spacing.md), verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
             groups.forEach { (title, notifications) ->
@@ -42,7 +41,7 @@ fun NotificationsScreen(groups: List<Pair<String, List<ServiceCall>>>, onBack: (
                 items(notifications) { call -> CallCard(call, onClick = {}) }
             }
             item {
-                Text("Você está em dia com suas notificações.", modifier = Modifier.fillMaxWidth().padding(Spacing.xl), color = SolariaInkMuted, style = androidx.compose.material3.MaterialTheme.typography.bodyMedium)
+                Text("Você está em dia com suas notificações.", modifier = Modifier.fillMaxWidth().padding(Spacing.xl), color = AppTheme.colors.onSurfaceMuted, style = androidx.compose.material3.MaterialTheme.typography.bodyMedium)
             }
         }
     }

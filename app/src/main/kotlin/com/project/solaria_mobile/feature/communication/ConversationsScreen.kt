@@ -31,14 +31,8 @@ import com.project.solaria_mobile.core.designsystem.components.ScreenTitle
 import com.project.solaria_mobile.core.designsystem.components.SearchField
 import com.project.solaria_mobile.core.designsystem.components.SectionHeading
 import com.project.solaria_mobile.core.designsystem.components.SolariaAvatar
-import com.project.solaria_mobile.core.designsystem.theme.SolariaInk
-import com.project.solaria_mobile.core.designsystem.theme.SolariaInkMuted
-import com.project.solaria_mobile.core.designsystem.theme.SolariaOrange
-import com.project.solaria_mobile.core.designsystem.theme.SolariaBlue
-import com.project.solaria_mobile.core.designsystem.theme.SolariaGreen
-import com.project.solaria_mobile.core.designsystem.theme.SolariaPink
+import com.project.solaria_mobile.core.designsystem.theme.AppTheme
 import com.project.solaria_mobile.core.designsystem.theme.Spacing
-import com.project.solaria_mobile.core.designsystem.theme.SolariaWhite
 
 @Composable
 fun ConversationsRoute(
@@ -60,7 +54,7 @@ fun ConversationsScreen(
     onOpenProject: () -> Unit,
 ) {
     Column(
-        modifier = Modifier.fillMaxSize().background(SolariaWhite).padding(horizontal = Spacing.screen).padding(top = Spacing.lg),
+        modifier = Modifier.fillMaxSize().background(AppTheme.colors.surface).padding(horizontal = Spacing.screen).padding(top = Spacing.lg),
         verticalArrangement = Arrangement.spacedBy(Spacing.md),
     ) {
         ScreenTitle("Conversas", onBack, trailingIcon = LucideR.drawable.lucide_ic_at_sign, trailingLabel = "Iniciar conversa", onTrailingClick = onOpenChat)
@@ -79,23 +73,23 @@ fun ConversationsScreen(
 
 @Composable
 private fun ConversationRow(item: Conversation, onClick: () -> Unit) {
-    Surface(modifier = Modifier.fillMaxWidth(), onClick = onClick, color = SolariaWhite) {
+    Surface(modifier = Modifier.fillMaxWidth(), onClick = onClick, color = AppTheme.colors.surface) {
         Row(
             modifier = Modifier.padding(vertical = Spacing.xs),
             horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             SolariaAvatar(item.initials, color = when (item.tone) {
-                AvatarTone.ORANGE -> SolariaOrange
-                AvatarTone.BLUE -> SolariaBlue
-                AvatarTone.GREEN -> SolariaGreen
-                AvatarTone.PINK -> SolariaPink
+                AvatarTone.ORANGE -> AppTheme.colors.secondary
+                AvatarTone.BLUE -> AppTheme.colors.info
+                AvatarTone.GREEN -> AppTheme.colors.primary
+                AvatarTone.PINK -> AppTheme.colors.danger
             })
             Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                Text(item.name, color = SolariaInk, style = androidx.compose.material3.MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                Text(item.preview, color = SolariaInkMuted, style = androidx.compose.material3.MaterialTheme.typography.labelMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(item.name, color = AppTheme.colors.onSurface, style = androidx.compose.material3.MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(item.preview, color = AppTheme.colors.onSurfaceMuted, style = androidx.compose.material3.MaterialTheme.typography.labelMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
-            Text(item.time, color = SolariaInkMuted, style = androidx.compose.material3.MaterialTheme.typography.labelMedium)
+            Text(item.time, color = AppTheme.colors.onSurfaceMuted, style = androidx.compose.material3.MaterialTheme.typography.labelMedium)
         }
     }
 }

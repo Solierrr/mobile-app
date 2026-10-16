@@ -24,11 +24,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.composables.icons.lucide.R as LucideR
-import com.project.solaria_mobile.core.designsystem.theme.SolariaGreen
-import com.project.solaria_mobile.core.designsystem.theme.SolariaInk
-import com.project.solaria_mobile.core.designsystem.theme.SolariaInkMuted
-import com.project.solaria_mobile.core.designsystem.theme.SolariaInput
-import com.project.solaria_mobile.core.designsystem.theme.SolariaPink
+import com.project.solaria_mobile.core.designsystem.theme.AppTheme
 import com.project.solaria_mobile.core.designsystem.theme.Spacing
 import com.project.solaria_mobile.core.designsystem.theme.Sizing
 import com.project.solaria_mobile.core.designsystem.theme.Radius
@@ -39,7 +35,7 @@ internal fun CallCard(call: ServiceCall, onClick: () -> Unit) {
         modifier = Modifier.fillMaxWidth(),
         onClick = onClick,
         shape = RoundedCornerShape(Radius.medium),
-        color = SolariaInput,
+        color = AppTheme.colors.inputFill,
     ) {
         Row(
             modifier = Modifier.padding(Spacing.md),
@@ -51,13 +47,13 @@ internal fun CallCard(call: ServiceCall, onClick: () -> Unit) {
                 ServiceCallIcon.PHONE -> LucideR.drawable.lucide_ic_phone
                 ServiceCallIcon.SHIELD_ALERT -> LucideR.drawable.lucide_ic_shield_alert
             }
-            Icon(painter = painterResource(icon), contentDescription = null, tint = SolariaInk, modifier = Modifier.size(Sizing.icon))
+            Icon(painter = painterResource(icon), contentDescription = null, tint = AppTheme.colors.onSurface, modifier = Modifier.size(Sizing.icon))
             Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                Text(call.title, color = SolariaInk, style = androidx.compose.material3.MaterialTheme.typography.bodyMedium)
-                Text(call.detail, color = SolariaInkMuted, style = androidx.compose.material3.MaterialTheme.typography.labelMedium, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                Text(call.title, color = AppTheme.colors.onSurface, style = androidx.compose.material3.MaterialTheme.typography.bodyMedium)
+                Text(call.detail, color = AppTheme.colors.onSurfaceMuted, style = androidx.compose.material3.MaterialTheme.typography.labelMedium, maxLines = 2, overflow = TextOverflow.Ellipsis)
             }
             if (call.badge != null) {
-                Text(call.badge, color = if (call.badge == "!!") SolariaPink else SolariaGreen, style = androidx.compose.material3.MaterialTheme.typography.labelMedium)
+                Text(call.badge, color = if (call.badge == "!!") AppTheme.colors.danger else AppTheme.colors.primary, style = androidx.compose.material3.MaterialTheme.typography.labelMedium)
             }
         }
     }

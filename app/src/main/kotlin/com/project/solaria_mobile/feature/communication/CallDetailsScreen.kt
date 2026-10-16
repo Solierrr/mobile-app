@@ -23,18 +23,15 @@ import com.project.solaria_mobile.core.designsystem.components.ActionRow
 import com.project.solaria_mobile.core.designsystem.components.MapBackdrop
 import com.project.solaria_mobile.core.designsystem.components.RoundIconButton
 import com.project.solaria_mobile.core.designsystem.components.SectionHeading
-import com.project.solaria_mobile.core.designsystem.theme.SolariaInk
-import com.project.solaria_mobile.core.designsystem.theme.SolariaInkMuted
-import com.project.solaria_mobile.core.designsystem.theme.SolariaMapPlaceholder
+import com.project.solaria_mobile.core.designsystem.theme.AppTheme
 import com.project.solaria_mobile.core.designsystem.theme.Spacing
-import com.project.solaria_mobile.core.designsystem.theme.SolariaWhite
 
 @Composable
 fun CallDetailsScreen(onBack: () -> Unit) {
     Column(
-        modifier = Modifier.fillMaxSize().background(SolariaWhite).verticalScroll(rememberScrollState()),
+        modifier = Modifier.fillMaxSize().background(AppTheme.colors.surface).verticalScroll(rememberScrollState()),
     ) {
-        Box(modifier = Modifier.fillMaxWidth().height(340.dp).background(SolariaMapPlaceholder)) {
+        Box(modifier = Modifier.fillMaxWidth().height(340.dp).background(AppTheme.colors.mapPlaceholder)) {
             MapBackdrop(modifier = Modifier.fillMaxSize())
             RoundIconButton(
                 icon = LucideR.drawable.lucide_ic_chevron_left,
@@ -47,8 +44,8 @@ fun CallDetailsScreen(onBack: () -> Unit) {
             modifier = Modifier.fillMaxWidth().padding(horizontal = Spacing.screen).padding(top = Spacing.lg, bottom = Spacing.screenBottom),
             verticalArrangement = Arrangement.spacedBy(Spacing.md),
         ) {
-            Text("Há 22 km da localização atual", color = SolariaInkMuted, style = androidx.compose.material3.MaterialTheme.typography.bodyMedium)
-            Text("Google América Latina", color = SolariaInk, style = androidx.compose.material3.MaterialTheme.typography.headlineMedium)
+            Text("Há 22 km da localização atual", color = AppTheme.colors.onSurfaceMuted, style = androidx.compose.material3.MaterialTheme.typography.bodyMedium)
+            Text("Google América Latina", color = AppTheme.colors.onSurface, style = androidx.compose.material3.MaterialTheme.typography.headlineMedium)
             Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
                 ActionRow("Google Maps", LucideR.drawable.lucide_ic_map_pin, {}, compact = true, modifier = Modifier.weight(1f))
                 ActionRow("Copiar", LucideR.drawable.lucide_ic_copy, {}, compact = true, modifier = Modifier.weight(1f))

@@ -19,31 +19,30 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import com.composables.icons.lucide.R as LucideR
-import com.project.solaria_mobile.core.designsystem.theme.SolariaOrange
+import com.project.solaria_mobile.core.designsystem.theme.AppTheme
 import com.project.solaria_mobile.core.designsystem.theme.Spacing
 import com.project.solaria_mobile.core.designsystem.theme.Radius
-import com.project.solaria_mobile.core.designsystem.theme.SolariaWhite
 
 @Composable
 fun SplashScreen() {
-    Box(modifier = Modifier.fillMaxSize().background(SolariaWhite), contentAlignment = Alignment.Center) {
+    Box(modifier = Modifier.fillMaxSize().background(AppTheme.colors.surface), contentAlignment = Alignment.Center) {
         Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(Spacing.xl)) {
             Box(
-                modifier = Modifier.size(148.dp).clip(RoundedCornerShape(38.dp)).background(SolariaOrange),
+                modifier = Modifier.size(148.dp).clip(RoundedCornerShape(38.dp)).background(AppTheme.colors.secondary),
                 contentAlignment = Alignment.Center,
             ) {
                 Icon(
                     painter = painterResource(LucideR.drawable.lucide_ic_handshake),
                     contentDescription = "Solaria",
-                    tint = SolariaWhite,
+                    tint = AppTheme.colors.onAccent,
                     modifier = Modifier.size(82.dp),
                 )
             }
             LinearProgressIndicator(
                 progress = { 0.36f },
                 modifier = Modifier.fillMaxWidth(0.58f).height(6.dp).clip(RoundedCornerShape(Radius.pill)),
-                color = SolariaOrange,
-                trackColor = SolariaOrange.copy(alpha = 0.08f),
+                color = AppTheme.colors.secondary,
+                trackColor = AppTheme.colors.secondary.copy(alpha = 0.08f),
             )
             Spacer(Modifier.height(80.dp))
         }

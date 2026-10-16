@@ -33,11 +33,9 @@ import com.composables.icons.lucide.R as LucideR
 import com.project.solaria_mobile.core.designsystem.components.ActionRow
 import com.project.solaria_mobile.core.designsystem.components.ScreenTitle
 import com.project.solaria_mobile.core.designsystem.components.SectionHeading
-import com.project.solaria_mobile.core.designsystem.theme.SolariaInk
-import com.project.solaria_mobile.core.designsystem.theme.SolariaInkMuted
+import com.project.solaria_mobile.core.designsystem.theme.AppTheme
 import com.project.solaria_mobile.core.designsystem.theme.Spacing
 import com.project.solaria_mobile.core.designsystem.theme.Radius
-import com.project.solaria_mobile.core.designsystem.theme.SolariaWhite
 
 @Composable
 fun ProjectListRoute(
@@ -60,7 +58,7 @@ fun ProjectListScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(SolariaWhite)
+            .background(AppTheme.colors.surface)
             .verticalScroll(rememberScrollState())
             .padding(horizontal = Spacing.screen)
             .padding(top = Spacing.lg, bottom = Spacing.screenBottom),
@@ -81,7 +79,7 @@ private fun ProjectListCard(project: ProjectSummary, index: Int, onClick: () -> 
         modifier = Modifier.fillMaxWidth(),
         onClick = onClick,
         shape = RoundedCornerShape(Radius.large),
-        color = SolariaWhite,
+        color = AppTheme.colors.surface,
         shadowElevation = 3.dp,
     ) {
         Column {
@@ -95,12 +93,12 @@ private fun ProjectListCard(project: ProjectSummary, index: Int, onClick: () -> 
                 modifier = Modifier.padding(Spacing.md),
                 verticalArrangement = Arrangement.spacedBy(Spacing.xs),
             ) {
-                Text(project.place, color = SolariaInkMuted, style = androidx.compose.material3.MaterialTheme.typography.labelLarge)
-                Text(project.name, color = SolariaInk, style = androidx.compose.material3.MaterialTheme.typography.titleLarge)
+                Text(project.place, color = AppTheme.colors.onSurfaceMuted, style = androidx.compose.material3.MaterialTheme.typography.labelLarge)
+                Text(project.name, color = AppTheme.colors.onSurface, style = androidx.compose.material3.MaterialTheme.typography.titleLarge)
                 Row(horizontalArrangement = Arrangement.spacedBy(Spacing.xs), verticalAlignment = Alignment.CenterVertically) {
-                    Text(project.status, color = com.project.solaria_mobile.core.designsystem.theme.SolariaGreen, style = androidx.compose.material3.MaterialTheme.typography.labelMedium)
-                    Text("·", color = SolariaInkMuted)
-                    Text(project.people, color = SolariaInkMuted, style = androidx.compose.material3.MaterialTheme.typography.labelMedium)
+                    Text(project.status, color = com.project.solaria_mobile.core.designsystem.theme.AppTheme.colors.primary, style = androidx.compose.material3.MaterialTheme.typography.labelMedium)
+                    Text("·", color = AppTheme.colors.onSurfaceMuted)
+                    Text(project.people, color = AppTheme.colors.onSurfaceMuted, style = androidx.compose.material3.MaterialTheme.typography.labelMedium)
                 }
             }
         }

@@ -37,11 +37,9 @@ import com.project.solaria_mobile.core.designsystem.components.ActionRow
 import com.project.solaria_mobile.core.designsystem.components.RoundIconButton
 import com.project.solaria_mobile.core.designsystem.components.ScreenTitle
 import com.project.solaria_mobile.core.designsystem.components.SectionHeading
-import com.project.solaria_mobile.core.designsystem.theme.SolariaInk
-import com.project.solaria_mobile.core.designsystem.theme.SolariaInkMuted
+import com.project.solaria_mobile.core.designsystem.theme.AppTheme
 import com.project.solaria_mobile.core.designsystem.theme.Spacing
 import com.project.solaria_mobile.core.designsystem.theme.Radius
-import com.project.solaria_mobile.core.designsystem.theme.SolariaWhite
 import kotlinx.coroutines.launch
 
 @Composable
@@ -50,7 +48,7 @@ fun EnterpriseScreen(onBack: () -> Unit) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val scope = rememberCoroutineScope()
 
-    Column(modifier = Modifier.fillMaxSize().background(SolariaWhite).verticalScroll(rememberScrollState())) {
+    Column(modifier = Modifier.fillMaxSize().background(AppTheme.colors.surface).verticalScroll(rememberScrollState())) {
         Box(modifier = Modifier.fillMaxWidth().height(255.dp)) {
             Image(painter = painterResource(R.drawable.project_building), contentDescription = "Google", modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
             Row(
@@ -66,10 +64,10 @@ fun EnterpriseScreen(onBack: () -> Unit) {
             verticalArrangement = Arrangement.spacedBy(Spacing.md),
         ) {
             Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm), verticalAlignment = Alignment.CenterVertically) {
-                Surface(modifier = Modifier.size(44.dp), shape = RoundedCornerShape(Radius.medium), color = SolariaWhite, shadowElevation = 2.dp) {
+                Surface(modifier = Modifier.size(44.dp), shape = RoundedCornerShape(Radius.medium), color = AppTheme.colors.surface, shadowElevation = 2.dp) {
                     Image(painter = painterResource(R.drawable.company_logo_1), contentDescription = null, contentScale = ContentScale.Crop)
                 }
-                Text("Google", color = SolariaInk, style = androidx.compose.material3.MaterialTheme.typography.headlineMedium)
+                Text("Google", color = AppTheme.colors.onSurface, style = androidx.compose.material3.MaterialTheme.typography.headlineMedium)
             }
             ProfileField("Unidade principal", "São Paulo")
             ProfileField("Tipo de empresa", "BigTech")
@@ -84,14 +82,14 @@ fun EnterpriseScreen(onBack: () -> Unit) {
         ModalBottomSheet(
             onDismissRequest = { infoOpen = false },
             sheetState = sheetState,
-            containerColor = SolariaWhite,
+            containerColor = AppTheme.colors.surface,
             shape = RoundedCornerShape(topStart = Radius.sheet, topEnd = Radius.sheet),
             dragHandle = null,
         ) {
             Column(modifier = Modifier.fillMaxWidth().padding(horizontal = Spacing.screen).padding(top = Spacing.xxl, bottom = Spacing.screenBottom), verticalArrangement = Arrangement.spacedBy(Spacing.md)) {
                 ScreenTitle("Informações", onBack = { scope.launch { sheetState.hide(); infoOpen = false } })
-                Text("Google", color = SolariaInk, style = androidx.compose.material3.MaterialTheme.typography.headlineMedium)
-                Text("Perfil público da empresa", color = SolariaInkMuted, style = androidx.compose.material3.MaterialTheme.typography.bodyMedium)
+                Text("Google", color = AppTheme.colors.onSurface, style = androidx.compose.material3.MaterialTheme.typography.headlineMedium)
+                Text("Perfil público da empresa", color = AppTheme.colors.onSurfaceMuted, style = androidx.compose.material3.MaterialTheme.typography.bodyMedium)
                 ProfileField("Unidade principal", "São Paulo")
                 ProfileField("Tipo de empresa", "BigTech")
                 ProfileField("Telefone", "55+ (11) 91022–3438")

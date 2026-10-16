@@ -36,11 +36,9 @@ import com.composables.icons.lucide.R as LucideR
 import com.project.solaria_mobile.core.designsystem.components.ActionRow
 import com.project.solaria_mobile.core.designsystem.components.RoundIconButton
 import com.project.solaria_mobile.core.designsystem.components.ScreenTitle
-import com.project.solaria_mobile.core.designsystem.theme.SolariaInk
-import com.project.solaria_mobile.core.designsystem.theme.SolariaInkMuted
+import com.project.solaria_mobile.core.designsystem.theme.AppTheme
 import com.project.solaria_mobile.core.designsystem.theme.Spacing
 import com.project.solaria_mobile.core.designsystem.theme.Radius
-import com.project.solaria_mobile.core.designsystem.theme.SolariaWhite
 import com.project.solaria_mobile.presentation.navigation.AppDestination
 import kotlinx.coroutines.launch
 
@@ -57,7 +55,7 @@ fun ProjectDetailScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(SolariaWhite)
+            .background(AppTheme.colors.surface)
             .verticalScroll(rememberScrollState()),
     ) {
         Box(modifier = Modifier.fillMaxWidth().height(345.dp)) {
@@ -83,13 +81,13 @@ fun ProjectDetailScreen(
                 .fillMaxWidth()
                 .offset(y = -Spacing.xxl)
                 .clip(RoundedCornerShape(topStart = Radius.sheet, topEnd = Radius.sheet))
-                .background(SolariaWhite)
+                .background(AppTheme.colors.surface)
                 .padding(horizontal = Spacing.screen)
                 .padding(top = Spacing.xxl, bottom = Spacing.screenBottom),
             verticalArrangement = Arrangement.spacedBy(Spacing.sm),
         ) {
-            Text("São Paulo", color = SolariaInkMuted, style = androidx.compose.material3.MaterialTheme.typography.bodyMedium)
-            Text("Fortech Enterprise", color = SolariaInk, style = androidx.compose.material3.MaterialTheme.typography.headlineMedium)
+            Text("São Paulo", color = AppTheme.colors.onSurfaceMuted, style = androidx.compose.material3.MaterialTheme.typography.bodyMedium)
+            Text("Fortech Enterprise", color = AppTheme.colors.onSurface, style = androidx.compose.material3.MaterialTheme.typography.headlineMedium)
             Spacer(Modifier.height(Spacing.xs))
             ActionRow("Informações do local", LucideR.drawable.lucide_ic_map_pin, { activeSheet = ProjectSheet.LOCATION })
             ActionRow("Imagens do local", LucideR.drawable.lucide_ic_images, { activeSheet = ProjectSheet.GALLERY })
@@ -107,7 +105,7 @@ fun ProjectDetailScreen(
         ModalBottomSheet(
             onDismissRequest = { activeSheet = null },
             sheetState = sheetState,
-            containerColor = SolariaWhite,
+            containerColor = AppTheme.colors.surface,
             shape = RoundedCornerShape(topStart = Radius.sheet, topEnd = Radius.sheet),
             dragHandle = null,
         ) {
@@ -123,7 +121,7 @@ fun ProjectDetailScreen(
         ModalBottomSheet(
             onDismissRequest = { menuOpen = false },
             sheetState = sheetState,
-            containerColor = SolariaWhite,
+            containerColor = AppTheme.colors.surface,
             shape = RoundedCornerShape(topStart = Radius.sheet, topEnd = Radius.sheet),
             dragHandle = null,
         ) {

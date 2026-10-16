@@ -45,13 +45,10 @@ import com.project.solaria_mobile.core.designsystem.components.RoundIconButton
 import com.project.solaria_mobile.core.designsystem.components.ScreenTitle
 import com.project.solaria_mobile.core.designsystem.components.SectionHeading
 import com.project.solaria_mobile.core.designsystem.components.SolariaAvatar
-import com.project.solaria_mobile.core.designsystem.theme.SolariaInk
-import com.project.solaria_mobile.core.designsystem.theme.SolariaHeaderGray
-import com.project.solaria_mobile.core.designsystem.theme.SolariaOrange
+import com.project.solaria_mobile.core.designsystem.theme.AppTheme
 import com.project.solaria_mobile.core.designsystem.theme.Spacing
 import com.project.solaria_mobile.core.designsystem.theme.Sizing
 import com.project.solaria_mobile.core.designsystem.theme.Radius
-import com.project.solaria_mobile.core.designsystem.theme.SolariaWhite
 import com.project.solaria_mobile.feature.communication.CallsBottomSheet
 import com.project.solaria_mobile.presentation.navigation.AppDestination
 import com.project.solaria_mobile.feature.home.data.CompanyLogoId
@@ -82,13 +79,13 @@ fun HomeScreen(
     Column(
         modifier = modifier
             .fillMaxSize()
-            .background(SolariaWhite)
+            .background(AppTheme.colors.surface)
             .verticalScroll(rememberScrollState()),
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .background(SolariaHeaderGray)
+                .background(AppTheme.colors.headerFill)
                 .padding(horizontal = Spacing.screen)
                 .padding(top = Spacing.screenTop, bottom = Spacing.xl),
             verticalArrangement = Arrangement.spacedBy(Spacing.md),
@@ -102,7 +99,7 @@ fun HomeScreen(
                     initials = "S",
                     modifier = Modifier.size(Sizing.compactHeaderControl).clickable { onOpenPage(AppDestination.ProfileSelf) },
                     size = Sizing.compactHeaderControl,
-                    color = SolariaOrange,
+                    color = AppTheme.colors.secondary,
                 )
                 Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
                     RoundIconButton(
@@ -132,7 +129,7 @@ fun HomeScreen(
                             modifier = Modifier.size(Sizing.companyLogo),
                             onClick = { onOpenPage(AppDestination.Enterprise) },
                             shape = RoundedCornerShape(Radius.companyLogo),
-                            color = SolariaWhite,
+                            color = AppTheme.colors.surface,
                             shadowElevation = 2.dp,
                         ) {
                             Image(
@@ -194,7 +191,7 @@ fun HomeScreen(
         ModalBottomSheet(
             onDismissRequest = { menuOpen = false },
             sheetState = sheetState,
-            containerColor = SolariaWhite,
+            containerColor = AppTheme.colors.surface,
             shape = RoundedCornerShape(topStart = Radius.sheet, topEnd = Radius.sheet),
             dragHandle = null,
         ) {
@@ -237,7 +234,7 @@ private fun RecentProjectCard(name: String, onClick: () -> Unit) {
         modifier = Modifier.width(Sizing.projectCardWidth).height(Sizing.projectCardHeight),
         onClick = onClick,
         shape = RoundedCornerShape(Radius.large),
-        color = SolariaWhite,
+        color = AppTheme.colors.surface,
         shadowElevation = 2.dp,
     ) {
         Box {
@@ -252,13 +249,13 @@ private fun RecentProjectCard(name: String, onClick: () -> Unit) {
                     .align(Alignment.BottomStart)
                     .padding(horizontal = Spacing.xs, vertical = Spacing.sm),
                 shape = RoundedCornerShape(Radius.pill),
-                color = SolariaWhite,
+                color = AppTheme.colors.surface,
                 shadowElevation = 2.dp,
             ) {
                 Text(
                     text = name,
                     modifier = Modifier.padding(horizontal = Spacing.sm, vertical = Spacing.xs),
-                    color = SolariaInk,
+                    color = AppTheme.colors.onSurface,
                     style = androidx.compose.material3.MaterialTheme.typography.labelLarge,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,

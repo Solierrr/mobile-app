@@ -8,8 +8,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import com.project.solaria_mobile.core.designsystem.theme.SolariaGreen
-import com.project.solaria_mobile.core.designsystem.theme.SolariaInkMuted
+import com.project.solaria_mobile.core.designsystem.theme.AppTheme
 
 @Composable
 fun SectionHeading(
@@ -26,13 +25,13 @@ fun SectionHeading(
     ) {
         Text(
             text = text,
-            color = if (faded) SolariaInkMuted.copy(alpha = 0.62f) else SolariaInkMuted,
+            color = if (faded) AppTheme.colors.onSurfaceMuted.copy(alpha = 0.62f) else AppTheme.colors.onSurfaceMuted,
             style = androidx.compose.material3.MaterialTheme.typography.titleMedium,
         )
         if (action != null && onAction != null) {
             Text(
                 text = action,
-                color = SolariaGreen,
+                color = AppTheme.colors.primary,
                 style = androidx.compose.material3.MaterialTheme.typography.labelLarge,
                 modifier = Modifier.clickable(onClick = onAction),
             )

@@ -13,19 +13,15 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import com.project.solaria_mobile.core.designsystem.theme.SolariaGreen
-import com.project.solaria_mobile.core.designsystem.theme.SolariaBlue
-import com.project.solaria_mobile.core.designsystem.theme.SolariaPink
-import com.project.solaria_mobile.core.designsystem.theme.SolariaOrange
+import com.project.solaria_mobile.core.designsystem.theme.AppTheme
 import com.project.solaria_mobile.core.designsystem.theme.Sizing
-import com.project.solaria_mobile.core.designsystem.theme.SolariaWhite
 
 @Composable
 fun SolariaAvatar(
     initials: String,
     modifier: Modifier = Modifier,
     size: Dp = Sizing.avatar,
-    color: Color = SolariaOrange,
+    color: Color = AppTheme.colors.secondary,
     online: Boolean = false,
 ) {
     Box(modifier = modifier.size(size)) {
@@ -38,7 +34,7 @@ fun SolariaAvatar(
         ) {
             Text(
                 text = initials,
-                color = SolariaWhite,
+                color = AppTheme.colors.onAccent,
                 style = androidx.compose.material3.MaterialTheme.typography.titleMedium,
             )
         }
@@ -48,18 +44,19 @@ fun SolariaAvatar(
                     .align(Alignment.BottomEnd)
                     .size(size * 0.3f)
                     .clip(CircleShape)
-                    .background(SolariaWhite)
+                    .background(AppTheme.colors.surface)
                     .padding(2.dp)
                     .clip(CircleShape)
-                    .background(SolariaGreen),
+                    .background(AppTheme.colors.primary),
             )
         }
     }
 }
 
+@Composable
 fun AvatarPalette(index: Int): Color = when (index % 4) {
-    0 -> SolariaOrange
-    1 -> SolariaBlue
-    2 -> SolariaGreen
-    else -> SolariaPink
+    0 -> AppTheme.colors.secondary
+    1 -> AppTheme.colors.info
+    2 -> AppTheme.colors.primary
+    else -> AppTheme.colors.danger
 }

@@ -2,7 +2,7 @@ package com.project.solaria_mobile.feature.home
 
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.tooling.preview.Preview
-import com.project.solaria_mobile.core.designsystem.theme.SolariamobileTheme
+import com.project.solaria_mobile.core.designsystem.theme.AppTheme
 import com.project.solaria_mobile.feature.home.data.CompanyLogo
 import com.project.solaria_mobile.feature.home.data.CompanyLogoId
 import com.project.solaria_mobile.feature.project.data.ProjectSummary
@@ -15,7 +15,7 @@ private val previewState = HomeUiState(
 @Preview(showBackground = true)
 @Composable
 private fun HomeScreenPreview() {
-    SolariamobileTheme {
+    AppTheme {
         HomeScreen(state = previewState, onCallsQueryChange = {}, onOpenPage = {})
     }
 }

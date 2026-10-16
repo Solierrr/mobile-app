@@ -37,13 +37,10 @@ import com.project.solaria_mobile.core.designsystem.components.ActionRow
 import com.project.solaria_mobile.core.designsystem.components.RoundIconButton
 import com.project.solaria_mobile.core.designsystem.components.ScreenTitle
 import com.project.solaria_mobile.core.designsystem.components.SectionHeading
-import com.project.solaria_mobile.core.designsystem.theme.SolariaInk
-import com.project.solaria_mobile.core.designsystem.theme.SolariaInkMuted
-import com.project.solaria_mobile.core.designsystem.theme.SolariaOrange
+import com.project.solaria_mobile.core.designsystem.theme.AppTheme
 import com.project.solaria_mobile.core.designsystem.theme.Spacing
 import com.project.solaria_mobile.core.designsystem.theme.Sizing
 import com.project.solaria_mobile.core.designsystem.theme.Radius
-import com.project.solaria_mobile.core.designsystem.theme.SolariaWhite
 
 @Composable
 fun ScheduleRoute(
@@ -66,7 +63,7 @@ fun ScheduleScreen(
     onToday: () -> Unit,
 ) {
     Column(
-        modifier = Modifier.fillMaxSize().background(SolariaWhite).verticalScroll(rememberScrollState()).padding(horizontal = Spacing.screen).padding(top = Spacing.lg, bottom = Spacing.screenBottom),
+        modifier = Modifier.fillMaxSize().background(AppTheme.colors.surface).verticalScroll(rememberScrollState()).padding(horizontal = Spacing.screen).padding(top = Spacing.lg, bottom = Spacing.screenBottom),
         verticalArrangement = Arrangement.spacedBy(Spacing.lg),
     ) {
         ScreenTitle("Agenda", onBack, trailingIcon = LucideR.drawable.lucide_ic_ellipsis, trailingLabel = "Mais opções", onTrailingClick = onOpenSettings)
@@ -82,7 +79,7 @@ fun ScheduleScreen(
         if (state.selectedEvents.isEmpty()) {
             Text(
                 text = "Nenhum evento para esta data",
-                color = SolariaInkMuted,
+                color = AppTheme.colors.onSurfaceMuted,
                 style = androidx.compose.material3.MaterialTheme.typography.bodyMedium,
             )
         } else {
@@ -109,7 +106,7 @@ private fun CalendarCard(
     Surface(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(Radius.large),
-        color = SolariaWhite,
+        color = AppTheme.colors.surface,
         shadowElevation = 2.dp,
     ) {
         Column(
@@ -118,12 +115,12 @@ private fun CalendarCard(
         ) {
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                 RoundIconButton(LucideR.drawable.lucide_ic_chevron_left, "Mês anterior", onPrevious, size = Sizing.compactMapControl)
-                Text(month, color = SolariaInk, style = androidx.compose.material3.MaterialTheme.typography.headlineMedium)
+                Text(month, color = AppTheme.colors.onSurface, style = androidx.compose.material3.MaterialTheme.typography.headlineMedium)
                 RoundIconButton(LucideR.drawable.lucide_ic_chevron_right, "Próximo mês", onNext, size = Sizing.compactMapControl)
             }
             Row(modifier = Modifier.fillMaxWidth()) {
                 listOf("Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb").forEach { day ->
-                    Text(day, modifier = Modifier.weight(1f), color = if (day == "Sáb") SolariaOrange else SolariaInkMuted, style = androidx.compose.material3.MaterialTheme.typography.labelLarge, textAlign = TextAlign.Center)
+                    Text(day, modifier = Modifier.weight(1f), color = if (day == "Sáb") AppTheme.colors.secondary else AppTheme.colors.onSurfaceMuted, style = androidx.compose.material3.MaterialTheme.typography.labelLarge, textAlign = TextAlign.Center)
                 }
             }
             days.chunked(7).forEach { week ->
@@ -137,11 +134,11 @@ private fun CalendarCard(
                             contentAlignment = Alignment.Center,
                         ) {
                             if (day.inCurrentMonth && day.number == selectedDay) {
-                                Box(modifier = Modifier.size(38.dp).clip(RoundedCornerShape(8.dp)).background(SolariaOrange), contentAlignment = Alignment.Center) {
-                                    Text(day.number.toString(), color = SolariaWhite, style = androidx.compose.material3.MaterialTheme.typography.titleMedium)
+                                Box(modifier = Modifier.size(38.dp).clip(RoundedCornerShape(8.dp)).background(AppTheme.colors.secondary), contentAlignment = Alignment.Center) {
+                                    Text(day.number.toString(), color = AppTheme.colors.onAccent, style = androidx.compose.material3.MaterialTheme.typography.titleMedium)
                                 }
                             } else {
-                                Text(day.number.toString(), color = if (day.inCurrentMonth) SolariaInk else SolariaInkMuted.copy(alpha = 0.55f), style = androidx.compose.material3.MaterialTheme.typography.bodyLarge)
+                                Text(day.number.toString(), color = if (day.inCurrentMonth) AppTheme.colors.onSurface else AppTheme.colors.onSurfaceMuted.copy(alpha = 0.55f), style = androidx.compose.material3.MaterialTheme.typography.bodyLarge)
                             }
                         }
                     }
@@ -154,11 +151,11 @@ private fun CalendarCard(
 @Composable
 private fun ScheduleEventRow(event: ScheduleEvent) {
     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(Spacing.md), verticalAlignment = Alignment.CenterVertically) {
-        Text(event.time, color = SolariaInkMuted, style = androidx.compose.material3.MaterialTheme.typography.labelLarge)
-        Box(modifier = Modifier.width(2.dp).height(34.dp).background(SolariaOrange))
+        Text(event.time, color = AppTheme.colors.onSurfaceMuted, style = androidx.compose.material3.MaterialTheme.typography.labelLarge)
+        Box(modifier = Modifier.width(2.dp).height(34.dp).background(AppTheme.colors.secondary))
         Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-            Text(event.title, color = SolariaInk, style = androidx.compose.material3.MaterialTheme.typography.titleMedium)
-            Text(event.place, color = SolariaInkMuted, style = androidx.compose.material3.MaterialTheme.typography.bodyMedium)
+            Text(event.title, color = AppTheme.colors.onSurface, style = androidx.compose.material3.MaterialTheme.typography.titleMedium)
+            Text(event.place, color = AppTheme.colors.onSurfaceMuted, style = androidx.compose.material3.MaterialTheme.typography.bodyMedium)
         }
     }
 }

@@ -32,8 +32,7 @@ import com.project.solaria_mobile.core.designsystem.components.ActionRow
 import com.project.solaria_mobile.core.designsystem.components.ScreenTitle
 import com.project.solaria_mobile.core.designsystem.components.SectionHeading
 import com.project.solaria_mobile.core.designsystem.components.SolariaAvatar
-import com.project.solaria_mobile.core.designsystem.theme.SolariaInk
-import com.project.solaria_mobile.core.designsystem.theme.SolariaInkMuted
+import com.project.solaria_mobile.core.designsystem.theme.AppTheme
 import com.project.solaria_mobile.core.designsystem.theme.Spacing
 import com.project.solaria_mobile.core.designsystem.theme.Sizing
 import com.project.solaria_mobile.core.designsystem.theme.Radius
@@ -65,9 +64,9 @@ internal fun ProjectSheetContent(
         when (sheet) {
             ProjectSheet.LOCATION -> {
                 Spacer(Modifier.height(Spacing.xs))
-                Text("Local do projeto", color = SolariaInkMuted, style = androidx.compose.material3.MaterialTheme.typography.bodyMedium)
-                Text("Fortech Enterprise", color = SolariaInk, style = androidx.compose.material3.MaterialTheme.typography.headlineMedium)
-                Text("Av. das Nações Unidas, 12901 · São Paulo, SP", color = SolariaInkMuted, style = androidx.compose.material3.MaterialTheme.typography.bodyMedium)
+                Text("Local do projeto", color = AppTheme.colors.onSurfaceMuted, style = androidx.compose.material3.MaterialTheme.typography.bodyMedium)
+                Text("Fortech Enterprise", color = AppTheme.colors.onSurface, style = androidx.compose.material3.MaterialTheme.typography.headlineMedium)
+                Text("Av. das Nações Unidas, 12901 · São Paulo, SP", color = AppTheme.colors.onSurfaceMuted, style = androidx.compose.material3.MaterialTheme.typography.bodyMedium)
                 ActionRow("Abrir no mapa", LucideR.drawable.lucide_ic_map_pin, { onNavigate(AppDestination.Map) })
                 ActionRow("Copiar endereço", LucideR.drawable.lucide_ic_copy, {})
             }
@@ -78,7 +77,7 @@ internal fun ProjectSheetContent(
                     modifier = Modifier.fillMaxWidth().height(240.dp).clip(RoundedCornerShape(Radius.large)),
                     contentScale = ContentScale.Crop,
                 )
-                Text("Local do projeto · 1 de 8 imagens", color = SolariaInkMuted, style = androidx.compose.material3.MaterialTheme.typography.bodyMedium)
+                Text("Local do projeto · 1 de 8 imagens", color = AppTheme.colors.onSurfaceMuted, style = androidx.compose.material3.MaterialTheme.typography.bodyMedium)
                 ActionRow("Adicionar imagem", LucideR.drawable.lucide_ic_image_plus, {})
             }
             ProjectSheet.AGENDA -> {
@@ -121,10 +120,10 @@ private fun TimelineEntry(title: String, detail: String) {
         horizontalArrangement = Arrangement.spacedBy(Spacing.md),
         verticalAlignment = Alignment.Top,
     ) {
-        Box(modifier = Modifier.padding(top = 7.dp).size(9.dp).clip(androidx.compose.foundation.shape.CircleShape).background(com.project.solaria_mobile.core.designsystem.theme.SolariaOrange))
+        Box(modifier = Modifier.padding(top = 7.dp).size(9.dp).clip(androidx.compose.foundation.shape.CircleShape).background(com.project.solaria_mobile.core.designsystem.theme.AppTheme.colors.secondary))
         Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
-            Text(title, color = SolariaInk, style = androidx.compose.material3.MaterialTheme.typography.titleMedium)
-            Text(detail, color = SolariaInkMuted, style = androidx.compose.material3.MaterialTheme.typography.bodyMedium)
+            Text(title, color = AppTheme.colors.onSurface, style = androidx.compose.material3.MaterialTheme.typography.titleMedium)
+            Text(detail, color = AppTheme.colors.onSurfaceMuted, style = androidx.compose.material3.MaterialTheme.typography.bodyMedium)
         }
     }
 }
@@ -138,9 +137,9 @@ private fun TeamEntry(initials: String, name: String, role: String, index: Int, 
     ) {
         SolariaAvatar(initials = initials, color = com.project.solaria_mobile.core.designsystem.components.AvatarPalette(index))
         Column(modifier = Modifier.weight(1f)) {
-            Text(name, color = SolariaInk, style = androidx.compose.material3.MaterialTheme.typography.titleMedium)
-            Text(role, color = SolariaInkMuted, style = androidx.compose.material3.MaterialTheme.typography.bodyMedium)
+            Text(name, color = AppTheme.colors.onSurface, style = androidx.compose.material3.MaterialTheme.typography.titleMedium)
+            Text(role, color = AppTheme.colors.onSurfaceMuted, style = androidx.compose.material3.MaterialTheme.typography.bodyMedium)
         }
-        Icon(painter = painterResource(LucideR.drawable.lucide_ic_ellipsis), contentDescription = "Mais opções de $name", tint = SolariaInkMuted, modifier = Modifier.size(Sizing.icon))
+        Icon(painter = painterResource(LucideR.drawable.lucide_ic_ellipsis), contentDescription = "Mais opções de $name", tint = AppTheme.colors.onSurfaceMuted, modifier = Modifier.size(Sizing.icon))
     }
 }
