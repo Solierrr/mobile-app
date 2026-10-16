@@ -15,7 +15,7 @@ private val PlusJakartaSans = FontFamily(
     Font(R.font.plus_jakarta_sans, FontWeight.Bold),
 )
 
-val SolariaTypography = Typography(
+val AppTypography = Typography(
     displayLarge = TextStyle(
         fontFamily = PlusJakartaSans,
         fontWeight = FontWeight.Bold,
@@ -71,6 +71,42 @@ val SolariaTypography = Typography(
         fontFamily = PlusJakartaSans,
         fontWeight = FontWeight.Medium,
         fontSize = 12.sp,
+        lineHeight = 16.sp,
+    ),
+    displayMedium = TextStyle(
+        fontFamily = PlusJakartaSans,
+        fontWeight = FontWeight.Bold,
+        fontSize = 45.sp,
+        lineHeight = 52.sp,
+    ),
+    displaySmall = TextStyle(
+        fontFamily = PlusJakartaSans,
+        fontWeight = FontWeight.Bold,
+        fontSize = 36.sp,
+        lineHeight = 44.sp,
+    ),
+    headlineSmall = TextStyle(
+        fontFamily = PlusJakartaSans,
+        fontWeight = FontWeight.SemiBold,
+        fontSize = 24.sp,
+        lineHeight = 32.sp,
+    ),
+    titleSmall = TextStyle(
+        fontFamily = PlusJakartaSans,
+        fontWeight = FontWeight.Medium,
+        fontSize = 14.sp,
+        lineHeight = 20.sp,
+    ),
+    bodySmall = TextStyle(
+        fontFamily = PlusJakartaSans,
+        fontWeight = FontWeight.Normal,
+        fontSize = 12.sp,
+        lineHeight = 16.sp,
+    ),
+    labelSmall = TextStyle(
+        fontFamily = PlusJakartaSans,
+        fontWeight = FontWeight.Medium,
+        fontSize = 11.sp,
         lineHeight = 16.sp,
     ),
 )

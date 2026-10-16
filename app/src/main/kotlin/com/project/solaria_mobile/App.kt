@@ -7,4 +7,4 @@ import dagger.hilt.android.HiltAndroidApp
  * Raiz para montagem de dependencias do hilt
  */
 @HiltAndroidApp
-class SolariaApplication : Application()
+class App : Application()

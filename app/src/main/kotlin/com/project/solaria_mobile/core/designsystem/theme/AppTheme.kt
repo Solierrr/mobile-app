@@ -36,7 +36,7 @@ fun AppTheme(
     CompositionLocalProvider(LocalAppColors provides colors) {
         MaterialTheme(
             colorScheme = colors.toColorScheme(),
-            typography = SolariaTypography,
+            typography = AppTypography,
             content = content,
         )
     }
