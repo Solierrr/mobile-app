@@ -2,7 +2,7 @@
 
 package com.project.solaria_mobile.feature.project
 
-import com.project.solaria_mobile.feature.project.data.ProjectSummary
+import com.project.solaria_mobile.feature.project.domain.ProjectSummary
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background

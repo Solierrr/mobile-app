@@ -2,7 +2,7 @@
 
 package com.project.solaria_mobile.feature.profile
 
-import com.project.solaria_mobile.feature.profile.data.Connection
+import com.project.solaria_mobile.feature.profile.domain.Connection
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement

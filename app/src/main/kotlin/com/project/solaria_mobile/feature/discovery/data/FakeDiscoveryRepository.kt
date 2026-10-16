@@ -5,6 +5,8 @@ import javax.inject.Singleton
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import java.util.Calendar
+import com.project.solaria_mobile.feature.discovery.domain.DiscoveryRepository
+import com.project.solaria_mobile.feature.discovery.domain.ScheduleEvent
 
 @Singleton
 class FakeDiscoveryRepository @Inject constructor() : DiscoveryRepository {

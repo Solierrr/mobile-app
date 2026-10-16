@@ -1,7 +1,7 @@
 package com.project.solaria_mobile.feature.communication
 
-import com.project.solaria_mobile.feature.communication.data.ChatMessage
-import com.project.solaria_mobile.feature.communication.data.CommunicationRepository
+import com.project.solaria_mobile.feature.communication.domain.ChatMessage
+import com.project.solaria_mobile.feature.communication.domain.CommunicationRepository
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope

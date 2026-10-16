@@ -1,4 +1,4 @@
-package com.project.solaria_mobile.feature.communication.data
+package com.project.solaria_mobile.feature.communication.domain
 
 enum class AvatarTone { ORANGE, BLUE, GREEN, PINK }
 enum class ServiceCallIcon { HASH, PHONE, SHIELD_ALERT }

@@ -1,14 +1,14 @@
 package com.project.solaria_mobile.feature.home
 
-import com.project.solaria_mobile.feature.home.data.CompanyLogo
-import com.project.solaria_mobile.feature.home.data.HomeRepository
-import com.project.solaria_mobile.feature.communication.data.CommunicationRepository
-import com.project.solaria_mobile.feature.communication.data.ServiceCall
+import com.project.solaria_mobile.feature.home.domain.CompanyLogo
+import com.project.solaria_mobile.feature.home.domain.HomeRepository
+import com.project.solaria_mobile.feature.communication.domain.CommunicationRepository
+import com.project.solaria_mobile.feature.communication.domain.ServiceCall
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.project.solaria_mobile.feature.project.data.ProjectRepository
-import com.project.solaria_mobile.feature.project.data.ProjectSummary
+import com.project.solaria_mobile.feature.project.domain.ProjectRepository
+import com.project.solaria_mobile.feature.project.domain.ProjectSummary
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.flow.SharingStarted

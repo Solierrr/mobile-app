@@ -1,7 +1,7 @@
 package com.project.solaria_mobile.feature.profile
 
-import com.project.solaria_mobile.feature.profile.data.UserProfile
-import com.project.solaria_mobile.feature.profile.data.ProfileRepository
+import com.project.solaria_mobile.feature.profile.domain.UserProfile
+import com.project.solaria_mobile.feature.profile.domain.ProfileRepository
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope

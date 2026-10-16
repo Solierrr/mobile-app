@@ -7,6 +7,12 @@ import java.util.Date
 import java.util.Locale
 import javax.inject.Inject
 import javax.inject.Singleton
+import com.project.solaria_mobile.feature.communication.domain.AvatarTone
+import com.project.solaria_mobile.feature.communication.domain.ChatMessage
+import com.project.solaria_mobile.feature.communication.domain.CommunicationRepository
+import com.project.solaria_mobile.feature.communication.domain.Conversation
+import com.project.solaria_mobile.feature.communication.domain.ServiceCall
+import com.project.solaria_mobile.feature.communication.domain.ServiceCallIcon
 
 @Singleton
 class FakeCommunicationRepository @Inject constructor() : CommunicationRepository {

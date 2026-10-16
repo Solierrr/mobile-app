@@ -1,4 +1,4 @@
-package com.project.solaria_mobile.feature.project.data
+package com.project.solaria_mobile.feature.project.domain
 
 import kotlinx.coroutines.flow.StateFlow
 

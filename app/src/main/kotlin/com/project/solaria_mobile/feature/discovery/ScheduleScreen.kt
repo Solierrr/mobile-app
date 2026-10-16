@@ -2,8 +2,8 @@
 
 package com.project.solaria_mobile.feature.discovery
 
-import com.project.solaria_mobile.feature.discovery.data.ScheduleEvent
-import com.project.solaria_mobile.feature.discovery.data.CalendarDay
+import com.project.solaria_mobile.feature.discovery.domain.ScheduleEvent
+import com.project.solaria_mobile.feature.discovery.domain.CalendarDay
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable

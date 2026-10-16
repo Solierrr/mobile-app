@@ -4,6 +4,9 @@ import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import com.project.solaria_mobile.feature.profile.domain.Connection
+import com.project.solaria_mobile.feature.profile.domain.ProfileRepository
+import com.project.solaria_mobile.feature.profile.domain.UserProfile
 
 @Singleton
 class FakeProfileRepository @Inject constructor() : ProfileRepository {

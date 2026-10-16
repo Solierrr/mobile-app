@@ -3,6 +3,8 @@ package com.project.solaria_mobile.feature.project.data
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.flow.MutableStateFlow
+import com.project.solaria_mobile.feature.project.domain.ProjectRepository
+import com.project.solaria_mobile.feature.project.domain.ProjectSummary
 
 @Singleton
 class FakeProjectRepository @Inject constructor() : ProjectRepository {

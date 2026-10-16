@@ -51,7 +51,7 @@ import com.project.solaria_mobile.core.designsystem.theme.Sizing
 import com.project.solaria_mobile.core.designsystem.theme.Radius
 import com.project.solaria_mobile.feature.communication.CallsBottomSheet
 import com.project.solaria_mobile.presentation.navigation.AppDestination
-import com.project.solaria_mobile.feature.home.data.CompanyLogoId
+import com.project.solaria_mobile.feature.home.domain.CompanyLogoId
 import kotlinx.coroutines.launch
 
 @Composable

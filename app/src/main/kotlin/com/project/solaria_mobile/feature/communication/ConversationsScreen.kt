@@ -2,8 +2,8 @@
 
 package com.project.solaria_mobile.feature.communication
 
-import com.project.solaria_mobile.feature.communication.data.Conversation
-import com.project.solaria_mobile.feature.communication.data.AvatarTone
+import com.project.solaria_mobile.feature.communication.domain.Conversation
+import com.project.solaria_mobile.feature.communication.domain.AvatarTone
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement

@@ -1,4 +1,4 @@
-package com.project.solaria_mobile.feature.discovery.data
+package com.project.solaria_mobile.feature.discovery.domain
 
 
 data class ScheduleEvent(val day: Int, val month: Int, val time: String, val title: String, val place: String)

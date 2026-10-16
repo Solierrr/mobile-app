@@ -1,4 +1,4 @@
-package com.project.solaria_mobile.feature.discovery.data
+package com.project.solaria_mobile.feature.discovery.domain
 
 import kotlinx.coroutines.flow.StateFlow
 

@@ -3,9 +3,9 @@ package com.project.solaria_mobile.feature.home
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.tooling.preview.Preview
 import com.project.solaria_mobile.core.designsystem.theme.AppTheme
-import com.project.solaria_mobile.feature.home.data.CompanyLogo
-import com.project.solaria_mobile.feature.home.data.CompanyLogoId
-import com.project.solaria_mobile.feature.project.data.ProjectSummary
+import com.project.solaria_mobile.feature.home.domain.CompanyLogo
+import com.project.solaria_mobile.feature.home.domain.CompanyLogoId
+import com.project.solaria_mobile.feature.project.domain.ProjectSummary
 
 private val previewState = HomeUiState(
     recentCompanies = listOf(CompanyLogo("Google", CompanyLogoId.GOOGLE), CompanyLogo("Amazon", CompanyLogoId.AMAZON)),

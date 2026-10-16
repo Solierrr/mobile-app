@@ -2,7 +2,7 @@
 
 package com.project.solaria_mobile.feature.communication
 
-import com.project.solaria_mobile.feature.communication.data.ServiceCall
+import com.project.solaria_mobile.feature.communication.domain.ServiceCall
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement

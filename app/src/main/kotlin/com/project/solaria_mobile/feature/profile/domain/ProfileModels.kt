@@ -1,4 +1,4 @@
-package com.project.solaria_mobile.feature.profile.data
+package com.project.solaria_mobile.feature.profile.domain
 
 
 data class UserProfile(

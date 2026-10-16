@@ -1,7 +1,7 @@
 package com.project.solaria_mobile.feature.project
 
-import com.project.solaria_mobile.feature.project.data.ProjectSummary
-import com.project.solaria_mobile.feature.project.data.ProjectRepository
+import com.project.solaria_mobile.feature.project.domain.ProjectSummary
+import com.project.solaria_mobile.feature.project.domain.ProjectRepository
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope

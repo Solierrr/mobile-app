@@ -1,8 +1,8 @@
 package com.project.solaria_mobile.feature.discovery
 
-import com.project.solaria_mobile.feature.discovery.data.ScheduleEvent
-import com.project.solaria_mobile.feature.discovery.data.CalendarDay
-import com.project.solaria_mobile.feature.discovery.data.DiscoveryRepository
+import com.project.solaria_mobile.feature.discovery.domain.ScheduleEvent
+import com.project.solaria_mobile.feature.discovery.domain.CalendarDay
+import com.project.solaria_mobile.feature.discovery.domain.DiscoveryRepository
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
