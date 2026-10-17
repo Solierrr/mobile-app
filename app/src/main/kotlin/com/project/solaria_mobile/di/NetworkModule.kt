@@ -1,5 +1,6 @@
 package com.project.solaria_mobile.di
 
+import com.project.solaria_mobile.core.auth.TokenAuthenticator
 import com.project.solaria_mobile.core.network.ApiJson
 import com.project.solaria_mobile.core.network.AuthHeaderInterceptor
 import dagger.Module
@@ -35,11 +36,15 @@ object NetworkModule {
     /** Cria o cliente HTTP compartilhado, com os timeouts padrão do app. */
     @Provides
     @Singleton
-    fun provideOkHttpClient(authHeaderInterceptor: AuthHeaderInterceptor): OkHttpClient =
+    fun provideOkHttpClient(
+        authHeaderInterceptor: AuthHeaderInterceptor,
+        tokenAuthenticator: TokenAuthenticator,
+    ): OkHttpClient =
         OkHttpClient.Builder()
             .connectTimeout(CONNECT_TIMEOUT)
             .readTimeout(READ_TIMEOUT)
             .writeTimeout(WRITE_TIMEOUT)
             .addInterceptor(authHeaderInterceptor)
+            .authenticator(tokenAuthenticator)
             .build()
 }

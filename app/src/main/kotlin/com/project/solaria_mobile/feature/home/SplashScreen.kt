@@ -1,0 +1,44 @@
+package com.project.solaria_mobile.feature.home
+
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Icon
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.unit.dp
+import com.composables.icons.lucide.R as LucideR
+import com.project.solaria_mobile.core.designsystem.theme.AppTheme
+import com.project.solaria_mobile.core.designsystem.theme.Spacing
+import com.project.solaria_mobile.core.designsystem.components.MorphingHexagon
+import com.project.solaria_mobile.core.designsystem.theme.Sizing
+
+@Composable
+fun SplashScreen() {
+    Box(modifier = Modifier.fillMaxSize().background(AppTheme.colors.surface), contentAlignment = Alignment.Center) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(Spacing.xl)) {
+            Box(
+                modifier = Modifier.size(148.dp).clip(RoundedCornerShape(38.dp)).background(AppTheme.colors.secondary),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    painter = painterResource(LucideR.drawable.lucide_ic_handshake),
+                    contentDescription = "Solaria",
+                    tint = AppTheme.colors.onAccent,
+                    modifier = Modifier.size(82.dp),
+                )
+            }
+            MorphingHexagon(Modifier.size(Sizing.loadingIndicator))
+            Spacer(Modifier.height(80.dp))
+        }
+    }
+}

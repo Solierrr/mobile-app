@@ -43,6 +43,15 @@ cd ./mobile-app
 
 Use o `Makefile` para verificar o ambiente, listar ou iniciar um emulador e executar o app. Se houver mais de um dispositivo conectado, informe o serial com `DEVICE` (por exemplo, `make run DEVICE=emulator-5554`).
 
+## Ambientes (flavors)
+
+O app tem dois flavors, escolhidos com `FLAVOR` (padrão `qa`):
+
+- `qa`: pacote `com.project.solaria_mobile.qa`, nome Solaria QA, APIs dos serviços do Render e o google-registry do Render. Como o Render gratuito dorme sem tráfego, a primeira chamada pode levar cerca de 30 segundos.
+- `prod`: pacote `com.project.solaria_mobile`, nome Solaria, APIs em `solarianetwork.site`, sem google-registry.
+
+Exemplos: `make run`, `make run FLAVOR=prod` e `make build FLAVOR=prod`. As URLs ficam em `BuildConfig` (`AUTH_BASE_URL`, `CORE_BASE_URL`, `MESSENGER_BASE_URL`, `GOOGLE_REGISTRY_BASE_URL`) e são definidas por flavor em `app/build.gradle.kts`. Não há flavor local: ninguém executa o backend para o mobile.
+
 ```bash
 make doctor
 make avds
@@ -67,3 +76,9 @@ O pipeline de CI roda dois workflows separados em toda Pull Request: testes unit
 ```bash
 make ci
 ```
+
+## Login e diagnóstico (QA)
+
+O app não tem tela de login: sem sessão, ele abre o login do web em Custom Tabs e volta pelo deeplink `solaria-qa://auth/callback` (qa) ou `solaria://auth/callback` (prod). O `api-auth` precisa de `MOBILE_REDIRECT_URIS` com esse endereço e de `MOBILE_WEB_AUTHORIZE_URL` apontando para a página `/pt-BR/auth/mobile` do web.
+
+No flavor `qa`, Configurações → Desenvolvimento → Diagnóstico mostra o ambiente, as URLs, o FID da instalação (copie e cadastre na página Dispositivos QA do web-sandbox) e o teste do google-registry. O FID só aparece com o `google-services.json` do app `.qa` em `app/src/qa/` (fora do git).

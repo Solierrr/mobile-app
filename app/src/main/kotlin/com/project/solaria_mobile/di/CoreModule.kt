@@ -1,7 +1,7 @@
 package com.project.solaria_mobile.di
 
 import com.project.solaria_mobile.core.network.CredentialProvider
-import com.project.solaria_mobile.core.network.NoCredentialProvider
+import com.project.solaria_mobile.core.auth.SessionCredentialProvider
 import dagger.Binds
 import dagger.Module
 import dagger.hilt.InstallIn
@@ -17,5 +17,5 @@ abstract class CoreModule {
 
     /** sem definição de implementação ainda */
     @Binds
-    abstract fun bindCredentialProvider(impl: NoCredentialProvider): CredentialProvider
+    abstract fun bindCredentialProvider(impl: SessionCredentialProvider): CredentialProvider
 }
