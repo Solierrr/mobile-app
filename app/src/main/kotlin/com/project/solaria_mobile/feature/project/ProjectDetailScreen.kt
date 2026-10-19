@@ -26,6 +26,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
@@ -41,6 +43,7 @@ import com.project.solaria_mobile.core.designsystem.theme.Spacing
 import com.project.solaria_mobile.core.designsystem.theme.Radius
 import com.project.solaria_mobile.presentation.navigation.AppDestination
 import kotlinx.coroutines.launch
+import com.project.solaria_mobile.core.common.UiState
 import com.project.solaria_mobile.core.designsystem.components.UiStateHost
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -51,21 +54,30 @@ fun ProjectDetailRoute(
     onBack: () -> Unit,
     onNavigate: (AppDestination) -> Unit,
     viewModel: ProjectDetailViewModel = hiltViewModel(),
+    sections: ProjectSectionsViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
-    UiStateHost(state, viewModel::load) { project -> ProjectDetailScreen(project, onBack, onNavigate) }
+    UiStateHost(state, viewModel::load) { project -> ProjectDetailScreen(project, sections, onBack, onNavigate) }
 }
 
 @Composable
 fun ProjectDetailScreen(
     project: ProjectSummary,
+    sections: ProjectSectionsViewModel,
     onBack: () -> Unit,
     onNavigate: (AppDestination) -> Unit,
 ) {
     var activeSheet by remember { mutableStateOf<ProjectSheet?>(null) }
     var menuOpen by remember { mutableStateOf(false) }
+    val open: (ProjectSheet) -> Unit = { target ->
+        sections.open(target)
+        activeSheet = target
+    }
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val scope = rememberCoroutineScope()
+    val clipboard = LocalClipboardManager.current
+    val photosState by sections.photos.collectAsStateWithLifecycle()
+    val coverId = (photosState as? UiState.Content)?.data?.firstOrNull()?.id
 
     Column(
         modifier = Modifier
@@ -74,12 +86,21 @@ fun ProjectDetailScreen(
             .verticalScroll(rememberScrollState()),
     ) {
         Box(modifier = Modifier.fillMaxWidth().height(345.dp)) {
-            Image(
-                painter = painterResource(R.drawable.project_building),
-                contentDescription = project.name,
-                modifier = Modifier.fillMaxSize(),
-                contentScale = ContentScale.Crop,
-            )
+            if (coverId != null) {
+                ProjectPhotoImage(
+                    photoId = coverId,
+                    load = sections::photoContent,
+                    description = project.name,
+                    modifier = Modifier.fillMaxSize(),
+                )
+            } else {
+                Image(
+                    painter = painterResource(R.drawable.project_building),
+                    contentDescription = project.name,
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Crop,
+                )
+            }
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -104,12 +125,12 @@ fun ProjectDetailScreen(
             Text(project.place, color = AppTheme.colors.onSurfaceMuted, style = androidx.compose.material3.MaterialTheme.typography.bodyMedium)
             Text(project.name, color = AppTheme.colors.onSurface, style = androidx.compose.material3.MaterialTheme.typography.headlineMedium)
             Spacer(Modifier.height(Spacing.xs))
-            ActionRow("Informações do local", LucideR.drawable.lucide_ic_map_pin, { activeSheet = ProjectSheet.LOCATION })
-            ActionRow("Imagens do local", LucideR.drawable.lucide_ic_images, { activeSheet = ProjectSheet.GALLERY })
-            ActionRow("Agenda do projeto", LucideR.drawable.lucide_ic_calendar_days, { activeSheet = ProjectSheet.AGENDA }, badge = "10")
-            ActionRow("Histórico", LucideR.drawable.lucide_ic_clock, { activeSheet = ProjectSheet.HISTORY })
-            ActionRow("Envolvidos", LucideR.drawable.lucide_ic_building, { activeSheet = ProjectSheet.TEAM })
-            ActionRow("Conversas", LucideR.drawable.lucide_ic_message_circle, { activeSheet = ProjectSheet.CONVERSATIONS }, badge = "10")
+            ActionRow("Informações do local", LucideR.drawable.lucide_ic_map_pin, { open(ProjectSheet.LOCATION) })
+            ActionRow("Imagens do local", LucideR.drawable.lucide_ic_images, { open(ProjectSheet.GALLERY) })
+            ActionRow("Agenda do projeto", LucideR.drawable.lucide_ic_calendar_days, { open(ProjectSheet.AGENDA) })
+            ActionRow("Histórico", LucideR.drawable.lucide_ic_clock, { open(ProjectSheet.HISTORY) })
+            ActionRow("Envolvidos", LucideR.drawable.lucide_ic_building, { open(ProjectSheet.TEAM) })
+            ActionRow("Conversas", LucideR.drawable.lucide_ic_message_circle, { open(ProjectSheet.CONVERSATIONS) })
             ActionRow("Empresa responsável", LucideR.drawable.lucide_ic_building, { onNavigate(AppDestination.Enterprise) })
             ActionRow("Configurações", LucideR.drawable.lucide_ic_settings, { onNavigate(AppDestination.Settings) })
         }
@@ -126,8 +147,10 @@ fun ProjectDetailScreen(
         ) {
             ProjectSheetContent(
                 sheet = sheet,
+                viewModel = sections,
                 onBack = { scope.launch { sheetState.hide(); activeSheet = null } },
                 onNavigate = { route -> scope.launch { sheetState.hide(); activeSheet = null; onNavigate(route) } },
+                onCopy = { text -> clipboard.setText(AnnotatedString(text)) },
             )
         }
     }
