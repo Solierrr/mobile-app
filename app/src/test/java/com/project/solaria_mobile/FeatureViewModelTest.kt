@@ -13,7 +13,6 @@ import com.project.solaria_mobile.feature.discovery.MapViewModel
 import com.project.solaria_mobile.feature.discovery.ScheduleViewModel
 import com.project.solaria_mobile.feature.discovery.data.FakeDiscoveryRepository
 import com.project.solaria_mobile.feature.home.HomeViewModel
-import com.project.solaria_mobile.feature.home.data.FakeHomeRepository
 import com.project.solaria_mobile.feature.profile.ConnectionsViewModel
 import com.project.solaria_mobile.feature.profile.data.FakeProfileRepository
 import com.project.solaria_mobile.feature.profile.domain.Connection
@@ -123,7 +122,7 @@ class FeatureViewModelTest {
     }
 
     @Test fun homeUsesSharedProjectAndCallSources() = runTest {
-        val viewModel = HomeViewModel(FakeHomeRepository(), FakeProjectRepository(), FakeCommunicationRepository(), FakeProfileRepository())
+        val viewModel = HomeViewModel(FakeProjectRepository(), FakeCommunicationRepository(), FakeProfileRepository())
         viewModel.uiState.test {
             val initial = awaitContent()
             assertEquals(4, initial.recentProjects.size)
@@ -135,8 +134,42 @@ class FeatureViewModelTest {
         }
     }
 
+    private class FixedProjectRepository(private val items: List<ProjectSummary>) : ProjectRepository {
+        override suspend fun projects(): ApiResult<List<ProjectSummary>> = ApiResult.Success(items)
+        override suspend fun project(id: String): ApiResult<ProjectSummary> = ApiResult.Failure(ErrorKind.NOT_FOUND)
+        override suspend fun create(draft: com.project.solaria_mobile.feature.project.domain.NewProjectDraft): ApiResult<String> = ApiResult.Failure(ErrorKind.NOT_FOUND)
+    }
+
+    private fun project(id: String, createdAt: Long, companyId: String?, company: String = "", logo: String? = null) =
+        ProjectSummary(id, "Obra $id", "Goiânia, GO", "Aberto", "", companyId, company, logo, createdAt)
+
+    @Test fun recentCompaniesAreTheDistinctCompaniesOfTheNewestProjects() = runTest {
+        val projects = listOf(
+            project("a", 100, "c1", "Solar Forte", "https://res.cloudinary.com/x/c1.webp"),
+            project("b", 300, "c2", "Serra Azul", null),
+            project("c", 200, "c1", "Solar Forte", "https://res.cloudinary.com/x/c1.webp"),
+            project("d", 400, null, "", null),
+        )
+        val viewModel = HomeViewModel(FixedProjectRepository(projects), FakeCommunicationRepository(), FakeProfileRepository())
+        viewModel.uiState.test {
+            val content = awaitContent()
+            assertEquals(listOf("c2", "c1"), content.recentCompanies.map { it.id })
+            assertEquals("https://res.cloudinary.com/x/c1.webp", content.recentCompanies.last().logoUrl)
+            assertEquals(listOf("d", "b", "c", "a"), content.recentProjects.map { it.id })
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test fun homeHasNoRecentCompaniesWhenNoProjectBelongsToACompany() = runTest {
+        val viewModel = HomeViewModel(FixedProjectRepository(listOf(project("a", 1, null))), FakeCommunicationRepository(), FakeProfileRepository())
+        viewModel.uiState.test {
+            assertTrue(awaitContent().recentCompanies.isEmpty())
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
     @Test fun homeAvatarComesFromTheOwnProfile() = runTest {
-        val viewModel = HomeViewModel(FakeHomeRepository(), FakeProjectRepository(), FakeCommunicationRepository(), FakeProfileRepository())
+        val viewModel = HomeViewModel(FakeProjectRepository(), FakeCommunicationRepository(), FakeProfileRepository())
         viewModel.uiState.test {
             assertEquals("RC", awaitContent().profile?.initials)
             cancelAndIgnoreRemainingEvents()
@@ -144,7 +177,7 @@ class FeatureViewModelTest {
     }
 
     @Test fun homeStillLoadsWhenTheProfileFails() = runTest {
-        val viewModel = HomeViewModel(FakeHomeRepository(), FakeProjectRepository(), FakeCommunicationRepository(), FailingProfileRepository())
+        val viewModel = HomeViewModel(FakeProjectRepository(), FakeCommunicationRepository(), FailingProfileRepository())
         viewModel.uiState.test {
             val content = awaitContent()
             assertEquals(null, content.profile)

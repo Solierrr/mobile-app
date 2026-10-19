@@ -29,7 +29,7 @@ android {
             dimension = "environment"
             applicationIdSuffix = ".qa"
             versionNameSuffix = "-qa"
-            resValue("string", "app_name", "Solaria QA")
+            resValue("string", "app_name", "Elos QA")
             buildConfigField("String", "ENVIRONMENT", "\"qa\"")
             manifestPlaceholders["authScheme"] = "solaria-qa"
             buildConfigField("String", "AUTH_REDIRECT_URI", "\"solaria-qa://auth/callback\"")
@@ -40,7 +40,7 @@ android {
         }
         create("prod") {
             dimension = "environment"
-            resValue("string", "app_name", "Solaria")
+            resValue("string", "app_name", "Elos")
             buildConfigField("String", "ENVIRONMENT", "\"prod\"")
             manifestPlaceholders["authScheme"] = "solaria"
             buildConfigField("String", "AUTH_REDIRECT_URI", "\"solaria://auth/callback\"")
