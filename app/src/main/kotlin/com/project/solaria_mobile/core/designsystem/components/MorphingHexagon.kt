@@ -1,5 +1,6 @@
 package com.project.solaria_mobile.core.designsystem.components
 
+import android.graphics.BlurMaskFilter
 import android.provider.Settings
 import androidx.compose.animation.core.EaseInOutCubic
 import androidx.compose.animation.core.LinearEasing
@@ -16,10 +17,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Paint
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.asAndroidPath
+import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
+import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.drawscope.DrawScope
-import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Matrix
 import androidx.compose.ui.graphics.asComposePath
@@ -29,20 +32,21 @@ import androidx.graphics.shapes.toPath
 
 private const val CYCLE_MILLIS_PER_SHAPE = 1400
 
+private val shapes = listOf(
+    MorphShapes.hexagon,
+    MorphShapes.clover,
+    MorphShapes.cookie,
+    MorphShapes.pill,
+    MorphShapes.pentagon,
+    MorphShapes.burst,
+    MorphShapes.sun,
+)
+
 @Composable
 fun MorphingHexagon(
     modifier: Modifier = Modifier,
 ) {
     val morphs = remember {
-        val shapes = listOf(
-            MorphShapes.hexagon,
-            MorphShapes.clover,
-            MorphShapes.cookie,
-            MorphShapes.pill,
-            MorphShapes.pentagon,
-            MorphShapes.burst,
-            MorphShapes.sun,
-        )
         shapes.indices.map { Morph(shapes[it], shapes[(it + 1) % shapes.size]) }
     }
     val animationsEnabled = animationsEnabled()
@@ -66,26 +70,40 @@ fun MorphingHexagon(
 
     Canvas(modifier = modifier.aspectRatio(1f)) {
         val path = morphs[index].toPath(progress).asComposePath()
-        // Cada forma tem um centro diferente; centralizar o contorno mantém o conteúdo (as mãos) no meio.
-        val bounds = path.getBounds()
-        path.translate(Offset(CENTER - bounds.center.x, CENTER - bounds.center.y))
-        path.transform(Matrix().apply { scale(size.width, size.height) })
+        // O centro de massa muda de forma para forma; ancorá-lo no meio mantém as mãos centralizadas.
+        val from = shapes[index]
+        val to = shapes[(index + 1) % shapes.size]
+        val centerX = from.centerX + (to.centerX - from.centerX) * progress
+        val centerY = from.centerY + (to.centerY - from.centerY) * progress
+        path.translate(Offset(-centerX, -centerY))
+        path.transform(
+            Matrix().apply {
+                scale(size.width * SHAPE_SCALE, size.height * SHAPE_SCALE)
+                translate(CENTER / SHAPE_SCALE, CENTER / SHAPE_SCALE)
+            },
+        )
         drawBrandShape(path)
     }
 }
 
 private const val CENTER = 0.5f
+private const val SHAPE_SCALE = 0.88f
 private val BRAND_TOP = Color(0xFFF57D2D)
 private val BRAND_BOTTOM = Color(0xFFE85900)
 
-/** Degradê, sombra e brilho do hexágono da marca, os mesmos do web (MorphingHexagon.tsx). */
+/** Degradê vertical da marca (como no web) com uma sombra bem difusa, sem contornos. */
 private fun DrawScope.drawBrandShape(path: Path) {
     val unit = size.minDimension
-    val shadowShift = unit * 0.035f
-    listOf(0.045f to 0.025f, 0.03f to 0.03f, 0.015f to 0.04f).forEach { (grow, alpha) ->
-        val shadow = Path().apply { addPath(path) }
-        shadow.translate(Offset(0f, shadowShift))
-        drawPath(shadow, Color.Black.copy(alpha = alpha), style = Stroke(width = unit * grow * 2))
+    drawIntoCanvas { canvas ->
+        val shadow = Paint().asFrameworkPaint().apply {
+            isAntiAlias = true
+            color = android.graphics.Color.argb(SHADOW_ALPHA, 0, 0, 0)
+            maskFilter = BlurMaskFilter(unit * SHADOW_BLUR, BlurMaskFilter.Blur.NORMAL)
+        }
+        canvas.save()
+        canvas.translate(0f, unit * SHADOW_SHIFT)
+        canvas.nativeCanvas.drawPath(path.asAndroidPath(), shadow)
+        canvas.restore()
     }
     drawPath(
         path,
@@ -95,12 +113,11 @@ private fun DrawScope.drawBrandShape(path: Path) {
             end = Offset(size.width / 2, size.height * 0.92f),
         ),
     )
-    clipPath(path) {
-        listOf(0.07f to 0.14f, 0.05f to 0.16f, 0.03f to 0.2f).forEach { (width, alpha) ->
-            drawPath(path, Color.White.copy(alpha = alpha), style = Stroke(width = unit * width * 2))
-        }
-    }
 }
+
+private const val SHADOW_ALPHA = 36
+private const val SHADOW_BLUR = 0.03f
+private const val SHADOW_SHIFT = 0.02f
 
 @Composable
 private fun animationsEnabled(): Boolean {
