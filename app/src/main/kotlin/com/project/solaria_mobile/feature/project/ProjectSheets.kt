@@ -2,8 +2,6 @@
 
 package com.project.solaria_mobile.feature.project
 
-import android.graphics.BitmapFactory
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -20,19 +18,16 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.produceState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.ImageBitmap
-import androidx.compose.ui.graphics.asImageBitmap
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.composables.icons.lucide.R as LucideR
 import com.project.solaria_mobile.core.designsystem.components.ActionRow
 import com.project.solaria_mobile.core.designsystem.components.Avatar
 import com.project.solaria_mobile.core.designsystem.components.AvatarPalette
+import com.project.solaria_mobile.core.designsystem.components.RemoteImage
 import com.project.solaria_mobile.core.designsystem.components.ScreenTitle
 import com.project.solaria_mobile.core.designsystem.components.SectionHeading
 import com.project.solaria_mobile.core.designsystem.components.UiStateHost
@@ -40,8 +35,6 @@ import com.project.solaria_mobile.core.designsystem.theme.AppTheme
 import com.project.solaria_mobile.core.designsystem.theme.Radius
 import com.project.solaria_mobile.core.designsystem.theme.Spacing
 import com.project.solaria_mobile.presentation.navigation.AppDestination
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 
 enum class ProjectSheet(val title: String) {
     LOCATION("Informações do local"),
@@ -115,8 +108,8 @@ private fun GallerySection(viewModel: ProjectSectionsViewModel) {
             style = MaterialTheme.typography.bodyMedium,
         )
         photos.forEach { photo ->
-            ProjectPhotoImage(
-                photoId = photo.id,
+            RemoteImage(
+                key = photo.id,
                 load = viewModel::photoContent,
                 description = if (photo.cover) "Capa do projeto" else "Imagem do projeto",
                 modifier = Modifier.fillMaxWidth().height(240.dp).clip(RoundedCornerShape(Radius.large)),
@@ -168,36 +161,6 @@ private fun TeamSection(viewModel: ProjectSectionsViewModel, onNavigate: (AppDes
         SectionHeading("Pessoas envolvidas", faded = true, action = "Ver conexões", onAction = { onNavigate(AppDestination.Connections) })
         members.forEachIndexed { index, member -> TeamEntry(member.initials, member.name, member.role, index) }
     }
-}
-
-@Composable
-internal fun ProjectPhotoImage(
-    photoId: String,
-    load: suspend (String) -> ByteArray?,
-    description: String,
-    modifier: Modifier = Modifier,
-    fallback: @Composable () -> Unit = {},
-) {
-    val image by produceState<ImageBitmap?>(null, photoId) {
-        value = load(photoId)?.let { bytes -> withContext(Dispatchers.Default) { decodeSampled(bytes) } }
-    }
-    val bitmap = image
-    if (bitmap != null) {
-        Image(bitmap = bitmap, contentDescription = description, modifier = modifier, contentScale = ContentScale.Crop)
-    } else {
-        Box(modifier = modifier.background(AppTheme.colors.onSurfaceMuted.copy(alpha = 0.12f))) { fallback() }
-    }
-}
-
-private const val MAX_EDGE = 1600
-
-internal fun decodeSampled(bytes: ByteArray): ImageBitmap? {
-    val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-    BitmapFactory.decodeByteArray(bytes, 0, bytes.size, bounds)
-    var sample = 1
-    while (bounds.outWidth / sample > MAX_EDGE || bounds.outHeight / sample > MAX_EDGE) sample *= 2
-    val options = BitmapFactory.Options().apply { inSampleSize = sample }
-    return BitmapFactory.decodeByteArray(bytes, 0, bytes.size, options)?.asImageBitmap()
 }
 
 @Composable

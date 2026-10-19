@@ -25,6 +25,8 @@ fun Avatar(
     color: Color = AppTheme.colors.secondary,
     online: Boolean = false,
     shape: Shape = CircleShape,
+    imageUrl: String? = null,
+    loadImage: (suspend (String) -> ByteArray?)? = null,
 ) {
     Box(modifier = modifier.size(size)) {
         Box(
@@ -39,6 +41,9 @@ fun Avatar(
                 color = AppTheme.colors.onAccent,
                 style = androidx.compose.material3.MaterialTheme.typography.titleMedium,
             )
+            if (imageUrl != null && loadImage != null) {
+                RemoteImage(imageUrl, loadImage, null, Modifier.matchParentSize(), placeholder = false)
+            }
         }
         if (online) {
             Box(

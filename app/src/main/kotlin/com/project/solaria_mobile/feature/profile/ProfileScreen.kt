@@ -42,7 +42,9 @@ import com.project.solaria_mobile.core.designsystem.components.ActionRow
 import com.project.solaria_mobile.core.designsystem.components.AvatarPalette
 import com.project.solaria_mobile.core.designsystem.components.ExpressiveShapes
 import com.project.solaria_mobile.core.designsystem.theme.Sizing
+import com.project.solaria_mobile.core.designsystem.components.RemoteImage
 import com.project.solaria_mobile.core.designsystem.components.RoundIconButton
+import com.project.solaria_mobile.core.images.ImageLoaderViewModel
 import com.project.solaria_mobile.core.designsystem.components.ScreenTitle
 import com.project.solaria_mobile.core.designsystem.components.SectionHeading
 import com.project.solaria_mobile.core.designsystem.components.Avatar
@@ -58,9 +60,12 @@ fun ProfileRoute(
     onBack: () -> Unit,
     onNavigate: (AppDestination) -> Unit,
     viewModel: ProfileViewModel = hiltViewModel(),
+    images: ImageLoaderViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
-    UiStateHost(state, viewModel::load) { content -> ProfileScreen(content, onBack, onNavigate, viewModel::toggleConnection) }
+    UiStateHost(state, viewModel::load) { content ->
+        ProfileScreen(content, onBack, onNavigate, viewModel::toggleConnection, images::bytes)
+    }
 }
 
 @Composable
@@ -69,6 +74,7 @@ fun ProfileScreen(
     onBack: () -> Unit,
     onNavigate: (AppDestination) -> Unit,
     onToggleConnection: () -> Unit,
+    loadImage: (suspend (String) -> ByteArray?)? = null,
 ) {
     val self = state.self
     val profile = state.profile
@@ -80,6 +86,9 @@ fun ProfileScreen(
     Column(modifier = Modifier.fillMaxSize().background(AppTheme.colors.surface).verticalScroll(rememberScrollState())) {
         Box(modifier = Modifier.fillMaxWidth().height(280.dp)) {
             Image(painter = painterResource(banner), contentDescription = null, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+            if (profile.bannerUrl != null && loadImage != null) {
+                RemoteImage(profile.bannerUrl, loadImage, null, Modifier.fillMaxSize(), placeholder = false)
+            }
             Row(
                 modifier = Modifier.fillMaxWidth().padding(horizontal = Spacing.screen).padding(top = Spacing.lg),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -97,16 +106,18 @@ fun ProfileScreen(
             verticalArrangement = Arrangement.spacedBy(Spacing.md),
         ) {
             Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm), verticalAlignment = Alignment.CenterVertically) {
-                Avatar(profile.initials, size = Sizing.avatarLarge, color = AvatarPalette(if (self) 0 else 1), online = !self, shape = if (self) ExpressiveShapes.cookie else ExpressiveShapes.clover)
+                Avatar(profile.initials, size = Sizing.avatarLarge, color = AvatarPalette(if (self) 0 else 1), online = !self, imageUrl = profile.avatarUrl, loadImage = loadImage, shape = if (self) ExpressiveShapes.cookie else ExpressiveShapes.clover)
                 Column(modifier = Modifier.weight(1f)) {
                     Text(profile.name, color = AppTheme.colors.onSurface, style = androidx.compose.material3.MaterialTheme.typography.headlineMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    Text(profile.handle, color = AppTheme.colors.onSurfaceMuted, style = androidx.compose.material3.MaterialTheme.typography.bodyMedium)
+                    if (profile.handle.isNotBlank()) {
+                        Text(profile.handle, color = AppTheme.colors.onSurfaceMuted, style = androidx.compose.material3.MaterialTheme.typography.bodyMedium)
+                    }
                 }
             }
             Spacer(Modifier.height(Spacing.sm))
-            ProfileField("Estado", profile.state)
-            ProfileField("Profissão", profile.occupation)
-            ProfileField("Telefone", profile.phone)
+            if (profile.state.isNotBlank()) ProfileField("Estado", profile.state)
+            if (profile.occupation.isNotBlank()) ProfileField("Profissão", profile.occupation)
+            if (profile.phone.isNotBlank()) ProfileField("Telefone", profile.phone)
             SectionHeading("Opções", faded = true)
             if (self) {
                 ActionRow("Editar informações", LucideR.drawable.lucide_ic_info, { infoOpen = true })
@@ -135,9 +146,9 @@ fun ProfileScreen(
                 ScreenTitle("Informações", onBack = { scope.launch { sheetState.hide(); infoOpen = false } })
                 Text(profile.name, color = AppTheme.colors.onSurface, style = androidx.compose.material3.MaterialTheme.typography.headlineMedium)
                 Text("Perfil público", color = AppTheme.colors.onSurfaceMuted, style = androidx.compose.material3.MaterialTheme.typography.bodyMedium)
-                ProfileField("Estado", profile.state)
-                ProfileField("Profissão", profile.occupation)
-                ProfileField("Telefone", profile.phone)
+                if (profile.state.isNotBlank()) ProfileField("Estado", profile.state)
+                if (profile.occupation.isNotBlank()) ProfileField("Profissão", profile.occupation)
+                if (profile.phone.isNotBlank()) ProfileField("Telefone", profile.phone)
                 ActionRow("Compartilhar perfil", LucideR.drawable.lucide_ic_share, {})
             }
         }

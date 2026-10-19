@@ -43,6 +43,30 @@ private fun UserDto.displayName(): String = username?.takeIf { it.isNotBlank() }
 
 private fun UserDto.handle(): String = "@" + displayName().replace(" ", "").lowercase()
 
+internal fun SelfProfileDto.toProfile(): UserProfile {
+    val name = person?.name?.takeIf { it.isNotBlank() } ?: "Usuário"
+    val professions = technician?.professions.orEmpty().mapNotNull { it.name?.takeIf { value -> value.isNotBlank() } }
+    val occupation = professions.joinToString(", ").ifBlank {
+        companyMemberships.firstOrNull()?.let { membership ->
+            listOfNotNull(
+                membership.position?.takeIf { it.isNotBlank() },
+                membership.companyName?.takeIf { it.isNotBlank() },
+            ).joinToString(" · ")
+        }.orEmpty()
+    }
+    return UserProfile(
+        id = id,
+        initials = initialsOf(name),
+        name = name,
+        handle = "",
+        state = "",
+        occupation = occupation,
+        phone = person?.phone.orEmpty().trim(),
+        avatarUrl = avatar?.takeIf { it.isNotBlank() },
+        bannerUrl = banner?.takeIf { it.isNotBlank() },
+    )
+}
+
 internal fun UserDto.toProfile(): UserProfile = UserProfile(
     id = id,
     initials = initialsOf(displayName()),
