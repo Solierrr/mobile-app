@@ -11,6 +11,7 @@ import com.project.solaria_mobile.core.auth.TokenStore
 import com.project.solaria_mobile.core.common.ApiResult
 import com.project.solaria_mobile.core.common.ErrorKind
 import com.project.solaria_mobile.core.network.ApiCallExecutor
+import com.project.solaria_mobile.core.offline.OfflineStore
 import com.project.solaria_mobile.feature.auth.domain.AuthRepository
 import com.project.solaria_mobile.feature.auth.domain.SessionState
 import javax.inject.Inject
@@ -28,6 +29,7 @@ class RemoteAuthRepository @Inject constructor(
     private val api: AuthApi,
     private val executor: ApiCallExecutor,
     private val tokenStore: TokenStore,
+    private val offlineStore: OfflineStore,
 ) : AuthRepository {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
@@ -65,6 +67,7 @@ class RemoteAuthRepository @Inject constructor(
         return when (val result = executor.execute { api.redeem(request) }) {
             is ApiResult.Failure -> result
             is ApiResult.Success -> {
+                offlineStore.clearAll()
                 tokenStore.saveTokens(AuthTokens(result.data.accessToken, result.data.refreshToken, result.data.accessTokenExpiresAt))
                 ApiResult.Success(Unit)
             }
@@ -74,6 +77,7 @@ class RemoteAuthRepository @Inject constructor(
     override suspend fun signOut(): ApiResult<Unit> {
         executor.execute { api.logout() }
         tokenStore.clearTokens()
+        offlineStore.clearAll()
         return ApiResult.Success(Unit)
     }
 

@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.project.solaria_mobile.core.common.ApiResult
 import com.project.solaria_mobile.core.common.ErrorKind
+import com.project.solaria_mobile.core.network.NetworkMonitor
 import com.project.solaria_mobile.feature.project.domain.NewProjectDraft
 import com.project.solaria_mobile.feature.project.domain.NewProjectField
 import com.project.solaria_mobile.feature.project.domain.ProjectRepository
@@ -20,6 +21,7 @@ data class NewProjectUiState(
     val errors: Set<NewProjectField> = emptySet(),
     val submitting: Boolean = false,
     val failure: ErrorKind? = null,
+    val offline: Boolean = false,
 )
 
 sealed interface NewProjectEffect {
@@ -29,9 +31,16 @@ sealed interface NewProjectEffect {
 @HiltViewModel
 class NewProjectViewModel @Inject constructor(
     private val repository: ProjectRepository,
+    private val network: NetworkMonitor,
 ) : ViewModel() {
     private val mutableState = MutableStateFlow(NewProjectUiState())
     val uiState: StateFlow<NewProjectUiState> = mutableState
+
+    init {
+        viewModelScope.launch {
+            network.isOnline.collect { online -> mutableState.value = mutableState.value.copy(offline = !online) }
+        }
+    }
 
     private val effects = Channel<NewProjectEffect>(Channel.BUFFERED)
     val effectFlow = effects.receiveAsFlow()
@@ -44,7 +53,7 @@ class NewProjectViewModel @Inject constructor(
 
     fun submit() {
         val current = mutableState.value
-        if (current.submitting) return
+        if (current.submitting || current.offline) return
         val errors = current.draft.validate()
         if (errors.isNotEmpty()) {
             mutableState.value = current.copy(errors = errors, failure = null)
