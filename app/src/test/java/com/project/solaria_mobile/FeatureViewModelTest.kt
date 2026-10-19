@@ -16,6 +16,9 @@ import com.project.solaria_mobile.feature.home.HomeViewModel
 import com.project.solaria_mobile.feature.home.data.FakeHomeRepository
 import com.project.solaria_mobile.feature.profile.ConnectionsViewModel
 import com.project.solaria_mobile.feature.profile.data.FakeProfileRepository
+import com.project.solaria_mobile.feature.profile.domain.Connection
+import com.project.solaria_mobile.feature.profile.domain.ProfileRepository
+import com.project.solaria_mobile.feature.profile.domain.UserProfile
 import com.project.solaria_mobile.feature.project.ProjectDetailViewModel
 import com.project.solaria_mobile.feature.project.ProjectListViewModel
 import com.project.solaria_mobile.feature.project.data.FakeProjectRepository
@@ -44,6 +47,14 @@ class FeatureViewModelTest {
         (expectMostRecentItem() as UiState.Content).data
 
     private fun handleOf(id: String) = SavedStateHandle(mapOf("id" to id))
+
+    private class FailingProfileRepository : ProfileRepository {
+        override suspend fun ownProfile(): ApiResult<UserProfile> = ApiResult.Failure(ErrorKind.SERVER)
+        override suspend fun profile(id: String): ApiResult<UserProfile> = ApiResult.Failure(ErrorKind.SERVER)
+        override suspend fun connections(): ApiResult<List<Connection>> = ApiResult.Failure(ErrorKind.SERVER)
+        override suspend fun isConnected(profileId: String): ApiResult<Boolean> = ApiResult.Failure(ErrorKind.SERVER)
+        override suspend fun toggleConnection(profileId: String): ApiResult<Boolean> = ApiResult.Failure(ErrorKind.SERVER)
+    }
 
     private class FailingProjectRepository : ProjectRepository {
         override suspend fun projects(): ApiResult<List<ProjectSummary>> = ApiResult.Failure(ErrorKind.CONNECTIVITY)
@@ -111,7 +122,7 @@ class FeatureViewModelTest {
     }
 
     @Test fun homeUsesSharedProjectAndCallSources() = runTest {
-        val viewModel = HomeViewModel(FakeHomeRepository(), FakeProjectRepository(), FakeCommunicationRepository())
+        val viewModel = HomeViewModel(FakeHomeRepository(), FakeProjectRepository(), FakeCommunicationRepository(), FakeProfileRepository())
         viewModel.uiState.test {
             val initial = awaitContent()
             assertEquals(4, initial.recentProjects.size)
@@ -119,6 +130,24 @@ class FeatureViewModelTest {
             viewModel.onCallsQueryChange("segurança")
             advanceUntilIdle()
             assertEquals(1, latestContent().recentCalls.size)
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test fun homeAvatarComesFromTheOwnProfile() = runTest {
+        val viewModel = HomeViewModel(FakeHomeRepository(), FakeProjectRepository(), FakeCommunicationRepository(), FakeProfileRepository())
+        viewModel.uiState.test {
+            assertEquals("RC", awaitContent().profile?.initials)
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test fun homeStillLoadsWhenTheProfileFails() = runTest {
+        val viewModel = HomeViewModel(FakeHomeRepository(), FakeProjectRepository(), FakeCommunicationRepository(), FailingProfileRepository())
+        viewModel.uiState.test {
+            val content = awaitContent()
+            assertEquals(null, content.profile)
+            assertEquals(4, content.recentProjects.size)
             cancelAndIgnoreRemainingEvents()
         }
     }
