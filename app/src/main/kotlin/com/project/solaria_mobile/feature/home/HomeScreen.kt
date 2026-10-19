@@ -45,6 +45,7 @@ import com.project.solaria_mobile.core.designsystem.components.RoundIconButton
 import com.project.solaria_mobile.core.designsystem.components.ScreenTitle
 import com.project.solaria_mobile.core.designsystem.components.SectionHeading
 import com.project.solaria_mobile.core.designsystem.components.Avatar
+import com.project.solaria_mobile.core.images.ImageLoaderViewModel
 import com.project.solaria_mobile.core.designsystem.theme.AppTheme
 import com.project.solaria_mobile.core.designsystem.theme.Spacing
 import com.project.solaria_mobile.core.designsystem.theme.Sizing
@@ -60,9 +61,12 @@ fun HomeRoute(
     onOpenPage: (AppDestination) -> Unit,
     modifier: Modifier = Modifier,
     viewModel: HomeViewModel = hiltViewModel(),
+    images: ImageLoaderViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
-    UiStateHost(state, viewModel::load, modifier) { content -> HomeScreen(content, viewModel::onCallsQueryChange, onOpenPage, modifier) }
+    UiStateHost(state, viewModel::load, modifier) { content ->
+        HomeScreen(content, viewModel::onCallsQueryChange, onOpenPage, modifier, images::bytes)
+    }
 }
 
 @Composable
@@ -71,6 +75,7 @@ fun HomeScreen(
     onCallsQueryChange: (String) -> Unit,
     onOpenPage: (AppDestination) -> Unit,
     modifier: Modifier = Modifier,
+    loadImage: (suspend (String) -> ByteArray?)? = null,
 ) {
     var menuOpen by remember { mutableStateOf(false) }
     var callsOpen by remember { mutableStateOf(false) }
@@ -97,10 +102,12 @@ fun HomeScreen(
                 horizontalArrangement = Arrangement.SpaceBetween,
             ) {
                 Avatar(
-                    initials = "S",
+                    initials = state.profile?.initials.orEmpty(),
                     modifier = Modifier.size(Sizing.compactHeaderControl).clickable { onOpenPage(AppDestination.ProfileSelf) },
                     size = Sizing.compactHeaderControl,
                     color = AppTheme.colors.secondary,
+                    imageUrl = state.profile?.avatarUrl,
+                    loadImage = loadImage,
                 )
                 Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
                     RoundIconButton(

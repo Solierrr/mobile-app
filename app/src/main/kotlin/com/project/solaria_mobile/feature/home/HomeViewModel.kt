@@ -10,10 +10,14 @@ import com.project.solaria_mobile.feature.communication.domain.CommunicationRepo
 import com.project.solaria_mobile.feature.communication.domain.ServiceCall
 import com.project.solaria_mobile.feature.home.domain.CompanyLogo
 import com.project.solaria_mobile.feature.home.domain.HomeRepository
+import com.project.solaria_mobile.feature.profile.domain.ProfileRepository
+import com.project.solaria_mobile.feature.profile.domain.UserProfile
 import com.project.solaria_mobile.feature.project.domain.ProjectRepository
 import com.project.solaria_mobile.feature.project.domain.ProjectSummary
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
@@ -26,6 +30,7 @@ data class HomeUiState(
     val recentProjects: List<ProjectSummary> = emptyList(),
     val callsQuery: String = "",
     val recentCalls: List<ServiceCall> = emptyList(),
+    val profile: UserProfile? = null,
 )
 
 private const val RECENT_LIMIT = 4
@@ -34,6 +39,14 @@ private data class HomeContent(
     val companies: List<CompanyLogo>,
     val projects: List<ProjectSummary>,
     val calls: List<ServiceCall>,
+    val profile: UserProfile?,
+)
+
+private data class HomeLoad(
+    val companies: ApiResult<List<CompanyLogo>>,
+    val projects: ApiResult<List<ProjectSummary>>,
+    val calls: ApiResult<List<ServiceCall>>,
+    val profile: ApiResult<UserProfile>,
 )
 
 @HiltViewModel
@@ -41,6 +54,7 @@ class HomeViewModel @Inject constructor(
     private val homeRepository: HomeRepository,
     private val projectRepository: ProjectRepository,
     private val communicationRepository: CommunicationRepository,
+    private val profileRepository: ProfileRepository,
 ) : ViewModel() {
     private val callsQuery = MutableStateFlow("")
     private val content = MutableStateFlow<UiState<HomeContent>>(UiState.Loading)
@@ -52,6 +66,7 @@ class HomeViewModel @Inject constructor(
                     recentCompanies = loaded.data.companies,
                     recentProjects = loaded.data.projects.take(RECENT_LIMIT),
                     callsQuery = query,
+                    profile = loaded.data.profile,
                     recentCalls = loaded.data.calls.take(RECENT_LIMIT).filter {
                         it.title.contains(query, ignoreCase = true) || it.detail.contains(query, ignoreCase = true)
                     },
@@ -68,15 +83,19 @@ class HomeViewModel @Inject constructor(
     fun load() {
         viewModelScope.launch {
             content.value = UiState.Loading
-            val companies = homeRepository.recentCompanies()
-            val projects = projectRepository.projects()
-            val calls = communicationRepository.calls()
+            val (companies, projects, calls, profile) = coroutineScope {
+                val companiesCall = async { homeRepository.recentCompanies() }
+                val projectsCall = async { projectRepository.projects() }
+                val callsCall = async { communicationRepository.calls() }
+                val profileCall = async { profileRepository.ownProfile() }
+                HomeLoad(companiesCall.await(), projectsCall.await(), callsCall.await(), profileCall.await())
+            }
             content.value = when {
                 companies is ApiResult.Failure -> UiState.Error(companies.kind)
                 projects is ApiResult.Failure -> UiState.Error(projects.kind)
                 calls is ApiResult.Failure -> UiState.Error(calls.kind)
                 companies is ApiResult.Success && projects is ApiResult.Success && calls is ApiResult.Success ->
-                    ApiResult.Success(HomeContent(companies.data, projects.data, calls.data)).toUiState()
+                    ApiResult.Success(HomeContent(companies.data, projects.data, calls.data, (profile as? ApiResult.Success)?.data)).toUiState()
                 else -> UiState.Error(ErrorKind.UNKNOWN)
             }
         }
