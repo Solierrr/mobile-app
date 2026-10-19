@@ -169,8 +169,8 @@ fun ProjectDetailScreen(
                 verticalArrangement = Arrangement.spacedBy(Spacing.md),
             ) {
                 ScreenTitle("Opções", onBack = { menuOpen = false })
-                ActionRow("Listar projetos", LucideR.drawable.lucide_ic_folder, { scope.launch { sheetState.hide(); menuOpen = false; onNavigate(AppDestination.Projects) } }, trailing = "24 projetos")
-                ActionRow("Novo projeto", LucideR.drawable.lucide_ic_folder_plus, { menuOpen = false })
+                ActionRow("Listar projetos", LucideR.drawable.lucide_ic_folder, { scope.launch { sheetState.hide(); menuOpen = false; onNavigate(AppDestination.Projects) } })
+                ActionRow("Novo projeto", LucideR.drawable.lucide_ic_folder_plus, { scope.launch { sheetState.hide(); menuOpen = false; onNavigate(AppDestination.NewProject) } })
                 ActionRow("Configurações", LucideR.drawable.lucide_ic_settings, { scope.launch { sheetState.hide(); menuOpen = false; onNavigate(AppDestination.Settings) } })
             }
         }

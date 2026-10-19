@@ -75,7 +75,7 @@ private fun MessageText(text: String) {
     )
 }
 
-private fun ErrorKind.userMessage(): String = when (this) {
+fun ErrorKind.userMessage(): String = when (this) {
     ErrorKind.CONNECTIVITY -> "Sem conexão. Verifique sua internet."
     ErrorKind.TIMEOUT -> "O servidor demorou para responder."
     ErrorKind.UNAUTHORIZED -> "Sua sessão expirou. Entre novamente."

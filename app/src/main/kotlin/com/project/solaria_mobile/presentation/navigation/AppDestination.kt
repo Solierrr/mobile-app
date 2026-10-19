@@ -7,6 +7,7 @@ sealed interface AppDestination {
     @Serializable data object Home : AppDestination
     @Serializable data object Projects : AppDestination
     @Serializable data class Project(val id: String) : AppDestination
+    @Serializable data object NewProject : AppDestination
     @Serializable data object Chats : AppDestination
     @Serializable data class Chat(val id: String) : AppDestination
     @Serializable data object Calls : AppDestination
