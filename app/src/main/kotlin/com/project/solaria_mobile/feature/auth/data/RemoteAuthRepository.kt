@@ -47,6 +47,7 @@ class RemoteAuthRepository @Inject constructor(
             redirectUri = BuildConfig.AUTH_REDIRECT_URI,
             state = state,
             codeChallenge = Pkce.challengeFor(verifier),
+            codeChallengeMethod = CODE_CHALLENGE_METHOD,
         )
         return when (val result = executor.execute { api.startTransaction(request) }) {
             is ApiResult.Failure -> result
@@ -78,6 +79,7 @@ class RemoteAuthRepository @Inject constructor(
 
     private companion object {
         const val CLIENT_ID = "solaria-mobile"
+        const val CODE_CHALLENGE_METHOD = "S256"
         const val VERIFIER_BYTES = 64
         const val STATE_BYTES = 32
     }
