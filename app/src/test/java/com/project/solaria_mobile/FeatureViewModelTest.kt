@@ -59,6 +59,7 @@ class FeatureViewModelTest {
     private class FailingProjectRepository : ProjectRepository {
         override suspend fun projects(): ApiResult<List<ProjectSummary>> = ApiResult.Failure(ErrorKind.CONNECTIVITY)
         override suspend fun project(id: String): ApiResult<ProjectSummary> = ApiResult.Failure(ErrorKind.CONNECTIVITY)
+        override suspend fun create(draft: com.project.solaria_mobile.feature.project.domain.NewProjectDraft): ApiResult<String> = ApiResult.Failure(ErrorKind.CONNECTIVITY)
     }
 
     @Test fun sendingMessageUpdatesRepositoryAndClearsDraft() = runTest {

@@ -214,8 +214,10 @@ fun HomeScreen(
                 Spacer(Modifier.height(Spacing.xs))
                 ActionRow("Listar projetos", LucideR.drawable.lucide_ic_folder, {
                     scope.launch { sheetState.hide(); menuOpen = false; onOpenPage(AppDestination.Projects) }
-                }, trailing = "24 projetos")
-                ActionRow("Novo projeto", LucideR.drawable.lucide_ic_folder_plus, { menuOpen = false })
+                })
+                ActionRow("Novo projeto", LucideR.drawable.lucide_ic_folder_plus, {
+                    scope.launch { sheetState.hide(); menuOpen = false; onOpenPage(AppDestination.NewProject) }
+                })
                 ActionRow("Configurações", LucideR.drawable.lucide_ic_settings, {
                     scope.launch { sheetState.hide(); menuOpen = false; onOpenPage(AppDestination.Settings) }
                 })

@@ -26,6 +26,7 @@ import com.project.solaria_mobile.feature.profile.ConnectionsRoute
 import com.project.solaria_mobile.feature.profile.EnterpriseScreen
 import com.project.solaria_mobile.feature.profile.ProfileRoute
 import com.project.solaria_mobile.feature.profile.SettingsRoute
+import com.project.solaria_mobile.feature.project.NewProjectRoute
 import com.project.solaria_mobile.feature.project.ProjectDetailRoute
 import com.project.solaria_mobile.feature.project.ProjectListRoute
 
@@ -62,6 +63,16 @@ fun AppNavHost(
             ProjectListRoute(onBack = ::back, onOpenProject = { open(AppDestination.Project(it)) }, onOpenMap = { open(AppDestination.Map) })
         }
         composable<AppDestination.Project> { ProjectDetailRoute(onBack = ::back, onNavigate = ::open) }
+        composable<AppDestination.NewProject> {
+            NewProjectRoute(
+                onBack = ::back,
+                onCreated = { id ->
+                    navController.navigate(AppDestination.Project(id)) {
+                        popUpTo<AppDestination.NewProject> { inclusive = true }
+                    }
+                },
+            )
+        }
         composable<AppDestination.Chats> {
             ConversationsRoute(
                 onBack = ::back,

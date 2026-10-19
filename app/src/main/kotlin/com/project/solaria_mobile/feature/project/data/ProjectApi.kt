@@ -2,7 +2,9 @@ package com.project.solaria_mobile.feature.project.data
 
 import kotlinx.serialization.Serializable
 import okhttp3.ResponseBody
+import retrofit2.http.Body
 import retrofit2.http.GET
+import retrofit2.http.POST
 import retrofit2.http.Path
 import retrofit2.http.Streaming
 
@@ -24,6 +26,13 @@ data class ProjectDto(
     val description: String? = null,
     val ownerName: String? = null,
     val status: String? = null,
+    val location: ProjectLocationDto? = null,
+)
+
+@Serializable
+data class ProjectRequestDto(
+    val name: String,
+    val description: String? = null,
     val location: ProjectLocationDto? = null,
 )
 
@@ -69,6 +78,9 @@ interface ProjectApi {
 
     @GET("api/projects/{id}")
     suspend fun project(@Path("id") id: String): ProjectDto
+
+    @POST("api/projects")
+    suspend fun create(@Body body: ProjectRequestDto): ProjectDto
 
     @GET("api/projects/{id}/members")
     suspend fun members(@Path("id") id: String): List<ProjectMemberDto>

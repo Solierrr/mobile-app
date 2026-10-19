@@ -2,6 +2,7 @@ package com.project.solaria_mobile.feature.project.data
 
 import com.project.solaria_mobile.core.common.ApiResult
 import com.project.solaria_mobile.core.common.ErrorKind
+import com.project.solaria_mobile.feature.project.domain.NewProjectDraft
 import com.project.solaria_mobile.feature.project.domain.ProjectRepository
 import com.project.solaria_mobile.feature.project.domain.ProjectSummary
 import javax.inject.Inject
@@ -20,4 +21,6 @@ class FakeProjectRepository @Inject constructor() : ProjectRepository {
 
     override suspend fun project(id: String): ApiResult<ProjectSummary> =
         items.firstOrNull { it.id == id }?.let { ApiResult.Success(it) } ?: ApiResult.Failure(ErrorKind.NOT_FOUND)
+
+    override suspend fun create(draft: NewProjectDraft): ApiResult<String> = ApiResult.Success("new")
 }
