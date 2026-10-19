@@ -17,11 +17,34 @@ data class UserDto(
 )
 
 @Serializable
+data class SelfPersonDto(val name: String? = null, val phone: String? = null)
+
+@Serializable
+data class SelfProfessionDto(val id: String? = null, val name: String? = null)
+
+@Serializable
+data class SelfTechnicianDto(val id: String? = null, val professions: List<SelfProfessionDto> = emptyList())
+
+@Serializable
+data class SelfMembershipDto(val companyId: String? = null, val companyName: String? = null, val position: String? = null)
+
+@Serializable
+data class SelfProfileDto(
+    val id: String,
+    val authId: String? = null,
+    val avatar: String? = null,
+    val banner: String? = null,
+    val person: SelfPersonDto? = null,
+    val technician: SelfTechnicianDto? = null,
+    val companyMemberships: List<SelfMembershipDto> = emptyList(),
+)
+
+@Serializable
 data class ConnectionRequest(val connectedUserId: String)
 
 interface ProfileApi {
     @GET("api/users/me")
-    suspend fun me(): UserDto
+    suspend fun me(): SelfProfileDto
 
     @GET("api/connections")
     suspend fun connections(): List<UserDto>

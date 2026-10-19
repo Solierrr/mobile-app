@@ -8,6 +8,8 @@ data class UserProfile(
     val state: String,
     val occupation: String,
     val phone: String,
+    val avatarUrl: String? = null,
+    val bannerUrl: String? = null,
 )
 
 data class Connection(val id: String, val initials: String, val name: String, val handle: String)

@@ -36,6 +36,7 @@ import androidx.compose.ui.unit.dp
 import com.project.solaria_mobile.R
 import com.composables.icons.lucide.R as LucideR
 import com.project.solaria_mobile.core.designsystem.components.ActionRow
+import com.project.solaria_mobile.core.designsystem.components.RemoteImage
 import com.project.solaria_mobile.core.designsystem.components.RoundIconButton
 import com.project.solaria_mobile.core.designsystem.components.ScreenTitle
 import com.project.solaria_mobile.core.designsystem.theme.AppTheme
@@ -87,8 +88,8 @@ fun ProjectDetailScreen(
     ) {
         Box(modifier = Modifier.fillMaxWidth().height(345.dp)) {
             if (coverId != null) {
-                ProjectPhotoImage(
-                    photoId = coverId,
+                RemoteImage(
+                    key = coverId,
                     load = sections::photoContent,
                     description = project.name,
                     modifier = Modifier.fillMaxSize(),
