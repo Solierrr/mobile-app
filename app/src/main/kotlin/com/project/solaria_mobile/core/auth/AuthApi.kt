@@ -11,7 +11,7 @@ data class StartTransactionRequest(
     val redirectUri: String,
     val state: String,
     val codeChallenge: String,
-    val codeChallengeMethod: String = "S256",
+    val codeChallengeMethod: String,
 )
 
 @Serializable
