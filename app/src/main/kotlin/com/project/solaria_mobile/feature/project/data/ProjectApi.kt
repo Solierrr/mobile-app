@@ -25,6 +25,9 @@ data class ProjectDto(
     val name: String,
     val description: String? = null,
     val ownerName: String? = null,
+    val ownerCompanyId: String? = null,
+    val ownerCompanyLogoUrl: String? = null,
+    val createdAt: String? = null,
     val status: String? = null,
     val location: ProjectLocationDto? = null,
 )

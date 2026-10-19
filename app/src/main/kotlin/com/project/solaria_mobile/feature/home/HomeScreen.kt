@@ -22,6 +22,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Surface
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
@@ -52,7 +53,9 @@ import com.project.solaria_mobile.core.designsystem.theme.Sizing
 import com.project.solaria_mobile.core.designsystem.theme.Radius
 import com.project.solaria_mobile.feature.communication.CallsBottomSheet
 import com.project.solaria_mobile.presentation.navigation.AppDestination
-import com.project.solaria_mobile.feature.home.domain.CompanyLogoId
+import com.project.solaria_mobile.core.designsystem.components.RemoteImage
+import com.project.solaria_mobile.core.format.initialsOf
+import com.project.solaria_mobile.feature.home.domain.RecentCompany
 import kotlinx.coroutines.launch
 import com.project.solaria_mobile.core.designsystem.components.UiStateHost
 
@@ -126,31 +129,22 @@ fun HomeScreen(
                 }
             }
 
-            Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-                SectionHeading(text = "Empresas recentes", faded = true)
-                Row(
-                    modifier = Modifier.horizontalScroll(rememberScrollState()),
-                    horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
-                ) {
-                    state.recentCompanies.forEach { company ->
-                        Surface(
-                            modifier = Modifier.size(Sizing.companyLogo),
-                            onClick = { onOpenPage(AppDestination.Enterprise) },
-                            shape = RoundedCornerShape(Radius.companyLogo),
-                            color = AppTheme.colors.surface,
-                            shadowElevation = 2.dp,
-                        ) {
-                            Image(
-                                painter = painterResource(when (company.logoId) {
-                                    CompanyLogoId.GOOGLE -> R.drawable.company_logo_1
-                                    CompanyLogoId.SWIFT -> R.drawable.company_logo_2
-                                    CompanyLogoId.AMAZON -> R.drawable.company_logo_3
-                                    CompanyLogoId.PARTNER -> R.drawable.company_logo_4
-                                    CompanyLogoId.SOLAR -> R.drawable.company_logo_5
-                                }),
-                                contentDescription = company.name,
-                                contentScale = ContentScale.Crop,
-                            )
+            if (state.recentCompanies.isNotEmpty()) {
+                Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+                    SectionHeading(text = "Empresas recentes", faded = true)
+                    Row(
+                        modifier = Modifier.horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+                    ) {
+                        state.recentCompanies.forEach { company ->
+                            Surface(
+                                modifier = Modifier.size(Sizing.companyLogo),
+                                shape = RoundedCornerShape(Radius.companyLogo),
+                                color = AppTheme.colors.surface,
+                                shadowElevation = 2.dp,
+                            ) {
+                                CompanyLogoImage(company, loadImage)
+                            }
                         }
                     }
                 }
@@ -272,5 +266,20 @@ private fun RecentProjectCard(name: String, onClick: () -> Unit) {
                 )
             }
         }
+    }
+}
+
+@Composable
+private fun CompanyLogoImage(company: RecentCompany, loadImage: (suspend (String) -> ByteArray?)?) {
+    val initials = initialsOf(company.name)
+    val label: @Composable () -> Unit = {
+        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            Text(initials, color = AppTheme.colors.onSurfaceMuted, style = MaterialTheme.typography.titleMedium)
+        }
+    }
+    if (company.logoUrl != null && loadImage != null) {
+        RemoteImage(company.logoUrl, loadImage, company.name, Modifier.fillMaxSize(), placeholder = false, fallback = label)
+    } else {
+        label()
     }
 }

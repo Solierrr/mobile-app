@@ -41,7 +41,7 @@ fun <T> UiStateHost(
     when (state) {
         is UiState.Content -> content(state.data)
         UiState.Loading -> CenteredMessage(modifier) {
-            MorphingHexagon(Modifier.size(Sizing.loadingIndicator))
+            BrandLoader(widthFraction = LOADING_WIDTH_FRACTION)
             SlowLoadingHint()
         }
         UiState.Empty -> CenteredMessage(modifier) {

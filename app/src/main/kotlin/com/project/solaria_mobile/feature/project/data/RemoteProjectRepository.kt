@@ -6,6 +6,7 @@ import com.project.solaria_mobile.core.network.ApiCallExecutor
 import com.project.solaria_mobile.feature.project.domain.NewProjectDraft
 import com.project.solaria_mobile.feature.project.domain.ProjectRepository
 import com.project.solaria_mobile.feature.project.domain.ProjectSummary
+import java.time.OffsetDateTime
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -52,4 +53,8 @@ internal fun ProjectDto.toSummary(): ProjectSummary = ProjectSummary(
         else -> status.orEmpty()
     },
     people = ownerName?.takeIf { it.isNotBlank() }?.let { "Responsável: $it" }.orEmpty(),
+    companyId = ownerCompanyId?.takeIf { it.isNotBlank() },
+    companyName = if (ownerCompanyId.isNullOrBlank()) "" else ownerName.orEmpty().trim(),
+    companyLogoUrl = ownerCompanyLogoUrl?.takeIf { it.isNotBlank() },
+    createdAtMillis = createdAt?.let { runCatching { OffsetDateTime.parse(it).toInstant().toEpochMilli() }.getOrNull() } ?: 0,
 )

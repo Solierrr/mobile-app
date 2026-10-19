@@ -8,8 +8,7 @@ import com.project.solaria_mobile.core.common.UiState
 import com.project.solaria_mobile.core.common.toUiState
 import com.project.solaria_mobile.feature.communication.domain.CommunicationRepository
 import com.project.solaria_mobile.feature.communication.domain.ServiceCall
-import com.project.solaria_mobile.feature.home.domain.CompanyLogo
-import com.project.solaria_mobile.feature.home.domain.HomeRepository
+import com.project.solaria_mobile.feature.home.domain.RecentCompany
 import com.project.solaria_mobile.feature.profile.domain.ProfileRepository
 import com.project.solaria_mobile.feature.profile.domain.UserProfile
 import com.project.solaria_mobile.feature.project.domain.ProjectRepository
@@ -26,7 +25,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.launch
 
 data class HomeUiState(
-    val recentCompanies: List<CompanyLogo> = emptyList(),
+    val recentCompanies: List<RecentCompany> = emptyList(),
     val recentProjects: List<ProjectSummary> = emptyList(),
     val callsQuery: String = "",
     val recentCalls: List<ServiceCall> = emptyList(),
@@ -34,16 +33,15 @@ data class HomeUiState(
 )
 
 private const val RECENT_LIMIT = 4
+private const val RECENT_COMPANY_LIMIT = 8
 
 private data class HomeContent(
-    val companies: List<CompanyLogo>,
     val projects: List<ProjectSummary>,
     val calls: List<ServiceCall>,
     val profile: UserProfile?,
 )
 
 private data class HomeLoad(
-    val companies: ApiResult<List<CompanyLogo>>,
     val projects: ApiResult<List<ProjectSummary>>,
     val calls: ApiResult<List<ServiceCall>>,
     val profile: ApiResult<UserProfile>,
@@ -51,7 +49,6 @@ private data class HomeLoad(
 
 @HiltViewModel
 class HomeViewModel @Inject constructor(
-    private val homeRepository: HomeRepository,
     private val projectRepository: ProjectRepository,
     private val communicationRepository: CommunicationRepository,
     private val profileRepository: ProfileRepository,
@@ -63,8 +60,8 @@ class HomeViewModel @Inject constructor(
         when (loaded) {
             is UiState.Content -> UiState.Content(
                 HomeUiState(
-                    recentCompanies = loaded.data.companies,
-                    recentProjects = loaded.data.projects.take(RECENT_LIMIT),
+                    recentCompanies = recentCompaniesOf(loaded.data.projects),
+                    recentProjects = loaded.data.projects.sortedByDescending { it.createdAtMillis }.take(RECENT_LIMIT),
                     callsQuery = query,
                     profile = loaded.data.profile,
                     recentCalls = loaded.data.calls.take(RECENT_LIMIT).filter {
@@ -83,19 +80,17 @@ class HomeViewModel @Inject constructor(
     fun load() {
         viewModelScope.launch {
             content.value = UiState.Loading
-            val (companies, projects, calls, profile) = coroutineScope {
-                val companiesCall = async { homeRepository.recentCompanies() }
+            val (projects, calls, profile) = coroutineScope {
                 val projectsCall = async { projectRepository.projects() }
                 val callsCall = async { communicationRepository.calls() }
                 val profileCall = async { profileRepository.ownProfile() }
-                HomeLoad(companiesCall.await(), projectsCall.await(), callsCall.await(), profileCall.await())
+                HomeLoad(projectsCall.await(), callsCall.await(), profileCall.await())
             }
             content.value = when {
-                companies is ApiResult.Failure -> UiState.Error(companies.kind)
                 projects is ApiResult.Failure -> UiState.Error(projects.kind)
                 calls is ApiResult.Failure -> UiState.Error(calls.kind)
-                companies is ApiResult.Success && projects is ApiResult.Success && calls is ApiResult.Success ->
-                    ApiResult.Success(HomeContent(companies.data, projects.data, calls.data, (profile as? ApiResult.Success)?.data)).toUiState()
+                projects is ApiResult.Success && calls is ApiResult.Success ->
+                    ApiResult.Success(HomeContent(projects.data, calls.data, (profile as? ApiResult.Success)?.data)).toUiState()
                 else -> UiState.Error(ErrorKind.UNKNOWN)
             }
         }
@@ -103,3 +98,11 @@ class HomeViewModel @Inject constructor(
 
     fun onCallsQueryChange(value: String) { callsQuery.value = value }
 }
+
+internal fun recentCompaniesOf(projects: List<ProjectSummary>): List<RecentCompany> =
+    projects
+        .filter { it.companyId != null && it.companyName.isNotBlank() }
+        .sortedByDescending { it.createdAtMillis }
+        .distinctBy { it.companyId }
+        .take(RECENT_COMPANY_LIMIT)
+        .map { RecentCompany(id = it.companyId.orEmpty(), name = it.companyName, logoUrl = it.companyLogoUrl) }
