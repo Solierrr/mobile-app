@@ -17,6 +17,12 @@ interface TokenStore {
 
     suspend fun saveTokens(tokens: AuthTokens)
 
+    suspend fun replaceTokensIfCurrent(expected: AuthTokens, replacement: AuthTokens?): Boolean {
+        if (currentTokens() != expected) return false
+        if (replacement == null) clearTokens() else saveTokens(replacement)
+        return true
+    }
+
     suspend fun clearTokens()
 
     suspend fun savePendingLogin(pending: PendingLogin)
