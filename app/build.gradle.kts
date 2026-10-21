@@ -29,7 +29,7 @@ android {
             dimension = "environment"
             applicationIdSuffix = ".qa"
             versionNameSuffix = "-qa"
-            resValue("string", "app_name", "Elos QA")
+            resValue("string", "app_name", "Elos")
             buildConfigField("String", "ENVIRONMENT", "\"qa\"")
             manifestPlaceholders["authScheme"] = "solaria-qa"
             buildConfigField("String", "AUTH_REDIRECT_URI", "\"solaria-qa://auth/callback\"")
