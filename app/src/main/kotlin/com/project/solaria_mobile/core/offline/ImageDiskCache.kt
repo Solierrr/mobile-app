@@ -31,7 +31,7 @@ class ImageDiskCache @Inject constructor(@ApplicationContext context: Context, p
             val target = file(key, request)
             val pending = File(target.path + ".tmp")
             pending.writeBytes(bytes)
-            if (!pending.renameTo(target)) pending.delete()
+            if (!pending.renameTo(target)) java.nio.file.Files.delete(pending.toPath())
         }
     }
 

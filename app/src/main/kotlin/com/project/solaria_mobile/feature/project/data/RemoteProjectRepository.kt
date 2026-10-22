@@ -45,7 +45,7 @@ class RemoteProjectRepository @Inject constructor(
         if (reader.cached("project:$id", ProjectCacheSerializer) == null) {
             val list = reader.cached("projects", ListSerializer(ProjectCacheSerializer))
             val project = (list?.result as? ApiResult.Success)?.data?.firstOrNull { it.id == id }
-            if (project != null) emit(ReadResult(ApiResult.Success(project.toSummary()), list?.syncedAt, cached = true, refreshing = network.isOnline.first()))
+            if (project != null) emit(ReadResult(ApiResult.Success(project.toSummary()), list.syncedAt, cached = true, refreshing = network.isOnline.first()))
         }
         emitAll(reader.observe("project:$id", ProjectCacheSerializer) { api.project(id) }.map { read -> read.map { it.toSummary() } })
     }

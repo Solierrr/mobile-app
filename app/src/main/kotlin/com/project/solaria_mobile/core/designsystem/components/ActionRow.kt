@@ -42,7 +42,7 @@ fun ActionRow(
         Row(
             modifier = Modifier
                 .defaultMinSize(minHeight = if (compact) Sizing.touchTarget else Sizing.actionHeight)
-                .padding(horizontal = if (compact) Spacing.md else Spacing.md, vertical = Spacing.sm),
+                .padding(horizontal = Spacing.md, vertical = Spacing.sm),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
         ) {

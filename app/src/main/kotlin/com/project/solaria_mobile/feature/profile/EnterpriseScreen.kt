@@ -40,6 +40,8 @@ import com.project.solaria_mobile.core.format.initialsOf
 import com.project.solaria_mobile.core.images.ImageLoaderViewModel
 import com.project.solaria_mobile.feature.project.ProjectCardImage
 
+private const val COMPANY_TITLE = "Sua empresa"
+
 @Composable
 fun EnterpriseRoute(
     onBack: () -> Unit,
@@ -50,11 +52,11 @@ fun EnterpriseRoute(
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val offline = com.project.solaria_mobile.core.offline.LocalOffline.current
     UiStateHost(state, viewModel::load, onBack = onBack,
-        header = { ScreenTitle("Sua empresa", onBack) },
+        header = { ScreenTitle(COMPANY_TITLE, onBack) },
         empty = { StateNotice("Sua conta não tem empresa vinculada", "Você pode continuar acessando seus projetos e os demais recursos da sua conta.", icon = AppIcons.building, actions = { PrimaryButton("Voltar", onBack, secondary = true, compact = true) }) },
     ) { company ->
         if (!company.detailsAvailable) {
-            StateNoticePage(header = { ScreenTitle("Sua empresa", onBack) }) {
+            StateNoticePage(header = { ScreenTitle(COMPANY_TITLE, onBack) }) {
                 StateNotice("O perfil ainda não está disponível", "No momento, não há informações da empresa disponíveis para consulta.", icon = AppIcons.building,
                     actions = { PrimaryButton("Voltar", onBack, secondary = true, compact = true) })
             }
@@ -65,7 +67,7 @@ fun EnterpriseRoute(
             contentPadding = androidx.compose.foundation.layout.PaddingValues(Spacing.screen),
             verticalArrangement = Arrangement.spacedBy(Spacing.lg),
         ) {
-            item { ScreenTitle("Sua empresa", onBack, actions = { if (company.detailsAvailable) RefreshButton(viewModel::load, (state as? UiState.Content)?.refreshing == true, "Atualizar empresa") }) }
+            item { ScreenTitle(COMPANY_TITLE, onBack, actions = { if (company.detailsAvailable) RefreshButton(viewModel::load, (state as? UiState.Content)?.refreshing == true, "Atualizar empresa") }) }
             item {
                 Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(Spacing.md)) {
                     Avatar(initialsOf(company.name), size = Sizing.avatarLarge, color = AppTheme.colors.surface, shape = RoundedCornerShape(Radius.medium), imageUrl = company.logoUrl, loadImage = images::bytes, textColor = AppTheme.colors.onSurface, imageContentScale = ContentScale.Fit)
