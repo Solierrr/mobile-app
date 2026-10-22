@@ -22,8 +22,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.dp
-import com.composables.icons.lucide.R as LucideR
+import com.project.solaria_mobile.core.designsystem.icons.AppIcons
 import com.project.solaria_mobile.core.designsystem.theme.AppTheme
 import com.project.solaria_mobile.core.designsystem.theme.Spacing
 import com.project.solaria_mobile.core.designsystem.theme.Sizing
@@ -43,13 +42,13 @@ internal fun CallCard(call: ServiceCall, onClick: () -> Unit) {
             verticalAlignment = Alignment.CenterVertically,
         ) {
             val icon = when (call.icon) {
-                ServiceCallIcon.HASH -> LucideR.drawable.lucide_ic_hash
-                ServiceCallIcon.PHONE -> LucideR.drawable.lucide_ic_phone
-                ServiceCallIcon.SHIELD_ALERT -> LucideR.drawable.lucide_ic_shield_alert
+                ServiceCallIcon.HASH -> AppIcons.hash
+                ServiceCallIcon.PHONE -> AppIcons.phone
+                ServiceCallIcon.SHIELD_ALERT -> AppIcons.shield_alert
             }
             Icon(painter = painterResource(icon), contentDescription = null, tint = AppTheme.colors.onSurface, modifier = Modifier.size(Sizing.icon))
-            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                Text(call.title, color = AppTheme.colors.onSurface, style = androidx.compose.material3.MaterialTheme.typography.bodyMedium)
+            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(Spacing.xxs)) {
+                Text(call.title, color = AppTheme.colors.onSurface, style = androidx.compose.material3.MaterialTheme.typography.titleSmall)
                 Text(call.detail, color = AppTheme.colors.onSurfaceMuted, style = androidx.compose.material3.MaterialTheme.typography.labelMedium, maxLines = 2, overflow = TextOverflow.Ellipsis)
             }
             if (call.badge != null) {

@@ -4,7 +4,8 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.project.solaria_mobile.core.common.UiState
-import com.project.solaria_mobile.core.common.load
+import com.project.solaria_mobile.core.common.collectRead
+import kotlinx.coroutines.Job
 import com.project.solaria_mobile.feature.project.domain.ProjectActivity
 import com.project.solaria_mobile.feature.project.domain.ProjectDetailRepository
 import com.project.solaria_mobile.feature.project.domain.ProjectHistoryEntry
@@ -23,7 +24,7 @@ class ProjectSectionsViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
     private val repository: ProjectDetailRepository,
 ) : ViewModel() {
-    private val projectId = savedStateHandle.routeId()
+    val projectId = savedStateHandle.routeId()
 
     private val mutableLocation = MutableStateFlow<UiState<ProjectLocationInfo>>(UiState.Loading)
     private val mutableMembers = MutableStateFlow<UiState<List<ProjectMember>>>(UiState.Loading)
@@ -38,6 +39,7 @@ class ProjectSectionsViewModel @Inject constructor(
     val photos: StateFlow<UiState<List<ProjectPhoto>>> = mutablePhotos
 
     private val loaded = mutableSetOf<ProjectSheet>()
+    private val jobs = mutableMapOf<ProjectSheet, Job>()
 
     init { loadPhotos() }
 
@@ -52,18 +54,20 @@ class ProjectSectionsViewModel @Inject constructor(
         (repository.photoContent(projectId, photoId) as? com.project.solaria_mobile.core.common.ApiResult.Success)?.data
 
     private fun loadPhotos() {
-        viewModelScope.launch { mutablePhotos.load(isEmpty = { it.isEmpty() }) { repository.photos(projectId) } }
+        loaded += ProjectSheet.GALLERY
+        jobs[ProjectSheet.GALLERY] = viewModelScope.launch { mutablePhotos.collectRead(repository.observePhotos(projectId), isEmpty = { it.isEmpty() }) }
     }
 
     private fun load(sheet: ProjectSheet) {
         loaded += sheet
-        viewModelScope.launch {
+        jobs.remove(sheet)?.cancel()
+        jobs[sheet] = viewModelScope.launch {
             when (sheet) {
-                ProjectSheet.LOCATION -> mutableLocation.load { repository.location(projectId) }
-                ProjectSheet.GALLERY -> mutablePhotos.load(isEmpty = { it.isEmpty() }) { repository.photos(projectId) }
-                ProjectSheet.AGENDA -> mutableActivities.load(isEmpty = { it.isEmpty() }) { repository.activities(projectId) }
-                ProjectSheet.HISTORY -> mutableHistory.load(isEmpty = { it.isEmpty() }) { repository.history(projectId) }
-                ProjectSheet.TEAM -> mutableMembers.load(isEmpty = { it.isEmpty() }) { repository.members(projectId) }
+                ProjectSheet.LOCATION -> mutableLocation.collectRead(repository.observeLocation(projectId))
+                ProjectSheet.GALLERY -> mutablePhotos.collectRead(repository.observePhotos(projectId), isEmpty = { it.isEmpty() })
+                ProjectSheet.AGENDA -> mutableActivities.collectRead(repository.observeActivities(projectId), isEmpty = { it.isEmpty() })
+                ProjectSheet.HISTORY -> mutableHistory.collectRead(repository.observeHistory(projectId), isEmpty = { it.isEmpty() })
+                ProjectSheet.TEAM -> mutableMembers.collectRead(repository.observeMembers(projectId), isEmpty = { it.isEmpty() })
                 ProjectSheet.CONVERSATIONS -> Unit
             }
         }

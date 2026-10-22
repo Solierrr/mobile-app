@@ -31,11 +31,18 @@ class RemoteAuthRepository @Inject constructor(
     private val executor: ApiCallExecutor,
     private val tokenStore: TokenStore,
     private val flavorLogin: FlavorLogin,
+    private val offline: com.project.solaria_mobile.core.offline.OfflineStore,
 ) : AuthRepository {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
+    private var hadSession = tokenStore.currentTokens() != null
+
     override val session: StateFlow<SessionState> = tokenStore.tokens
-        .map { if (it == null) SessionState.SIGNED_OUT else SessionState.SIGNED_IN }
+        .map {
+            if (it == null && hadSession) offline.clearAll()
+            hadSession = it != null
+            if (it == null) SessionState.SIGNED_OUT else SessionState.SIGNED_IN
+        }
         .stateIn(
             scope,
             SharingStarted.Eagerly,
@@ -43,6 +50,7 @@ class RemoteAuthRepository @Inject constructor(
         )
 
     override suspend fun beginLogin(): ApiResult<LoginDestination> {
+        offline.clearAll()
         flavorLogin.beginLogin()?.let { return it }
         val verifier = Pkce.randomUrlSafe(VERIFIER_BYTES)
         val state = Pkce.randomUrlSafe(STATE_BYTES)
@@ -78,6 +86,7 @@ class RemoteAuthRepository @Inject constructor(
     override suspend fun signOut(): ApiResult<Unit> {
         executor.execute { api.logout() }
         tokenStore.clearTokens()
+        offline.clearAll()
         return ApiResult.Success(Unit)
     }
 

@@ -15,7 +15,6 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import com.composables.icons.lucide.R as LucideR
 import com.project.solaria_mobile.core.designsystem.components.ScreenTitle
 import com.project.solaria_mobile.core.designsystem.components.SearchField
 import com.project.solaria_mobile.core.designsystem.components.SectionHeading
@@ -30,7 +29,7 @@ fun CallsRoute(
     viewModel: CallsViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
-    UiStateHost(state, viewModel::load) { content -> CallsScreen(content, viewModel::onQueryChange, onBack, onOpenCall) }
+    UiStateHost(state, viewModel::load, onBack = onBack, header = { ScreenTitle("Chamados", onBack) }, unavailableMessage = "Seus chamados serão exibidos aqui quando este recurso estiver disponível.") { content -> CallsScreen(content, viewModel::onQueryChange, onBack, onOpenCall) }
 }
 
 @Composable
@@ -44,8 +43,8 @@ fun CallsScreen(
         modifier = Modifier.fillMaxSize().background(AppTheme.colors.surface).padding(horizontal = Spacing.screen).padding(top = Spacing.lg),
         verticalArrangement = Arrangement.spacedBy(Spacing.md),
     ) {
-        ScreenTitle("Chamados", onBack, trailingIcon = LucideR.drawable.lucide_ic_sliders_horizontal, trailingLabel = "Filtrar", onTrailingClick = {})
-        SearchField("Buscar chamado", state.query, onQueryChange, trailingIcon = LucideR.drawable.lucide_ic_sliders_horizontal, onTrailingClick = {})
+        ScreenTitle("Chamados", onBack)
+        SearchField("Buscar chamado", state.query, onQueryChange)
         LazyColumn(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
             item { SectionHeading("Recentes", faded = true) }
             items(state.calls) { call ->

@@ -23,6 +23,8 @@ data class ChatUiState(
     val conversation: Conversation,
     val draft: String = "",
     val messages: List<ChatMessage> = emptyList(),
+    val sendFailure: ErrorKind? = null,
+    val sending: Boolean = false,
 )
 
 private data class ChatContent(val conversation: Conversation, val messages: List<ChatMessage>)
@@ -34,11 +36,13 @@ class ChatViewModel @Inject constructor(
 ) : ViewModel() {
     private val conversationId = savedStateHandle.routeId()
     private val draft = MutableStateFlow("")
+    private val sendFailure = MutableStateFlow<ErrorKind?>(null)
+    private val sending = MutableStateFlow(false)
     private val content = MutableStateFlow<UiState<ChatContent>>(UiState.Loading)
 
-    val uiState: StateFlow<UiState<ChatUiState>> = combine(content, draft) { loaded, text ->
+    val uiState: StateFlow<UiState<ChatUiState>> = combine(content, draft, sendFailure, sending) { loaded, text, failure, inProgress ->
         when (loaded) {
-            is UiState.Content -> UiState.Content(ChatUiState(loaded.data.conversation, text, loaded.data.messages))
+            is UiState.Content -> UiState.Content(ChatUiState(loaded.data.conversation, text, loaded.data.messages, failure, inProgress))
             UiState.Loading -> UiState.Loading
             UiState.Empty -> UiState.Empty
             is UiState.Error -> loaded
@@ -65,15 +69,21 @@ class ChatViewModel @Inject constructor(
     fun onDraftChange(value: String) { draft.value = value }
 
     fun send() {
-        val text = draft.value
-        if (text.isBlank()) return
+        val text = draft.value.trim()
+        if (text.isBlank() || sending.value) return
+        sending.value = true
+        sendFailure.value = null
         viewModelScope.launch {
-            val result = repository.sendMessage(conversationId, text)
-            val current = content.value
-            if (result is ApiResult.Success && current is UiState.Content) {
-                content.value = UiState.Content(current.data.copy(messages = current.data.messages + result.data))
-                draft.value = ""
-            }
+            try {
+                when (val result = repository.sendMessage(conversationId, text)) {
+                    is ApiResult.Failure -> sendFailure.value = result.kind
+                    is ApiResult.Success -> {
+                        val current = content.value as? UiState.Content ?: return@launch
+                        content.value = UiState.Content(current.data.copy(messages = current.data.messages + result.data))
+                        if (draft.value.trim() == text) draft.value = ""
+                    }
+                }
+            } finally { sending.value = false }
         }
     }
 }

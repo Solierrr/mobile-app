@@ -23,7 +23,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.composables.icons.lucide.R as LucideR
+import com.project.solaria_mobile.core.designsystem.icons.AppIcons
 import com.project.solaria_mobile.core.designsystem.components.ActionRow
 import com.project.solaria_mobile.core.designsystem.components.Avatar
 import com.project.solaria_mobile.core.designsystem.components.AvatarPalette
@@ -31,6 +31,7 @@ import com.project.solaria_mobile.core.designsystem.components.RemoteImage
 import com.project.solaria_mobile.core.designsystem.components.ScreenTitle
 import com.project.solaria_mobile.core.designsystem.components.SectionHeading
 import com.project.solaria_mobile.core.designsystem.components.UiStateHost
+import com.project.solaria_mobile.core.designsystem.components.ContentSkeleton
 import com.project.solaria_mobile.core.designsystem.theme.AppTheme
 import com.project.solaria_mobile.core.designsystem.theme.Radius
 import com.project.solaria_mobile.core.designsystem.theme.Spacing
@@ -45,7 +46,7 @@ enum class ProjectSheet(val title: String) {
     TEAM("Envolvidos"),
 }
 
-private val sectionModifier = Modifier.fillMaxWidth().height(160.dp)
+private val sectionModifier = Modifier.fillMaxWidth()
 
 @Composable
 internal fun ProjectSheetContent(
@@ -59,7 +60,7 @@ internal fun ProjectSheetContent(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = Spacing.screen)
-            .padding(top = Spacing.xxl, bottom = Spacing.screenBottom),
+            .padding(top = Spacing.sm, bottom = Spacing.screenBottom),
         verticalArrangement = Arrangement.spacedBy(Spacing.md),
     ) {
         ScreenTitle(sheet.title, onBack)
@@ -77,7 +78,7 @@ internal fun ProjectSheetContent(
 @Composable
 private fun LocationSection(viewModel: ProjectSectionsViewModel, onNavigate: (AppDestination) -> Unit, onCopy: (String) -> Unit) {
     val state by viewModel.location.collectAsStateWithLifecycle()
-    UiStateHost(state, { viewModel.retry(ProjectSheet.LOCATION) }, sectionModifier) { info ->
+    UiStateHost(state, { viewModel.retry(ProjectSheet.LOCATION) }, sectionModifier, inline = true, loading = { ContentSkeleton() }) { info ->
         Spacer(Modifier.height(Spacing.xs))
         if (info.description.isNotBlank()) {
             Text(info.description, color = AppTheme.colors.onSurface, style = MaterialTheme.typography.bodyLarge)
@@ -89,11 +90,11 @@ private fun LocationSection(viewModel: ProjectSectionsViewModel, onNavigate: (Ap
                 Text(
                     line,
                     color = if (index == 0) AppTheme.colors.onSurface else AppTheme.colors.onSurfaceMuted,
-                    style = if (index == 0) MaterialTheme.typography.headlineMedium else MaterialTheme.typography.bodyMedium,
+                    style = if (index == 0) MaterialTheme.typography.bodyLarge else MaterialTheme.typography.bodyMedium,
                 )
             }
-            ActionRow("Abrir no mapa", LucideR.drawable.lucide_ic_map_pin, { onNavigate(AppDestination.Map) })
-            ActionRow("Copiar endereço", LucideR.drawable.lucide_ic_copy, { onCopy(info.copyText) })
+            ActionRow("Abrir no mapa", AppIcons.map_pin, { onNavigate(AppDestination.Map(viewModel.projectId)) })
+            ActionRow("Copiar endereço", AppIcons.copy, { onCopy(info.copyText) })
         }
     }
 }
@@ -101,7 +102,7 @@ private fun LocationSection(viewModel: ProjectSectionsViewModel, onNavigate: (Ap
 @Composable
 private fun GallerySection(viewModel: ProjectSectionsViewModel) {
     val state by viewModel.photos.collectAsStateWithLifecycle()
-    UiStateHost(state, { viewModel.retry(ProjectSheet.GALLERY) }, sectionModifier, "Este projeto ainda não tem imagens.") { photos ->
+    UiStateHost(state, { viewModel.retry(ProjectSheet.GALLERY) }, sectionModifier, inline = true, emptyMessage = "Este projeto ainda não tem imagens.") { photos ->
         Text(
             if (photos.size == 1) "1 imagem" else "${photos.size} imagens",
             color = AppTheme.colors.onSurfaceMuted,
@@ -121,13 +122,12 @@ private fun GallerySection(viewModel: ProjectSectionsViewModel) {
 @Composable
 private fun AgendaSection(viewModel: ProjectSectionsViewModel) {
     val state by viewModel.activities.collectAsStateWithLifecycle()
-    UiStateHost(state, { viewModel.retry(ProjectSheet.AGENDA) }, sectionModifier, "Nenhuma atividade agendada.") { activities ->
+    UiStateHost(state, { viewModel.retry(ProjectSheet.AGENDA) }, sectionModifier, inline = true, emptyMessage = "Nenhuma atividade agendada.", loading = { ContentSkeleton() }) { activities ->
         SectionHeading("Atividades do projeto", faded = true)
         activities.forEach { activity ->
-            ActionRow(
+            com.project.solaria_mobile.core.designsystem.components.InformationRow(
                 activity.title,
-                LucideR.drawable.lucide_ic_calendar_days,
-                {},
+                AppIcons.calendar_days,
                 trailing = activity.time.ifBlank { null },
                 subtitle = activity.subtitle.ifBlank { null },
             )
@@ -142,13 +142,13 @@ private fun ConversationsSection(onNavigate: (AppDestination) -> Unit) {
         color = AppTheme.colors.onSurfaceMuted,
         style = MaterialTheme.typography.bodyMedium,
     )
-    ActionRow("Ver todas as conversas", LucideR.drawable.lucide_ic_messages_square, { onNavigate(AppDestination.Chats) })
+    ActionRow("Ver todas as conversas", AppIcons.messages_square, { onNavigate(AppDestination.Chats) })
 }
 
 @Composable
 private fun HistorySection(viewModel: ProjectSectionsViewModel) {
     val state by viewModel.history.collectAsStateWithLifecycle()
-    UiStateHost(state, { viewModel.retry(ProjectSheet.HISTORY) }, sectionModifier, "Nada no histórico ainda.") { entries ->
+    UiStateHost(state, { viewModel.retry(ProjectSheet.HISTORY) }, sectionModifier, inline = true, emptyMessage = "Nada no histórico ainda.") { entries ->
         SectionHeading("Atividade recente", faded = true)
         entries.forEach { TimelineEntry(it.title, it.detail) }
     }
@@ -157,7 +157,7 @@ private fun HistorySection(viewModel: ProjectSectionsViewModel) {
 @Composable
 private fun TeamSection(viewModel: ProjectSectionsViewModel, onNavigate: (AppDestination) -> Unit) {
     val state by viewModel.members.collectAsStateWithLifecycle()
-    UiStateHost(state, { viewModel.retry(ProjectSheet.TEAM) }, sectionModifier, "Nenhuma pessoa neste projeto.") { members ->
+    UiStateHost(state, { viewModel.retry(ProjectSheet.TEAM) }, sectionModifier, inline = true, emptyMessage = "Nenhuma pessoa neste projeto.", loading = { ContentSkeleton() }) { members ->
         SectionHeading("Pessoas envolvidas", faded = true, action = "Ver conexões", onAction = { onNavigate(AppDestination.Connections) })
         members.forEachIndexed { index, member -> TeamEntry(member.initials, member.name, member.role, index) }
     }
@@ -170,7 +170,7 @@ private fun TimelineEntry(title: String, detail: String) {
         horizontalArrangement = Arrangement.spacedBy(Spacing.md),
         verticalAlignment = Alignment.Top,
     ) {
-        Box(modifier = Modifier.padding(top = 7.dp).size(9.dp).clip(CircleShape).background(AppTheme.colors.secondary))
+        Box(modifier = Modifier.padding(top = 7.dp).size(9.dp).clip(CircleShape).background(AppTheme.colors.onSurface))
         Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
             Text(title, color = AppTheme.colors.onSurface, style = MaterialTheme.typography.titleMedium)
             if (detail.isNotBlank()) Text(detail, color = AppTheme.colors.onSurfaceMuted, style = MaterialTheme.typography.bodyMedium)

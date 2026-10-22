@@ -21,7 +21,6 @@ class RemoteCommunicationRepository @Inject constructor(
     private val api: MessengerApi,
     private val executor: ApiCallExecutor,
     private val credentials: CredentialProvider,
-    private val serviceCalls: FakeCommunicationRepository,
 ) : CommunicationRepository {
     override suspend fun conversations(): ApiResult<List<Conversation>> =
         executor.execute { api.conversations() }.map { items -> items.map { it.toConversation() } }
@@ -45,11 +44,11 @@ class RemoteCommunicationRepository @Inject constructor(
         return executor.execute { api.send(request) }.map { it.toMessage(me) }
     }
 
-    override suspend fun calls(): ApiResult<List<ServiceCall>> = serviceCalls.calls()
+    override suspend fun calls(): ApiResult<List<ServiceCall>> = ApiResult.Failure(com.project.solaria_mobile.core.common.ErrorKind.NOT_SUPPORTED)
 
-    override suspend fun call(id: String): ApiResult<ServiceCall> = serviceCalls.call(id)
+    override suspend fun call(id: String): ApiResult<ServiceCall> = ApiResult.Failure(com.project.solaria_mobile.core.common.ErrorKind.NOT_SUPPORTED)
 
-    override suspend fun notifications(): ApiResult<List<NotificationGroup>> = serviceCalls.notifications()
+    override suspend fun notifications(): ApiResult<List<NotificationGroup>> = ApiResult.Failure(com.project.solaria_mobile.core.common.ErrorKind.NOT_SUPPORTED)
 
     private fun currentUserId(): String? = credentials.accessToken()?.let(::accessTokenSubject)
 }

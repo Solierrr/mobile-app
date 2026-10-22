@@ -10,6 +10,9 @@ import retrofit2.http.Streaming
 
 @Serializable
 data class ProjectLocationDto(
+    val latitude: Double? = null,
+    val longitude: Double? = null,
+    val geocodedAt: String? = null,
     val city: String? = null,
     val state: String? = null,
     val neighborhood: String? = null,
@@ -76,6 +79,9 @@ data class ProjectPhotoDto(
 )
 
 interface ProjectApi {
+    @POST("api/projects/{id}/map-location")
+    suspend fun resolveLocation(@Path("id") id: String): ProjectDto
+
     @GET("api/projects")
     suspend fun projects(): List<ProjectDto>
 

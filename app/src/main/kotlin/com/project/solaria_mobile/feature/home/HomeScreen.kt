@@ -2,48 +2,39 @@
 
 package com.project.solaria_mobile.feature.home
 
-import androidx.compose.foundation.Image
+import com.project.solaria_mobile.core.designsystem.theme.Elevation
+import androidx.compose.ui.draw.clip
+import com.project.solaria_mobile.feature.project.RecentProjectItem
+import com.project.solaria_mobile.core.designsystem.components.ListItemDivider
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Surface
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import com.project.solaria_mobile.R
-import com.composables.icons.lucide.R as LucideR
+import com.project.solaria_mobile.core.designsystem.icons.AppIcons
 import com.project.solaria_mobile.core.designsystem.components.ActionRow
 import com.project.solaria_mobile.core.designsystem.components.RoundIconButton
-import com.project.solaria_mobile.core.designsystem.components.ScreenTitle
 import com.project.solaria_mobile.core.designsystem.components.SectionHeading
 import com.project.solaria_mobile.core.designsystem.components.Avatar
 import com.project.solaria_mobile.core.images.ImageLoaderViewModel
@@ -53,10 +44,6 @@ import com.project.solaria_mobile.core.designsystem.theme.Sizing
 import com.project.solaria_mobile.core.designsystem.theme.Radius
 import com.project.solaria_mobile.feature.communication.CallsBottomSheet
 import com.project.solaria_mobile.presentation.navigation.AppDestination
-import com.project.solaria_mobile.core.designsystem.components.RemoteImage
-import com.project.solaria_mobile.core.format.initialsOf
-import com.project.solaria_mobile.feature.home.domain.RecentCompany
-import kotlinx.coroutines.launch
 import com.project.solaria_mobile.core.designsystem.components.UiStateHost
 
 @Composable
@@ -80,142 +67,53 @@ fun HomeScreen(
     modifier: Modifier = Modifier,
     loadImage: (suspend (String) -> ByteArray?)? = null,
 ) {
-    var menuOpen by remember { mutableStateOf(false) }
     var callsOpen by remember { mutableStateOf(false) }
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-    val scope = rememberCoroutineScope()
 
-    Column(
-        modifier = modifier
-            .fillMaxSize()
-            .background(AppTheme.colors.surface)
-            .verticalScroll(rememberScrollState()),
-    ) {
+    Box(modifier.fillMaxSize().background(AppTheme.colors.surface)) {
         Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(AppTheme.colors.headerFill)
-                .padding(horizontal = Spacing.screen)
-                .padding(top = Spacing.screenTop, bottom = Spacing.xl),
-            verticalArrangement = Arrangement.spacedBy(Spacing.md),
+            Modifier.fillMaxSize().verticalScroll(rememberScrollState())
+                .padding(horizontal = Spacing.screen).padding(top = Spacing.screenTop, bottom = 112.dp),
+            verticalArrangement = Arrangement.spacedBy(Spacing.section),
         ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween,
-            ) {
-                Avatar(
-                    initials = state.profile?.initials.orEmpty(),
-                    modifier = Modifier.size(Sizing.compactHeaderControl).clickable { onOpenPage(AppDestination.ProfileSelf) },
-                    size = Sizing.compactHeaderControl,
-                    color = AppTheme.colors.secondary,
-                    imageUrl = state.profile?.avatarUrl,
-                    loadImage = loadImage,
-                )
-                Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-                    RoundIconButton(
-                        icon = LucideR.drawable.lucide_ic_bell,
-                        contentDescription = "Notificações",
-                        onClick = { onOpenPage(AppDestination.Notifications) },
-                        size = Sizing.compactHeaderControl,
-                        badge = "10",
-                    )
-                    RoundIconButton(
-                        icon = LucideR.drawable.lucide_ic_ellipsis,
-                        contentDescription = "Mais opções",
-                        onClick = { menuOpen = true },
-                        size = Sizing.compactHeaderControl,
-                    )
-                }
-            }
-
-            if (state.recentCompanies.isNotEmpty()) {
-                Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-                    SectionHeading(text = "Empresas recentes", faded = true)
-                    Row(
-                        modifier = Modifier.horizontalScroll(rememberScrollState()),
-                        horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
-                    ) {
-                        state.recentCompanies.forEach { company ->
-                            Surface(
-                                modifier = Modifier.size(Sizing.companyLogo),
-                                shape = RoundedCornerShape(Radius.companyLogo),
-                                color = AppTheme.colors.surface,
-                                shadowElevation = 2.dp,
-                            ) {
-                                CompanyLogoImage(company, loadImage)
-                            }
-                        }
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+                    Avatar(initials = state.profile?.initials.orEmpty(), modifier = Modifier.clickable { onOpenPage(AppDestination.ProfileSelf) }, color = AppTheme.colors.inputFill, textColor = AppTheme.colors.onSurface, imageUrl = state.profile?.avatarUrl, loadImage = loadImage)
+                    Column {
+                        Text("Olá,", style = MaterialTheme.typography.bodyMedium, color = AppTheme.colors.onSurfaceMuted)
+                        Text(state.profile?.name?.substringBefore(" ").orEmpty().ifBlank { "Sua conta" }, style = MaterialTheme.typography.titleSmall, color = AppTheme.colors.onSurface)
                     }
                 }
+                RoundIconButton(AppIcons.bell, "Notificações", { onOpenPage(AppDestination.Notifications) }, background = AppTheme.colors.inputFill)
             }
-
             Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-                SectionHeading(
-                    text = "Projetos recentes",
-                    faded = true,
-                    action = "Ver todos",
-                    onAction = { onOpenPage(AppDestination.Projects) },
-                )
-                Row(
-                    modifier = Modifier.horizontalScroll(rememberScrollState()),
-                    horizontalArrangement = Arrangement.spacedBy(Spacing.md),
-                ) {
-                    state.recentProjects.forEach { project ->
-                        RecentProjectCard(
-                            name = project.name,
-                            onClick = { onOpenPage(AppDestination.Project(project.id)) },
-                        )
+                SectionHeading("Projetos recentes", action = "Ver todos", navigation = true, onAction = { onOpenPage(AppDestination.Projects) })
+                if (state.recentProjects.isEmpty()) Text("Seus projetos aparecerão aqui.", style = MaterialTheme.typography.bodyMedium, color = AppTheme.colors.onSurfaceMuted)
+                else Column(Modifier.clip(RoundedCornerShape(Radius.large)).background(AppTheme.colors.inputFill)) {
+                    state.recentProjects.take(3).forEachIndexed { index, project ->
+                        if (index > 0) ListItemDivider(Modifier.padding(horizontal = Spacing.md))
+                        RecentProjectItem(project, { onOpenPage(AppDestination.Project(project.id)) })
                     }
                 }
             }
+            Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+                SectionHeading("Seu espaço")
+                ActionRow("Agenda", AppIcons.calendar_days, { onOpenPage(AppDestination.Schedule) })
+                ActionRow("Chamados", AppIcons.phone, { callsOpen = true })
+                ActionRow("Conexões", AppIcons.users, { onOpenPage(AppDestination.Connections) })
+                state.profile?.companyId?.let { id -> ActionRow("Sua empresa", AppIcons.building, { onOpenPage(AppDestination.Enterprise(id)) }) }
+                ActionRow("Novo projeto", AppIcons.folder_plus, { onOpenPage(AppDestination.NewProject) })
+                ActionRow("Configurações", AppIcons.settings, { onOpenPage(AppDestination.Settings) })
+            }
         }
-
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = Spacing.screen)
-                .padding(top = Spacing.xl, bottom = Spacing.screenBottom),
-            verticalArrangement = Arrangement.spacedBy(Spacing.sm),
+        Surface(
+            modifier = Modifier.align(Alignment.BottomCenter).padding(horizontal = Spacing.screen, vertical = Spacing.md),
+            shape = RoundedCornerShape(Radius.pill), color = AppTheme.colors.surface.copy(alpha = 0.98f),
+            border = androidx.compose.foundation.BorderStroke(1.dp, AppTheme.colors.outline), shadowElevation = Elevation.floating,
         ) {
-            SectionHeading(text = "Opções", faded = true)
-            ActionRow("Projetos", LucideR.drawable.lucide_ic_folder, { onOpenPage(AppDestination.Projects) })
-            ActionRow("Chamados", LucideR.drawable.lucide_ic_phone, { callsOpen = true }, badge = "10")
-            ActionRow("Agenda", LucideR.drawable.lucide_ic_calendar_days, { onOpenPage(AppDestination.Schedule) })
-            ActionRow("Conversas", LucideR.drawable.lucide_ic_message_circle, { onOpenPage(AppDestination.Chats) }, badge = "10")
-            ActionRow("Conexões", LucideR.drawable.lucide_ic_users, { onOpenPage(AppDestination.Connections) })
-            ActionRow("Sua empresa", LucideR.drawable.lucide_ic_building, { onOpenPage(AppDestination.Enterprise) })
-            ActionRow("Configurações", LucideR.drawable.lucide_ic_settings, { onOpenPage(AppDestination.Settings) })
-        }
-    }
-
-    if (menuOpen) {
-        ModalBottomSheet(
-            onDismissRequest = { menuOpen = false },
-            sheetState = sheetState,
-            containerColor = AppTheme.colors.surface,
-            shape = RoundedCornerShape(topStart = Radius.sheet, topEnd = Radius.sheet),
-            dragHandle = null,
-        ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = Spacing.screen)
-                    .padding(top = Spacing.xxl, bottom = Spacing.screenBottom),
-                verticalArrangement = Arrangement.spacedBy(Spacing.md),
-            ) {
-                ScreenTitle("Opções", onBack = { menuOpen = false })
-                Spacer(Modifier.height(Spacing.xs))
-                ActionRow("Listar projetos", LucideR.drawable.lucide_ic_folder, {
-                    scope.launch { sheetState.hide(); menuOpen = false; onOpenPage(AppDestination.Projects) }
-                })
-                ActionRow("Novo projeto", LucideR.drawable.lucide_ic_folder_plus, {
-                    scope.launch { sheetState.hide(); menuOpen = false; onOpenPage(AppDestination.NewProject) }
-                })
-                ActionRow("Configurações", LucideR.drawable.lucide_ic_settings, {
-                    scope.launch { sheetState.hide(); menuOpen = false; onOpenPage(AppDestination.Settings) }
-                })
-                Spacer(Modifier.height(Spacing.section))
+            Row(Modifier.fillMaxWidth().padding(Spacing.xs), horizontalArrangement = Arrangement.SpaceEvenly) {
+                HomeNavItem("Início", AppIcons.home, true, {})
+                HomeNavItem("Projetos", AppIcons.folder, false, { onOpenPage(AppDestination.Projects) })
+                HomeNavItem("Conversas", AppIcons.message_circle, false, { onOpenPage(AppDestination.Chats) })
             }
         }
     }
@@ -224,6 +122,7 @@ fun HomeScreen(
         CallsBottomSheet(
             calls = state.recentCalls,
             query = state.callsQuery,
+            failure = state.callsFailure,
             onQueryChange = onCallsQueryChange,
             onDismiss = { callsOpen = false },
             onOpenCall = { id -> callsOpen = false; onOpenPage(AppDestination.Call(id)) },
@@ -233,53 +132,11 @@ fun HomeScreen(
 }
 
 @Composable
-private fun RecentProjectCard(name: String, onClick: () -> Unit) {
-    Surface(
-        modifier = Modifier.width(Sizing.projectCardWidth).height(Sizing.projectCardHeight),
-        onClick = onClick,
-        shape = RoundedCornerShape(Radius.large),
-        color = AppTheme.colors.surface,
-        shadowElevation = 2.dp,
-    ) {
-        Box {
-            Image(
-                painter = painterResource(R.drawable.project_building),
-                contentDescription = null,
-                modifier = Modifier.fillMaxSize(),
-                contentScale = ContentScale.Crop,
-            )
-            Surface(
-                modifier = Modifier
-                    .align(Alignment.BottomStart)
-                    .padding(horizontal = Spacing.xs, vertical = Spacing.sm),
-                shape = RoundedCornerShape(Radius.pill),
-                color = AppTheme.colors.surface,
-                shadowElevation = 2.dp,
-            ) {
-                Text(
-                    text = name,
-                    modifier = Modifier.padding(horizontal = Spacing.sm, vertical = Spacing.xs),
-                    color = AppTheme.colors.onSurface,
-                    style = androidx.compose.material3.MaterialTheme.typography.labelLarge,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
+private fun androidx.compose.foundation.layout.RowScope.HomeNavItem(label: String, icon: Int, selected: Boolean, onClick: () -> Unit) {
+    Surface(onClick = onClick, modifier = Modifier.weight(1f), shape = RoundedCornerShape(Radius.pill), color = if (selected) AppTheme.colors.inputFill else androidx.compose.ui.graphics.Color.Transparent) {
+        Column(Modifier.padding(vertical = Spacing.xs), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(Spacing.xxs)) {
+            androidx.compose.material3.Icon(androidx.compose.ui.res.painterResource(icon), null, Modifier.size(Sizing.icon), tint = if (selected) AppTheme.colors.onSurface else AppTheme.colors.onSurfaceMuted)
+            Text(label, style = MaterialTheme.typography.labelMedium, color = if (selected) AppTheme.colors.onSurface else AppTheme.colors.onSurfaceMuted)
         }
-    }
-}
-
-@Composable
-private fun CompanyLogoImage(company: RecentCompany, loadImage: (suspend (String) -> ByteArray?)?) {
-    val initials = initialsOf(company.name)
-    val label: @Composable () -> Unit = {
-        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            Text(initials, color = AppTheme.colors.onSurfaceMuted, style = MaterialTheme.typography.titleMedium)
-        }
-    }
-    if (company.logoUrl != null && loadImage != null) {
-        RemoteImage(company.logoUrl, loadImage, company.name, Modifier.fillMaxSize(), placeholder = false, fallback = label)
-    } else {
-        label()
     }
 }
