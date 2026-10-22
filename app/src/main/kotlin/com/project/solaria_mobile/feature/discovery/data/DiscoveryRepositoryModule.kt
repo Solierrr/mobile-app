@@ -9,5 +9,5 @@ import com.project.solaria_mobile.feature.discovery.domain.DiscoveryRepository
 @Module
 @InstallIn(SingletonComponent::class)
 abstract class DiscoveryRepositoryModule {
-    @Binds abstract fun bindRepository(repository: FakeDiscoveryRepository): DiscoveryRepository
+    @Binds abstract fun bindRepository(repository: UnavailableDiscoveryRepository): DiscoveryRepository
 }

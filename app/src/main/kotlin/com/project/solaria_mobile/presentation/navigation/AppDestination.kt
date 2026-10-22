@@ -13,12 +13,12 @@ sealed interface AppDestination {
     @Serializable data object Calls : AppDestination
     @Serializable data class Call(val id: String) : AppDestination
     @Serializable data object Schedule : AppDestination
-    @Serializable data object Map : AppDestination
+    @Serializable data class Map(val projectId: String? = null) : AppDestination
     @Serializable data object ProfileSelf : AppDestination
     @Serializable data class ProfileOther(val id: String) : AppDestination
     @Serializable data object Connections : AppDestination
     @Serializable data object Notifications : AppDestination
-    @Serializable data object Enterprise : AppDestination
+    @Serializable data class Enterprise(val id: String? = null) : AppDestination
     @Serializable data object Settings : AppDestination
     @Serializable data object Diagnostics : AppDestination
 }

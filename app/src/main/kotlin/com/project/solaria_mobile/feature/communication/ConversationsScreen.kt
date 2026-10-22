@@ -24,8 +24,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import com.composables.icons.lucide.R as LucideR
-import com.project.solaria_mobile.core.designsystem.components.ActionRow
+import com.project.solaria_mobile.core.designsystem.icons.AppIcons
 import com.project.solaria_mobile.core.designsystem.components.ScreenTitle
 import com.project.solaria_mobile.core.designsystem.components.SearchField
 import com.project.solaria_mobile.core.designsystem.components.SectionHeading
@@ -33,18 +32,21 @@ import com.project.solaria_mobile.core.designsystem.components.Avatar
 import com.project.solaria_mobile.core.designsystem.theme.AppTheme
 import com.project.solaria_mobile.core.designsystem.theme.Spacing
 import com.project.solaria_mobile.core.designsystem.components.UiStateHost
+import com.project.solaria_mobile.core.designsystem.components.StateNotice
+import com.project.solaria_mobile.core.designsystem.components.PrimaryButton
+import com.project.solaria_mobile.core.designsystem.components.ResourceStatus
+import com.project.solaria_mobile.core.designsystem.components.RefreshButton
+import com.project.solaria_mobile.core.common.UiState
 
 @Composable
 fun ConversationsRoute(
     onBack: () -> Unit,
     onOpenChat: (String) -> Unit,
-    onStartChat: () -> Unit,
-    onOpenProject: () -> Unit,
     viewModel: ConversationsViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
-    UiStateHost(state, viewModel::load) { content ->
-        ConversationsScreen(content, viewModel::onQueryChange, onBack, onOpenChat, onStartChat, onOpenProject)
+    UiStateHost(state, viewModel::load, onBack = onBack, header = { ScreenTitle("Conversas", onBack) }) { content ->
+        ConversationsScreen(content, viewModel::onQueryChange, onBack, onOpenChat, state as? UiState.Content, viewModel::load)
     }
 }
 
@@ -54,20 +56,24 @@ fun ConversationsScreen(
     onQueryChange: (String) -> Unit,
     onBack: () -> Unit,
     onOpenChat: (String) -> Unit,
-    onStartChat: () -> Unit,
-    onOpenProject: () -> Unit,
+    resource: UiState.Content<*>? = null,
+    onRefresh: () -> Unit = {},
 ) {
     Column(
         modifier = Modifier.fillMaxSize().background(AppTheme.colors.surface).padding(horizontal = Spacing.screen).padding(top = Spacing.lg),
         verticalArrangement = Arrangement.spacedBy(Spacing.md),
     ) {
-        ScreenTitle("Conversas", onBack, trailingIcon = LucideR.drawable.lucide_ic_at_sign, trailingLabel = "Iniciar conversa", onTrailingClick = onStartChat)
-        SectionHeading("Opções", faded = true)
-        ActionRow("Iniciar conversa", LucideR.drawable.lucide_ic_message_circle, onStartChat, compact = true)
-        ActionRow("Conversas de projetos", LucideR.drawable.lucide_ic_folder, onOpenProject, compact = true)
+        ScreenTitle("Conversas", onBack, actions = { RefreshButton(onRefresh, resource?.refreshing == true, "Atualizar conversas") })
         SectionHeading("Todas as conversas", faded = true)
-        SearchField("Busque uma mensagem", state.query, onQueryChange, trailingIcon = LucideR.drawable.lucide_ic_sliders_horizontal, onTrailingClick = {})
+        SearchField("Buscar conversa", state.query, onQueryChange)
+        if (resource != null) ResourceStatus(resource)
         LazyColumn(verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
+            if (state.conversations.isEmpty()) item { StateNotice(
+                        if (state.query.isBlank()) "Nenhuma conversa ainda" else "Nenhuma conversa encontrada",
+                        if (state.query.isBlank()) "As conversas da sua conta aparecerão aqui." else "Tente buscar por outro nome ou limpe a busca.",
+                        icon = AppIcons.messages_square,
+                        actions = if (state.query.isNotBlank()) { { PrimaryButton("Limpar busca", { onQueryChange("") }, secondary = true, compact = true) } } else null,
+                    ) }
             items(state.conversations) { item ->
                 ConversationRow(item = item, onClick = { onOpenChat(item.id) })
             }
@@ -85,7 +91,7 @@ private fun ConversationRow(item: Conversation, onClick: () -> Unit) {
         ) {
             Avatar(item.initials, color = item.tone.toColor())
             Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                Text(item.name, color = AppTheme.colors.onSurface, style = androidx.compose.material3.MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(item.name, color = AppTheme.colors.onSurface, style = androidx.compose.material3.MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 Text(item.preview, color = AppTheme.colors.onSurfaceMuted, style = androidx.compose.material3.MaterialTheme.typography.labelMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
             Text(item.time, color = AppTheme.colors.onSurfaceMuted, style = androidx.compose.material3.MaterialTheme.typography.labelMedium)

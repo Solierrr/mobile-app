@@ -13,6 +13,7 @@ import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.receiveAsFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
 data class NewProjectUiState(
@@ -20,6 +21,7 @@ data class NewProjectUiState(
     val errors: Set<NewProjectField> = emptySet(),
     val submitting: Boolean = false,
     val failure: ErrorKind? = null,
+    val online: Boolean = true,
 )
 
 sealed interface NewProjectEffect {
@@ -29,12 +31,17 @@ sealed interface NewProjectEffect {
 @HiltViewModel
 class NewProjectViewModel @Inject constructor(
     private val repository: ProjectRepository,
+    private val network: com.project.solaria_mobile.core.network.NetworkMonitor,
 ) : ViewModel() {
     private val mutableState = MutableStateFlow(NewProjectUiState())
     val uiState: StateFlow<NewProjectUiState> = mutableState
 
     private val effects = Channel<NewProjectEffect>(Channel.BUFFERED)
     val effectFlow = effects.receiveAsFlow()
+
+    init {
+        viewModelScope.launch { network.isOnline.collect { online -> mutableState.value = mutableState.value.copy(online = online) } }
+    }
 
     fun update(transform: (NewProjectDraft) -> NewProjectDraft) {
         val current = mutableState.value
@@ -45,6 +52,10 @@ class NewProjectViewModel @Inject constructor(
     fun submit() {
         val current = mutableState.value
         if (current.submitting) return
+        if (!current.online) {
+            mutableState.value = current.copy(failure = ErrorKind.CONNECTIVITY)
+            return
+        }
         val errors = current.draft.validate()
         if (errors.isNotEmpty()) {
             mutableState.value = current.copy(errors = errors, failure = null)
@@ -52,7 +63,8 @@ class NewProjectViewModel @Inject constructor(
         }
         mutableState.value = current.copy(submitting = true, errors = emptySet(), failure = null)
         viewModelScope.launch {
-            when (val result = repository.create(current.draft)) {
+            val response = if (network.isOnline.first()) repository.create(current.draft) else ApiResult.Failure(ErrorKind.CONNECTIVITY)
+            when (val result = response) {
                 is ApiResult.Success -> {
                     mutableState.value = mutableState.value.copy(submitting = false)
                     effects.send(NewProjectEffect.Created(result.data))

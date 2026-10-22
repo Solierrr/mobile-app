@@ -7,11 +7,14 @@ import retrofit2.http.DELETE
 import retrofit2.http.GET
 import retrofit2.http.POST
 import retrofit2.http.Path
+import retrofit2.http.Query
 
 @Serializable
 data class UserDto(
     val id: String,
-    val authId: String? = null,
+    val name: String? = null,
+    val connected: Boolean = false,
+    val banner: String? = null,
     val username: String? = null,
     val avatar: String? = null,
 )
@@ -40,16 +43,23 @@ data class SelfProfileDto(
 )
 
 @Serializable
+data class PeoplePageDto(val items: List<UserDto> = emptyList(), val hasMore: Boolean = false)
+
+@Serializable
 data class ConnectionRequest(val connectedUserId: String)
 
 interface ProfileApi {
+    @GET("api/connections/people")
+    suspend fun people(@Query("query") query: String, @Query("page") page: Int,
+        @Query("connectedOnly") connectedOnly: Boolean): PeoplePageDto
+
     @GET("api/users/me")
     suspend fun me(): SelfProfileDto
 
     @GET("api/connections")
     suspend fun connections(): List<UserDto>
 
-    @GET("api/connections/{id}")
+    @GET("api/connections/people/{id}")
     suspend fun connection(@Path("id") id: String): UserDto
 
     @POST("api/connections")

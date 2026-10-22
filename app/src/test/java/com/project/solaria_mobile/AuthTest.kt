@@ -8,6 +8,7 @@ import com.project.solaria_mobile.feature.auth.AuthEffect
 import com.project.solaria_mobile.feature.auth.AuthViewModel
 import com.project.solaria_mobile.feature.auth.domain.AuthRepository
 import com.project.solaria_mobile.feature.auth.domain.SessionState
+import com.project.solaria_mobile.feature.auth.domain.LoginDestination
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -25,9 +26,12 @@ class AuthTest {
     private class FakeAuthRepository(initial: SessionState = SessionState.SIGNED_OUT) : AuthRepository {
         val sessionState = MutableStateFlow(initial)
         override val session: StateFlow<SessionState> = sessionState
-        var loginResult: ApiResult<String> = ApiResult.Success("https://web.example/mobile?transaction=abc")
+        var loginResult: ApiResult<LoginDestination> = ApiResult.Success(LoginDestination.Browser("https://web.example/mobile?transaction=abc"))
         var completed: Pair<String, String>? = null
-        override suspend fun beginLogin(): ApiResult<String> = loginResult
+        override suspend fun beginLogin(): ApiResult<LoginDestination> {
+            if (loginResult == ApiResult.Success(LoginDestination.Authenticated)) sessionState.value = SessionState.SIGNED_IN
+            return loginResult
+        }
         override suspend fun completeLogin(code: String, state: String): ApiResult<Unit> {
             completed = code to state
             sessionState.value = SessionState.SIGNED_IN
@@ -75,6 +79,36 @@ class AuthTest {
         advanceUntilIdle()
         assertEquals("code-value" to "state-value", repository.completed)
         assertEquals(SessionState.SIGNED_IN, viewModel.uiState.value.session)
+    }
+
+    @Test fun directLoginSignsInWithoutOpeningTheBrowser() = runTest {
+        val repository = FakeAuthRepository().apply { loginResult = ApiResult.Success(LoginDestination.Authenticated) }
+        val viewModel = AuthViewModel(repository)
+        viewModel.effectFlow.test {
+            advanceUntilIdle()
+            assertEquals(SessionState.SIGNED_IN, viewModel.uiState.value.session)
+            expectNoEvents()
+        }
+    }
+
+    @Test fun restoredSessionDoesNotStartAnotherLogin() = runTest {
+        val viewModel = AuthViewModel(FakeAuthRepository(SessionState.SIGNED_IN))
+        viewModel.effectFlow.test {
+            advanceUntilIdle()
+            assertEquals(SessionState.SIGNED_IN, viewModel.uiState.value.session)
+            expectNoEvents()
+        }
+    }
+
+    @Test fun logoutStaysSignedOutUntilTheUserStartsLogin() = runTest {
+        val viewModel = AuthViewModel(FakeAuthRepository(SessionState.SIGNED_IN))
+        viewModel.effectFlow.test {
+            advanceUntilIdle()
+            viewModel.signOut()
+            advanceUntilIdle()
+            assertEquals(SessionState.SIGNED_OUT, viewModel.uiState.value.session)
+            expectNoEvents()
+        }
     }
 
     @Test fun callbackWithoutCodeIsRejected() = runTest {

@@ -61,7 +61,7 @@ class NewProjectTest {
 
     @Test fun submitWithInvalidDataShowsTheErrorsAndDoesNotCallTheServer() = runTest {
         val repository = RecordingRepository()
-        val model = NewProjectViewModel(repository)
+        val model = NewProjectViewModel(repository, object : com.project.solaria_mobile.core.network.NetworkMonitor { override val isOnline = kotlinx.coroutines.flow.flowOf(true) })
         model.submit()
         advanceUntilIdle()
         assertEquals(setOf(NewProjectField.NAME), model.uiState.value.errors)
@@ -69,7 +69,7 @@ class NewProjectTest {
     }
 
     @Test fun editingClearsTheErrors() = runTest {
-        val model = NewProjectViewModel(RecordingRepository())
+        val model = NewProjectViewModel(RecordingRepository(), object : com.project.solaria_mobile.core.network.NetworkMonitor { override val isOnline = kotlinx.coroutines.flow.flowOf(true) })
         model.submit()
         model.update { it.copy(name = "Obra nova") }
         assertTrue(model.uiState.value.errors.isEmpty())
@@ -77,7 +77,7 @@ class NewProjectTest {
 
     @Test fun aValidSubmitCreatesTheProjectAndEmitsItsId() = runTest {
         val repository = RecordingRepository()
-        val model = NewProjectViewModel(repository)
+        val model = NewProjectViewModel(repository, object : com.project.solaria_mobile.core.network.NetworkMonitor { override val isOnline = kotlinx.coroutines.flow.flowOf(true) })
         model.update { it.copy(name = "Obra nova") }
         model.effectFlow.test {
             model.submit()
@@ -91,7 +91,7 @@ class NewProjectTest {
 
     @Test fun aServerFailureKeepsTheFormAndShowsTheError() = runTest {
         val repository = RecordingRepository(ApiResult.Failure(ErrorKind.VALIDATION))
-        val model = NewProjectViewModel(repository)
+        val model = NewProjectViewModel(repository, object : com.project.solaria_mobile.core.network.NetworkMonitor { override val isOnline = kotlinx.coroutines.flow.flowOf(true) })
         model.update { it.copy(name = "Obra nova", city = "Goiânia") }
         model.submit()
         advanceUntilIdle()
@@ -99,4 +99,19 @@ class NewProjectTest {
         assertFalse(model.uiState.value.submitting)
         assertEquals("Goiânia", model.uiState.value.draft.city)
     }
+    @Test fun offlineSubmissionIsBlockedWithoutLosingTheDraft() = runTest {
+        val network = object : com.project.solaria_mobile.core.network.NetworkMonitor {
+            override val isOnline = kotlinx.coroutines.flow.MutableStateFlow(false)
+        }
+        val repository = RecordingRepository()
+        val model = NewProjectViewModel(repository, network)
+        advanceUntilIdle()
+        model.update { it.copy(name = "Obra no telhado") }
+        model.submit()
+        advanceUntilIdle()
+        assertTrue(repository.drafts.isEmpty())
+        assertEquals("Obra no telhado", model.uiState.value.draft.name)
+        assertEquals(ErrorKind.CONNECTIVITY, model.uiState.value.failure)
+    }
+
 }

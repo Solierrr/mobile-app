@@ -13,6 +13,8 @@ import com.project.solaria_mobile.core.common.ErrorKind
 import com.project.solaria_mobile.core.network.ApiCallExecutor
 import com.project.solaria_mobile.feature.auth.domain.AuthRepository
 import com.project.solaria_mobile.feature.auth.domain.SessionState
+import com.project.solaria_mobile.feature.auth.domain.LoginDestination
+import com.project.solaria_mobile.core.auth.FlavorLogin
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.CoroutineScope
@@ -28,18 +30,28 @@ class RemoteAuthRepository @Inject constructor(
     private val api: AuthApi,
     private val executor: ApiCallExecutor,
     private val tokenStore: TokenStore,
+    private val flavorLogin: FlavorLogin,
+    private val offline: com.project.solaria_mobile.core.offline.OfflineStore,
 ) : AuthRepository {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
+    private var hadSession = tokenStore.currentTokens() != null
+
     override val session: StateFlow<SessionState> = tokenStore.tokens
-        .map { if (it == null) SessionState.SIGNED_OUT else SessionState.SIGNED_IN }
+        .map {
+            if (it == null && hadSession) offline.clearAll()
+            hadSession = it != null
+            if (it == null) SessionState.SIGNED_OUT else SessionState.SIGNED_IN
+        }
         .stateIn(
             scope,
             SharingStarted.Eagerly,
             if (tokenStore.currentTokens() == null) SessionState.SIGNED_OUT else SessionState.SIGNED_IN,
         )
 
-    override suspend fun beginLogin(): ApiResult<String> {
+    override suspend fun beginLogin(): ApiResult<LoginDestination> {
+        offline.clearAll()
+        flavorLogin.beginLogin()?.let { return it }
         val verifier = Pkce.randomUrlSafe(VERIFIER_BYTES)
         val state = Pkce.randomUrlSafe(STATE_BYTES)
         val request = StartTransactionRequest(
@@ -53,7 +65,7 @@ class RemoteAuthRepository @Inject constructor(
             is ApiResult.Failure -> result
             is ApiResult.Success -> {
                 tokenStore.savePendingLogin(PendingLogin(state, verifier))
-                ApiResult.Success(result.data.authorizationUrl)
+                ApiResult.Success(LoginDestination.Browser(result.data.authorizationUrl))
             }
         }
     }
@@ -74,6 +86,7 @@ class RemoteAuthRepository @Inject constructor(
     override suspend fun signOut(): ApiResult<Unit> {
         executor.execute { api.logout() }
         tokenStore.clearTokens()
+        offline.clearAll()
         return ApiResult.Success(Unit)
     }
 

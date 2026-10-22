@@ -18,7 +18,7 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.ModalBottomSheet
+import com.project.solaria_mobile.core.designsystem.components.BottomSheet
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
@@ -37,7 +37,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.project.solaria_mobile.R
-import com.composables.icons.lucide.R as LucideR
+import com.project.solaria_mobile.core.designsystem.icons.AppIcons
 import com.project.solaria_mobile.core.designsystem.components.ActionRow
 import com.project.solaria_mobile.core.designsystem.components.AvatarPalette
 import com.project.solaria_mobile.core.designsystem.components.ExpressiveShapes
@@ -54,6 +54,7 @@ import com.project.solaria_mobile.core.designsystem.theme.Radius
 import com.project.solaria_mobile.presentation.navigation.AppDestination
 import kotlinx.coroutines.launch
 import com.project.solaria_mobile.core.designsystem.components.UiStateHost
+import com.project.solaria_mobile.core.designsystem.components.userMessage
 
 @Composable
 fun ProfileRoute(
@@ -63,7 +64,7 @@ fun ProfileRoute(
     images: ImageLoaderViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
-    UiStateHost(state, viewModel::load) { content ->
+    UiStateHost(state, viewModel::load, onBack = onBack, header = { ScreenTitle("Perfil", onBack) }) { content ->
         ProfileScreen(content, onBack, onNavigate, viewModel::toggleConnection, images::bytes)
     }
 }
@@ -93,11 +94,11 @@ fun ProfileScreen(
                 modifier = Modifier.fillMaxWidth().padding(horizontal = Spacing.screen).padding(top = Spacing.lg),
                 horizontalArrangement = Arrangement.SpaceBetween,
             ) {
-                RoundIconButton(LucideR.drawable.lucide_ic_chevron_left, "Voltar", onBack)
+                RoundIconButton(AppIcons.chevron_left, "Voltar", onBack)
                 RoundIconButton(
-                    if (self) LucideR.drawable.lucide_ic_pencil else LucideR.drawable.lucide_ic_share,
-                    if (self) "Editar perfil" else "Compartilhar perfil",
-                    onClick = { if (self) infoOpen = true },
+                    AppIcons.info,
+                    "Ver informações",
+                    onClick = { infoOpen = true },
                 )
             }
         }
@@ -108,7 +109,7 @@ fun ProfileScreen(
             Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm), verticalAlignment = Alignment.CenterVertically) {
                 Avatar(profile.initials, size = Sizing.avatarLarge, color = AvatarPalette(if (self) 0 else 1), online = !self, imageUrl = profile.avatarUrl, loadImage = loadImage, shape = if (self) ExpressiveShapes.cookie else ExpressiveShapes.clover)
                 Column(modifier = Modifier.weight(1f)) {
-                    Text(profile.name, color = AppTheme.colors.onSurface, style = androidx.compose.material3.MaterialTheme.typography.headlineMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text(profile.name, color = AppTheme.colors.onSurface, style = androidx.compose.material3.MaterialTheme.typography.headlineMedium, maxLines = 2, overflow = TextOverflow.Ellipsis)
                     if (profile.handle.isNotBlank()) {
                         Text(profile.handle, color = AppTheme.colors.onSurfaceMuted, style = androidx.compose.material3.MaterialTheme.typography.bodyMedium)
                     }
@@ -118,30 +119,22 @@ fun ProfileScreen(
             if (profile.state.isNotBlank()) ProfileField("Estado", profile.state)
             if (profile.occupation.isNotBlank()) ProfileField("Profissão", profile.occupation)
             if (profile.phone.isNotBlank()) ProfileField("Telefone", profile.phone)
+            state.actionError?.let { Text(it.userMessage(), color = AppTheme.colors.danger, style = androidx.compose.material3.MaterialTheme.typography.bodyMedium) }
             SectionHeading("Opções", faded = true)
             if (self) {
-                ActionRow("Editar informações", LucideR.drawable.lucide_ic_info, { infoOpen = true })
-                ActionRow("Privacidade", LucideR.drawable.lucide_ic_shield, { onNavigate(AppDestination.Settings) })
-                ActionRow("Compartilhar", LucideR.drawable.lucide_ic_share, {})
-                ActionRow("Configurações", LucideR.drawable.lucide_ic_settings, { onNavigate(AppDestination.Settings) })
+                ActionRow("Informações do perfil", AppIcons.info, { infoOpen = true })
+                ActionRow("Privacidade", AppIcons.shield, { onNavigate(AppDestination.Settings) })
+                ActionRow("Configurações", AppIcons.settings, { onNavigate(AppDestination.Settings) })
             } else {
-                ActionRow("Informações", LucideR.drawable.lucide_ic_info, { infoOpen = true })
-                ActionRow("Ver agenda", LucideR.drawable.lucide_ic_calendar_days, { onNavigate(AppDestination.Schedule) })
-                ActionRow(if (state.connected) "Conectado" else "Adicionar conexão", LucideR.drawable.lucide_ic_link, onToggleConnection)
-                ActionRow("Conversar", LucideR.drawable.lucide_ic_message_circle, { onNavigate(AppDestination.Chat("c1")) })
-                ActionRow("Compartilhar", LucideR.drawable.lucide_ic_share, {})
+                ActionRow("Informações", AppIcons.info, { infoOpen = true })
+                ActionRow("Ver agenda", AppIcons.calendar_days, { onNavigate(AppDestination.Schedule) })
+                ActionRow(if (state.connecting) "Atualizando conexão…" else if (state.connected) "Remover conexão" else "Adicionar conexão", AppIcons.link, { if (!state.connecting) onToggleConnection() })
             }
         }
     }
 
     if (infoOpen) {
-        ModalBottomSheet(
-            onDismissRequest = { infoOpen = false },
-            sheetState = sheetState,
-            containerColor = AppTheme.colors.surface,
-            shape = RoundedCornerShape(topStart = Radius.sheet, topEnd = Radius.sheet),
-            dragHandle = null,
-        ) {
+        BottomSheet(onDismiss = { infoOpen = false }, state = sheetState) {
             Column(modifier = Modifier.fillMaxWidth().padding(horizontal = Spacing.screen).padding(top = Spacing.xxl, bottom = Spacing.screenBottom), verticalArrangement = Arrangement.spacedBy(Spacing.md)) {
                 ScreenTitle("Informações", onBack = { scope.launch { sheetState.hide(); infoOpen = false } })
                 Text(profile.name, color = AppTheme.colors.onSurface, style = androidx.compose.material3.MaterialTheme.typography.headlineMedium)
@@ -149,7 +142,6 @@ fun ProfileScreen(
                 if (profile.state.isNotBlank()) ProfileField("Estado", profile.state)
                 if (profile.occupation.isNotBlank()) ProfileField("Profissão", profile.occupation)
                 if (profile.phone.isNotBlank()) ProfileField("Telefone", profile.phone)
-                ActionRow("Compartilhar perfil", LucideR.drawable.lucide_ic_share, {})
             }
         }
     }

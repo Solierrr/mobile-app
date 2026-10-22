@@ -155,7 +155,8 @@ fun NewProjectScreen(
         PrimaryButton(
             text = if (state.submitting) "Criando…" else "Criar projeto",
             onClick = onSubmit,
-            enabled = enabled,
+            enabled = enabled && state.online,
         )
+        if (!state.online) Text("Conecte-se para criar. Seu rascunho permanece nesta tela.", color = AppTheme.colors.onSurfaceMuted, style = MaterialTheme.typography.bodyMedium)
     }
 }

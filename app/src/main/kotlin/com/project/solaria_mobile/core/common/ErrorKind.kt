@@ -36,6 +36,8 @@ enum class ErrorKind {
     /** resposta com formato inválido dos DTOs */
     SERIALIZATION,
 
+    NOT_SUPPORTED,
+
     /** qualquer outra coisa */
     UNKNOWN,
 }

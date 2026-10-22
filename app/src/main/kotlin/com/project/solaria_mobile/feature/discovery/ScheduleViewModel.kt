@@ -10,6 +10,7 @@ import com.project.solaria_mobile.feature.discovery.domain.DiscoveryRepository
 import com.project.solaria_mobile.feature.discovery.domain.ScheduleEvent
 import dagger.hilt.android.lifecycle.HiltViewModel
 import java.util.Calendar
+import java.time.LocalDate
 import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -20,18 +21,19 @@ import kotlinx.coroutines.launch
 
 data class ScheduleUiState(
     val monthOffset: Int = 0,
-    val selectedDay: Int = 4,
-    val monthLabel: String = "Janeiro, 2026",
-    val selectedLabel: String = "4 de Janeiro",
+    val selectedDay: Int = 1,
+    val monthLabel: String = "",
+    val selectedLabel: String = "",
     val calendarDays: List<CalendarDay> = emptyList(),
     val selectedEvents: List<ScheduleEvent> = emptyList(),
 )
 
 @HiltViewModel
-class ScheduleViewModel @Inject constructor(private val repository: DiscoveryRepository) : ViewModel() {
-    private data class Selection(val monthOffset: Int = 0, val selectedDay: Int = 4)
+class ScheduleViewModel internal constructor(private val repository: DiscoveryRepository, private val today: LocalDate) : ViewModel() {
+    @Inject constructor(repository: DiscoveryRepository) : this(repository, LocalDate.now())
+    private data class Selection(val monthOffset: Int = 0, val selectedDay: Int)
 
-    private val selection = MutableStateFlow(Selection())
+    private val selection = MutableStateFlow(Selection(selectedDay = today.dayOfMonth))
     private val source = MutableStateFlow<UiState<List<ScheduleEvent>>>(UiState.Loading)
     private val months = listOf("Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro")
 
@@ -48,10 +50,10 @@ class ScheduleViewModel @Inject constructor(private val repository: DiscoveryRep
     fun selectDay(day: Int) { selection.value = selection.value.copy(selectedDay = day) }
     fun previousMonth() { selection.value = Selection(selection.value.monthOffset - 1, 1) }
     fun nextMonth() { selection.value = Selection(selection.value.monthOffset + 1, 1) }
-    fun resetToDemoToday() { selection.value = Selection() }
+    fun selectToday() { selection.value = Selection(selectedDay = today.dayOfMonth) }
 
     private fun buildState(events: List<ScheduleEvent>, offset: Int, day: Int): ScheduleUiState {
-        val firstDay = Calendar.getInstance().apply { set(2026, Calendar.JANUARY, 1); add(Calendar.MONTH, offset) }
+        val firstDay = Calendar.getInstance().apply { set(today.year, today.monthValue - 1, 1); add(Calendar.MONTH, offset) }
         val month = firstDay.get(Calendar.MONTH)
         val first = (firstDay.clone() as Calendar).apply { add(Calendar.DAY_OF_MONTH, -(get(Calendar.DAY_OF_WEEK) - Calendar.SUNDAY)) }
         val days = List(42) { index ->
