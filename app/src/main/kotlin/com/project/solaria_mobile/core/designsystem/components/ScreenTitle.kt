@@ -9,7 +9,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextOverflow
-import com.composables.icons.lucide.R as LucideR
+import com.project.solaria_mobile.core.designsystem.icons.AppIcons
 import com.project.solaria_mobile.core.designsystem.theme.AppTheme
 import com.project.solaria_mobile.core.designsystem.theme.Spacing
 
@@ -21,6 +21,7 @@ fun ScreenTitle(
     @DrawableRes trailingIcon: Int? = null,
     trailingLabel: String? = null,
     onTrailingClick: (() -> Unit)? = null,
+    actions: (@Composable () -> Unit)? = null,
 ) {
     Row(
         modifier = modifier.fillMaxWidth(),
@@ -28,24 +29,27 @@ fun ScreenTitle(
         horizontalArrangement = Arrangement.spacedBy(Spacing.md),
     ) {
         RoundIconButton(
-            icon = LucideR.drawable.lucide_ic_chevron_left,
+            icon = AppIcons.chevron_left,
             contentDescription = "Voltar",
             onClick = onBack,
         )
         Text(
             text = title,
             modifier = Modifier.weight(1f),
-            style = androidx.compose.material3.MaterialTheme.typography.titleLarge,
+            style = androidx.compose.material3.MaterialTheme.typography.headlineMedium,
             color = AppTheme.colors.onSurface,
-            maxLines = 1,
+            maxLines = 2,
             overflow = TextOverflow.Ellipsis,
         )
-        if (trailingIcon != null && onTrailingClick != null) {
-            RoundIconButton(
-                icon = trailingIcon,
-                contentDescription = trailingLabel ?: title,
-                onClick = onTrailingClick,
-            )
+        Row(horizontalArrangement = Arrangement.spacedBy(Spacing.xs), verticalAlignment = Alignment.CenterVertically) {
+            actions?.invoke()
+            if (trailingIcon != null && onTrailingClick != null) {
+                RoundIconButton(
+                    icon = trailingIcon,
+                    contentDescription = trailingLabel ?: title,
+                    onClick = onTrailingClick,
+                )
+            }
         }
     }
 }

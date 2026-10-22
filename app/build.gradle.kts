@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
@@ -23,10 +25,19 @@ android {
 
     }
 
+    val mapsProperties = Properties().apply {
+        val file = rootProject.file("local.properties")
+        if (file.exists()) file.inputStream().use { load(it) }
+    }
+    fun mapsKey(environment: String): String = providers.environmentVariable("MAPS_ANDROID_KEY_${environment.uppercase()}").orNull
+        ?: mapsProperties.getProperty("maps.android.key.$environment", "")
+
     flavorDimensions += "environment"
     productFlavors {
         create("qa") {
             dimension = "environment"
+            manifestPlaceholders["mapsApiKey"] = mapsKey(name)
+            buildConfigField("boolean", "MAPS_CONFIGURED", mapsKey(name).isNotBlank().toString())
             applicationIdSuffix = ".qa"
             versionNameSuffix = "-qa"
             resValue("string", "app_name", "Elos")
@@ -40,6 +51,8 @@ android {
         }
         create("prod") {
             dimension = "environment"
+            manifestPlaceholders["mapsApiKey"] = mapsKey(name)
+            buildConfigField("boolean", "MAPS_CONFIGURED", mapsKey(name).isNotBlank().toString())
             resValue("string", "app_name", "Elos")
             buildConfigField("String", "ENVIRONMENT", "\"prod\"")
             manifestPlaceholders["authScheme"] = "solaria"
@@ -52,8 +65,8 @@ android {
     }
 
     compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_11
-        targetCompatibility = JavaVersion.VERSION_11
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
     }
     buildFeatures {
         compose = true
@@ -63,10 +76,13 @@ android {
 }
 
 dependencies {
+    implementation(libs.google.maps.compose)
+    implementation(libs.androidx.room.runtime)
+    implementation(libs.androidx.room.ktx)
+    ksp(libs.androidx.room.compiler)
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.compose.material3)
-    implementation(libs.lucide.icons)
     implementation(libs.androidx.compose.ui)
     implementation(libs.androidx.compose.ui.graphics)
     implementation(libs.androidx.compose.ui.tooling.preview)
