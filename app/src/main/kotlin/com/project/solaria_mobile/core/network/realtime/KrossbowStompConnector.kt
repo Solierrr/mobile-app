@@ -1,5 +1,6 @@
 package com.project.solaria_mobile.core.network.realtime
 
+import com.project.solaria_mobile.core.auth.accessTokenSubject
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.flow
@@ -28,6 +29,7 @@ import kotlin.time.Duration.Companion.seconds
  * - `/ws` (local) | `/messaging/ws` (local com kong | QA | prod)
  * - jwt vai no header `Authorization` do frame `CONNECT`
  * - heartbeat de 10 s (Kong derruba conexão ociosa em 60 s)
+ * - eventos privados em `/topic/users.{userId}.{acks|errors|conversations}`, com o `sub` do jwt
  * - servidor confere expiração do token apenas quando chega um frame
  *
  *
@@ -52,7 +54,7 @@ class KrossbowStompConnector @Inject constructor(
             // Um frame ERROR durante o CONNECT só acontece por recusa de autenticação
             throw authFailureOf(e)?.let { StompAuthException(it, e) } ?: e
         }
-        return KrossbowStompLink(session)
+        return KrossbowStompLink(session, accessTokenSubject(token).orEmpty().lowercase())
     }
 
     private companion object {
@@ -62,6 +64,7 @@ class KrossbowStompConnector @Inject constructor(
 
 private class KrossbowStompLink(
     private val session: StompSession,
+    private val userId: String,
 ) : StompLink {
 
     override fun subscribe(destination: String): Flow<String> =
@@ -77,17 +80,13 @@ private class KrossbowStompLink(
 
     override suspend fun awaitLoss(): AuthFailure? =
         try {
-            session.subscribeText(PERSONAL_ERRORS_QUEUE).collect { }
+            session.subscribeText("/topic/users.$userId.errors").collect { }
             null
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
             authFailureOf(e)
         }
-
-    private companion object {
-        const val PERSONAL_ERRORS_QUEUE = "/user/queue/errors"
-    }
 }
 
 internal fun authFailureOf(error: Throwable): AuthFailure? {
