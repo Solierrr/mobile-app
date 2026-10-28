@@ -1,6 +1,6 @@
 package com.project.solaria_mobile.feature.communication.data
 
-import com.project.solaria_mobile.core.auth.accessTokenSubject
+import com.project.solaria_mobile.core.auth.currentUserId
 import com.project.solaria_mobile.core.common.ApiResult
 import com.project.solaria_mobile.core.common.ApplicationScope
 import com.project.solaria_mobile.core.common.ErrorKind
@@ -105,7 +105,7 @@ class MessageOutbox @Inject constructor(
      * @return [ApiResult.Success] quando gravada. Sem sessão, [ErrorKind.UNAUTHORIZED]; se o banco falhar, [ErrorKind.UNKNOWN].
      */
     suspend fun enqueue(conversationId: String, messageType: String, content: String): ApiResult<Unit> {
-        val senderId = currentUserId() ?: return ApiResult.Failure(ErrorKind.UNAUTHORIZED)
+        val senderId = credentials.currentUserId() ?: return ApiResult.Failure(ErrorKind.UNAUTHORIZED)
         val message = PendingMessageEntity(
             clientMessageId = UUID.randomUUID().toString(),
             senderId = senderId,
@@ -131,7 +131,7 @@ class MessageOutbox @Inject constructor(
      * Sem sessão, emite uma lista vazia.
      */
     fun observe(conversationId: String): Flow<List<PendingMessageEntity>> {
-        val senderId = currentUserId() ?: return flowOf(emptyList())
+        val senderId = credentials.currentUserId() ?: return flowOf(emptyList())
         return dao.observe(senderId, conversationId)
     }
 
@@ -183,7 +183,7 @@ class MessageOutbox @Inject constructor(
         }
 
     private suspend fun drainOnce(): Outcome {
-        val senderId = currentUserId() ?: return Outcome.STOP
+        val senderId = credentials.currentUserId() ?: return Outcome.STOP
         for (message in dao.sendable(senderId)) {
             when (val outcome = deliver(message)) {
                 Outcome.DELIVERED -> Unit
@@ -224,8 +224,6 @@ class MessageOutbox @Inject constructor(
         dao.delete(message.clientMessageId)
         return Outcome.DELIVERED
     }
-
-    private fun currentUserId(): String? = credentials.accessToken()?.let(::accessTokenSubject)?.lowercase()
 
     /**
      * Resultado de uma tentativa de envio, que decide o próximo passo do worker.

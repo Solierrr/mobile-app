@@ -1,5 +1,6 @@
 package com.project.solaria_mobile.core.auth
 
+import com.project.solaria_mobile.core.network.CredentialProvider
 import java.util.Base64
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
@@ -12,3 +13,7 @@ fun accessTokenSubject(token: String): String? = runCatching {
     val claims: JsonObject = Json.parseToJsonElement(decoded).jsonObject
     claims["sub"]?.jsonPrimitive?.content
 }.getOrNull()
+
+fun accessTokenUserId(token: String): String? = accessTokenSubject(token)?.lowercase()
+
+fun CredentialProvider.currentUserId(): String? = accessToken()?.let(::accessTokenUserId)

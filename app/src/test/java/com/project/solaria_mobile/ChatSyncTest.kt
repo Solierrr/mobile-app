@@ -13,6 +13,7 @@ import com.project.solaria_mobile.core.network.realtime.websocketUrlOf
 import com.project.solaria_mobile.feature.communication.ChatUiState
 import com.project.solaria_mobile.feature.communication.ChatViewModel
 import com.project.solaria_mobile.feature.communication.data.FakeCommunicationRepository
+import com.project.solaria_mobile.feature.communication.data.MessageDto
 import com.project.solaria_mobile.feature.communication.data.MessageOutbox
 import com.project.solaria_mobile.feature.communication.data.RemoteCommunicationRepository
 import com.project.solaria_mobile.feature.communication.domain.AvatarTone
@@ -169,6 +170,16 @@ class ChatSyncTest {
         val network = object : NetworkMonitor { override val isOnline = MutableStateFlow(online) }
         val outbox = MessageOutbox(dao, api, executor, network, credentials, backgroundScope)
         return RemoteCommunicationRepository(api, executor, credentials, outbox, realtime, network, ApiJson.instance, FakeCommunicationRepository())
+    }
+
+    @Test fun catchUpFollowsThePagesUntilTheLastOne() = runTest {
+        val api = ScriptedMessengerApi().apply { history += (1..250).map { MessageDto("m$it", "c1", sequence = it) } }
+        val repository = remoteRepository(api, FakeRealtimeClient(), online = true)
+
+        val result = repository.messages("c1", afterSequence = 0)
+
+        assertEquals((1..250).map { "m$it" }, (result as ApiResult.Success).data.map { it.id })
+        assertEquals(3, api.historyCalls)
     }
 
     @Test fun realtimeMessageEventsBecomeChatMessagesAndOtherEventsAreIgnored() = runTest {

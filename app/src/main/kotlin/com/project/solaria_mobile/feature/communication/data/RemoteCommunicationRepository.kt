@@ -1,6 +1,6 @@
 package com.project.solaria_mobile.feature.communication.data
 
-import com.project.solaria_mobile.core.auth.accessTokenSubject
+import com.project.solaria_mobile.core.auth.currentUserId
 import com.project.solaria_mobile.core.common.ApiResult
 import com.project.solaria_mobile.core.common.map
 import com.project.solaria_mobile.core.common.onSuccess
@@ -56,13 +56,27 @@ class RemoteCommunicationRepository @Inject constructor(
             .map { it.toConversation() }
 
     override suspend fun messages(conversationId: String, afterSequence: Int?): ApiResult<List<ChatMessage>> {
-        val me = currentUserId()
-        return executor.execute { api.messages(conversationId, sinceSequence = afterSequence) }
-            .map { items -> items.sortedBy { it.sequence }.map { it.toMessage(me) } }
+        val me = credentials.currentUserId()
+        val page = if (afterSequence == null) executor.execute { api.messages(conversationId) } else messagesSince(conversationId, afterSequence)
+        return page.map { items -> items.sortedBy { it.sequence }.map { it.toMessage(me) } }
+    }
+
+    private suspend fun messagesSince(conversationId: String, sequence: Int): ApiResult<List<MessageDto>> {
+        val all = mutableListOf<MessageDto>()
+        var cursor = sequence
+        while (true) {
+            val page = when (val result = executor.execute { api.messages(conversationId, sinceSequence = cursor, limit = PAGE_SIZE) }) {
+                is ApiResult.Failure -> return result
+                is ApiResult.Success -> result.data
+            }
+            all += page
+            if (page.size < PAGE_SIZE) return ApiResult.Success(all)
+            cursor = page.maxOf { it.sequence }
+        }
     }
 
     override fun liveMessages(conversationId: String): Flow<ChatMessage> {
-        val me = currentUserId()
+        val me = credentials.currentUserId()
         val published = realtime.subscribe("/topic/conversations.$conversationId").mapNotNull(::messageEventOf)
         val confirmed = outbox.delivered.filter { it.conversationId == conversationId }
         return merge(published, confirmed).map { it.toMessage(me) }
@@ -111,10 +125,9 @@ class RemoteCommunicationRepository @Inject constructor(
         return runCatching { json.decodeFromJsonElement(MessageDto.serializer(), payload) }.getOrNull()
     }
 
-    private fun currentUserId(): String? = credentials.accessToken()?.let(::accessTokenSubject)
-
     private companion object {
         val MESSAGE_EVENTS = setOf("MESSAGE_CREATED", "MESSAGE_EDITED", "MESSAGE_DELETED")
+        const val PAGE_SIZE = 100
     }
 }
 

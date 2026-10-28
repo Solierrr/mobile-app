@@ -80,7 +80,9 @@ class ScriptedMessengerApi : MessengerApi {
 
     override suspend fun messages(conversationId: String, sinceSequence: Int?, limit: Int): List<MessageDto> {
         historyCalls++
-        return history.filter { it.conversationId == conversationId && it.sequence > (sinceSequence ?: 0) }.takeLast(limit)
+        val matching = history.filter { it.conversationId == conversationId && it.sequence > (sinceSequence ?: 0) }
+        // Como o messenger: sem cursor devolve as últimas, com cursor as primeiras depois dele
+        return if (sinceSequence == null) matching.takeLast(limit) else matching.take(limit)
     }
 
     override suspend fun send(body: SendMessageRequest): MessageDto {
