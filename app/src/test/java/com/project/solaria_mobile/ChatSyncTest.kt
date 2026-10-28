@@ -159,6 +159,20 @@ class ChatSyncTest {
         assertEquals(listOf("m1", "m2", "m3"), state().messages.map { it.id })
     }
 
+    @Test fun laterMessageArrivingFirstDoesNotHideAGapBeforeIt() = runTest {
+        val repository = ControllableRepository().apply { history += sent(1) }
+        val (_, state) = chatOf(repository)
+
+        // m4 chega ao vivo (própria mensagem confirmada) enquanto m2 e m3 ficaram para trás
+        repository.history += listOf(sent(2), sent(3), sent(4))
+        repository.live.emit(sent(4))
+        repository.reconnected.emit(Unit)
+        advanceUntilIdle()
+
+        assertEquals(listOf(1), repository.catchUpCursors)
+        assertEquals(listOf("m1", "m2", "m3", "m4"), state().messages.map { it.id })
+    }
+
     private fun TestScope.remoteRepository(
         api: ScriptedMessengerApi,
         realtime: FakeRealtimeClient,

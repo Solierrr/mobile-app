@@ -94,8 +94,17 @@ class ChatViewModel @Inject constructor(
 
     private suspend fun catchUp() {
         if (conversation.value !is UiState.Content) return
-        val lastSequence = delivered.value.values.maxOfOrNull { it.sequence ?: 0 } ?: 0
-        repository.messages(conversationId, afterSequence = lastSequence).onSuccess(::merge)
+        repository.messages(conversationId, afterSequence = contiguousSequence()).onSuccess(::merge)
+    }
+
+    // Só o trecho contínuo conta: uma mensagem própria confirmada depois de um buraco não pode esconder o buraco
+    private fun contiguousSequence(): Int {
+        val sequences = delivered.value.values.mapNotNull { it.sequence }.sorted()
+        var last = sequences.firstOrNull() ?: return 0
+        for (sequence in sequences) {
+            if (sequence == last + 1 || sequence == last) last = sequence else break
+        }
+        return last
     }
 
     private fun merge(messages: List<ChatMessage>) {
