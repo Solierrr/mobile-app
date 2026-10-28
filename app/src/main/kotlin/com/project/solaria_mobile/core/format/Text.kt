@@ -19,6 +19,13 @@ fun initialsOf(name: String): String {
 
 fun formatTimestamp(value: String?, today: Instant = Instant.now()): String {
     val instant = value?.let { runCatching { Instant.parse(it) }.getOrNull() } ?: return ""
+    return formatInstant(instant, today)
+}
+
+fun formatTimestamp(epochMillis: Long, today: Instant = Instant.now()): String =
+    formatInstant(Instant.ofEpochMilli(epochMillis), today)
+
+private fun formatInstant(instant: Instant, today: Instant): String {
     val sameDay = day.format(instant) == day.format(today)
     return if (sameDay) clock.format(instant) else day.format(instant)
 }

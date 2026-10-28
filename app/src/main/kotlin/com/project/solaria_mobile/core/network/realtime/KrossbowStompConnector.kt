@@ -1,6 +1,6 @@
 package com.project.solaria_mobile.core.network.realtime
 
-import com.project.solaria_mobile.core.auth.accessTokenSubject
+import com.project.solaria_mobile.core.auth.accessTokenUserId
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.flow
@@ -54,7 +54,7 @@ class KrossbowStompConnector @Inject constructor(
             // Um frame ERROR durante o CONNECT só acontece por recusa de autenticação
             throw authFailureOf(e)?.let { StompAuthException(it, e) } ?: e
         }
-        return KrossbowStompLink(session, accessTokenSubject(token).orEmpty().lowercase())
+        return KrossbowStompLink(session, accessTokenUserId(token).orEmpty())
     }
 
     private companion object {

@@ -1,6 +1,7 @@
 package com.project.solaria_mobile.feature.communication.data
 
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.JsonElement
 import retrofit2.http.Body
 import retrofit2.http.GET
 import retrofit2.http.POST
@@ -20,7 +21,9 @@ data class MessageDto(
     val id: String,
     val conversationId: String,
     val senderId: String? = null,
+    val clientMessageId: String? = null,
     val content: String = "",
+    val deleted: Boolean = false,
     val timestamp: String? = null,
     val sequence: Int = 0,
 )
@@ -30,7 +33,14 @@ data class SendMessageRequest(
     val conversationId: String,
     val messageType: String,
     val content: String,
-    val role: String = "user",
+    val clientMessageId: String,
+)
+
+@Serializable
+data class RealtimeEventDto(
+    val type: String,
+    val conversationId: String? = null,
+    val payload: JsonElement? = null,
 )
 
 interface MessengerApi {
@@ -43,6 +53,7 @@ interface MessengerApi {
     @GET("messaging/messages/conversation/{conversationId}")
     suspend fun messages(
         @Path("conversationId") conversationId: String,
+        @Query("sinceSequence") sinceSequence: Int? = null,
         @Query("limit") limit: Int = 100,
     ): List<MessageDto>
 
