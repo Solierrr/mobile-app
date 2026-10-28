@@ -14,6 +14,12 @@ import java.util.Date
 import java.util.Locale
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.emptyFlow
+import kotlinx.coroutines.flow.filter
+import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.map
 
 @Singleton
 class FakeCommunicationRepository @Inject constructor() : CommunicationRepository {
@@ -37,21 +43,41 @@ class FakeCommunicationRepository @Inject constructor() : CommunicationRepositor
     private val baseCalls = listOf(supervisor, newCall, security, olderCall)
     private val calls = baseCalls + baseCalls.map { it.copy(id = it.id + "-b") }
 
+    private val sent = MutableSharedFlow<Pair<String, ChatMessage>>(extraBufferCapacity = 16)
+
+    override val online: Flow<Boolean> = flowOf(true)
+
     override suspend fun conversations(): ApiResult<List<Conversation>> = ApiResult.Success(conversations)
 
     override suspend fun conversation(id: String): ApiResult<Conversation> =
         conversations.firstOrNull { it.id == id }?.let { ApiResult.Success(it) } ?: ApiResult.Failure(ErrorKind.NOT_FOUND)
 
-    override suspend fun messages(conversationId: String): ApiResult<List<ChatMessage>> =
-        ApiResult.Success(messages.getOrPut(conversationId) { initialMessages() })
+    override suspend fun messages(conversationId: String, afterSequence: Int?): ApiResult<List<ChatMessage>> =
+        ApiResult.Success(messagesOf(conversationId).filter { (it.sequence ?: 0) > (afterSequence ?: 0) })
 
-    override suspend fun sendMessage(conversationId: String, text: String): ApiResult<ChatMessage> {
+    override fun liveMessages(conversationId: String): Flow<ChatMessage> =
+        sent.filter { it.first == conversationId }.map { it.second }
+
+    override fun pendingMessages(conversationId: String): Flow<List<ChatMessage>> = flowOf(emptyList())
+
+    override fun reconnections(): Flow<Unit> = emptyFlow()
+
+    override suspend fun sendMessage(conversationId: String, text: String): ApiResult<Unit> {
         if (text.isBlank()) return ApiResult.Failure(ErrorKind.VALIDATION, setOf("text"))
         val time = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date())
-        val message = ChatMessage(text, true, time)
-        messages[conversationId] = messages.getOrPut(conversationId) { initialMessages() } + message
-        return ApiResult.Success(message)
+        val history = messagesOf(conversationId)
+        val sequence = history.size + 1
+        val message = ChatMessage("$conversationId-$sequence", text, true, time, sequence)
+        messages[conversationId] = history + message
+        sent.tryEmit(conversationId to message)
+        return ApiResult.Success(Unit)
     }
+
+    override suspend fun retryMessage(messageId: String) = Unit
+
+    override suspend fun discardMessage(messageId: String) = Unit
+
+    private fun messagesOf(conversationId: String) = messages.getOrPut(conversationId) { initialMessages(conversationId) }
 
     override suspend fun calls(): ApiResult<List<ServiceCall>> = ApiResult.Success(calls)
 
@@ -67,9 +93,9 @@ class FakeCommunicationRepository @Inject constructor() : CommunicationRepositor
         )
     )
 
-    private fun initialMessages() = listOf(
-        ChatMessage("Olá! Você conseguiu revisar o cronograma do projeto?", false, "10:30"),
-        ChatMessage("Consegui sim. Vou enviar os detalhes ainda hoje.", true, "10:42"),
-        ChatMessage("Perfeito, obrigado!", false, "10:45"),
+    private fun initialMessages(conversationId: String) = listOf(
+        ChatMessage("$conversationId-1", "Olá! Você conseguiu revisar o cronograma do projeto?", false, "10:30", 1),
+        ChatMessage("$conversationId-2", "Consegui sim. Vou enviar os detalhes ainda hoje.", true, "10:42", 2),
+        ChatMessage("$conversationId-3", "Perfeito, obrigado!", false, "10:45", 3),
     )
 }
