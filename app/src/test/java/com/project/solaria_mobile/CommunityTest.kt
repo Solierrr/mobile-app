@@ -4,7 +4,6 @@ import androidx.lifecycle.SavedStateHandle
 import com.project.solaria_mobile.core.common.ApiResult
 import com.project.solaria_mobile.core.common.ErrorKind
 import com.project.solaria_mobile.core.common.UiState
-import com.project.solaria_mobile.core.database.ConversationEntity
 import com.project.solaria_mobile.core.database.LocalDataWiper
 import com.project.solaria_mobile.core.network.ApiCallExecutor
 import com.project.solaria_mobile.core.network.ApiErrorParser

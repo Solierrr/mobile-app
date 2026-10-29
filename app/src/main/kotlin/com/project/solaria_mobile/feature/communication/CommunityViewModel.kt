@@ -6,7 +6,6 @@ import androidx.lifecycle.viewModelScope
 import com.project.solaria_mobile.core.common.ApiResult
 import com.project.solaria_mobile.core.common.ErrorKind
 import com.project.solaria_mobile.core.common.UiState
-import com.project.solaria_mobile.core.common.toUiState
 import com.project.solaria_mobile.feature.communication.domain.Community
 import com.project.solaria_mobile.feature.communication.domain.CommunityRepository
 import com.project.solaria_mobile.feature.communication.domain.CommunityRole
