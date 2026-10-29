@@ -80,6 +80,10 @@ class FakeCommunicationRepository @Inject constructor() : CommunicationRepositor
 
     override suspend fun setArchived(conversationId: String, archived: Boolean): ApiResult<Unit> = ApiResult.Success(Unit)
 
+    override suspend fun editMessage(messageId: String, text: String): ApiResult<Unit> = ApiResult.Success(Unit)
+
+    override suspend fun deleteMessage(messageId: String): ApiResult<Unit> = ApiResult.Success(Unit)
+
     private fun messagesOf(conversationId: String) = messages.value[conversationId] ?: initialMessages(conversationId)
 
     override suspend fun calls(): ApiResult<List<ServiceCall>> = ApiResult.Success(calls)

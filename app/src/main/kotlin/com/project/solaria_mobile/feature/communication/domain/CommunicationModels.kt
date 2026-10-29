@@ -31,6 +31,9 @@ data class ChatMessage(
     val status: MessageStatus = MessageStatus.SENT,
     val sender: String? = null,
     val edited: Boolean = false,
+    val deleted: Boolean = false,
+    val sentAt: Long? = null,
+    val changeable: Boolean = false,
 )
 
 data class ServiceCall(val id: String, val title: String, val detail: String, val icon: ServiceCallIcon, val badge: String? = null)

@@ -6,6 +6,7 @@ import com.project.solaria_mobile.core.common.ErrorKind
 import com.project.solaria_mobile.core.common.UiState
 import com.project.solaria_mobile.core.network.realtime.websocketUrlOf
 import com.project.solaria_mobile.feature.communication.ChatUiState
+import com.project.solaria_mobile.feature.communication.ChatNotice
 import com.project.solaria_mobile.feature.communication.ChatViewModel
 import com.project.solaria_mobile.feature.communication.ConversationsUiState
 import com.project.solaria_mobile.feature.communication.ConversationsViewModel
@@ -83,6 +84,10 @@ class ChatSyncTest {
         var refreshes = 0
         var opens = 0
         val namesRequests = mutableListOf<String?>()
+        val edits = mutableListOf<Pair<String, String>>()
+        val deletes = mutableListOf<String>()
+        var editResult: ApiResult<Unit> = ApiResult.Success(Unit)
+        var deleteResult: ApiResult<Unit> = ApiResult.Success(Unit)
 
         override val online: Flow<Boolean> = connection
         override val syncResult: Flow<ApiResult<Unit>?> = sync
@@ -110,9 +115,135 @@ class ChatSyncTest {
         override suspend fun markRead(conversationId: String) = Unit
         override suspend fun setMuted(conversationId: String, muted: Boolean): ApiResult<Unit> = ApiResult.Success(Unit)
         override suspend fun setArchived(conversationId: String, archived: Boolean): ApiResult<Unit> = ApiResult.Success(Unit)
+        override suspend fun editMessage(messageId: String, text: String): ApiResult<Unit> {
+            edits += messageId to text
+            return editResult
+        }
+        override suspend fun deleteMessage(messageId: String): ApiResult<Unit> {
+            deletes += messageId
+            return deleteResult
+        }
         override suspend fun calls(): ApiResult<List<ServiceCall>> = ApiResult.Success(emptyList())
         override suspend fun call(id: String): ApiResult<ServiceCall> = ApiResult.Failure(ErrorKind.NOT_FOUND)
         override suspend fun notifications(): ApiResult<List<NotificationGroup>> = ApiResult.Success(emptyList())
+    }
+
+    // ---- ações do chat: edição e exclusão de mensagem
+
+    private val now = 1_793_181_600_000L
+
+    private fun mine(sequence: Int, sentAt: Long, text: String = "meu texto") =
+        ChatMessage("m$sequence", text, true, "10:00", sequence, sentAt = sentAt)
+
+    private fun TestScope.chatAt(repository: CommunicationRepository): Pair<ChatViewModel, () -> UiState<ChatUiState>> {
+        val viewModel = ChatViewModel(SavedStateHandle(mapOf("id" to "c1")), repository).also { it.now = { now } }
+        backgroundScope.launch { viewModel.uiState.collect { } }
+        advanceUntilIdle()
+        return viewModel to { viewModel.uiState.value }
+    }
+
+    @Test fun recentOwnMessageIsChangeableAndEditingSendsTheNewTextAndLeavesEditMode() = runTest {
+        val repository = ControllableRepository().apply {
+            stored.value = conversation()
+            history.value = listOf(mine(1, now - 60_000))
+        }
+        val (viewModel, state) = chatAt(repository)
+        assertTrue(contentOf(state).messages.single().changeable)
+
+        viewModel.startEdit("m1")
+        advanceUntilIdle()
+        assertEquals("meu texto", contentOf(state).draft)
+        assertEquals("m1", contentOf(state).editing?.id)
+
+        viewModel.onDraftChange("texto corrigido")
+        viewModel.send()
+        advanceUntilIdle()
+
+        assertEquals(listOf("m1" to "texto corrigido"), repository.edits)
+        assertNull(contentOf(state).editing)
+        assertEquals("", contentOf(state).draft)
+        assertEquals(1, contentOf(state).messages.size)
+    }
+
+    @Test fun refusedEditKeepsTheTextAndShowsANoticeUntilDismissed() = runTest {
+        val repository = ControllableRepository().apply {
+            stored.value = conversation()
+            history.value = listOf(mine(1, now - 60_000))
+            editResult = ApiResult.Failure(ErrorKind.VALIDATION)
+        }
+        val (viewModel, state) = chatAt(repository)
+
+        viewModel.startEdit("m1")
+        viewModel.onDraftChange("tarde demais")
+        viewModel.send()
+        advanceUntilIdle()
+
+        assertEquals(ChatNotice.NOT_ALLOWED, contentOf(state).notice)
+        assertEquals("tarde demais", contentOf(state).draft)
+        assertEquals("m1", contentOf(state).editing?.id)
+
+        viewModel.dismissNotice()
+        viewModel.cancelEdit()
+        advanceUntilIdle()
+
+        assertNull(contentOf(state).notice)
+        assertNull(contentOf(state).editing)
+        assertEquals("", contentOf(state).draft)
+    }
+
+    @Test fun messageOlderThanThirtyMinutesIsNotChangeableAndEditingItIsIgnored() = runTest {
+        val repository = ControllableRepository().apply {
+            stored.value = conversation()
+            history.value = listOf(mine(1, now - 31 * 60_000))
+        }
+        val (viewModel, state) = chatAt(repository)
+
+        viewModel.startEdit("m1")
+        viewModel.delete("m1")
+        advanceUntilIdle()
+
+        assertFalse(contentOf(state).messages.single().changeable)
+        assertNull(contentOf(state).editing)
+        assertTrue(repository.deletes.isEmpty())
+    }
+
+    @Test fun deleteGoesToTheRepositoryAndFailuresBecomeNotices() = runTest {
+        val repository = ControllableRepository().apply {
+            stored.value = conversation()
+            history.value = listOf(mine(1, now - 60_000))
+        }
+        val (viewModel, state) = chatAt(repository)
+
+        viewModel.delete("m1")
+        advanceUntilIdle()
+        assertEquals(listOf("m1"), repository.deletes)
+        assertNull(contentOf(state).notice)
+
+        repository.deleteResult = ApiResult.Failure(ErrorKind.CONNECTIVITY)
+        viewModel.delete("m1")
+        advanceUntilIdle()
+        assertEquals(ChatNotice.OFFLINE, contentOf(state).notice)
+
+        repository.deleteResult = ApiResult.Failure(ErrorKind.CONFLICT)
+        viewModel.delete("m1")
+        advanceUntilIdle()
+        assertEquals(ChatNotice.TRY_AGAIN, contentOf(state).notice)
+
+        repository.deleteResult = ApiResult.Failure(ErrorKind.NOT_FOUND)
+        viewModel.delete("m1")
+        advanceUntilIdle()
+        assertEquals(ChatNotice.NO_ACCESS, contentOf(state).notice)
+    }
+
+    @Test fun offlineMakesEveryMessageUnchangeable() = runTest {
+        val repository = ControllableRepository().apply {
+            stored.value = conversation()
+            history.value = listOf(mine(1, now - 60_000))
+            connection.value = false
+        }
+        val (_, state) = chatAt(repository)
+
+        assertFalse(contentOf(state).messages.single().changeable)
     }
 
     private fun TestScope.chatOf(repository: CommunicationRepository): Pair<ChatViewModel, () -> UiState<ChatUiState>> {

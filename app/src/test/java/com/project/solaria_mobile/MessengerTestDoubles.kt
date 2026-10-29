@@ -1,5 +1,6 @@
 package com.project.solaria_mobile
 
+import com.project.solaria_mobile.feature.communication.data.EditMessageRequest
 import com.project.solaria_mobile.core.auth.AuthTokens
 import com.project.solaria_mobile.feature.communication.data.ConversationStateRequest
 import com.project.solaria_mobile.feature.communication.data.ConversationStateDto
@@ -314,6 +315,10 @@ class ScriptedMessengerApi : MessengerApi {
     var version = 0L
     var updateCalls = 0
 
+    /** Pedidos de edição (`edit:id`) e exclusão (`delete:id`), na ordem. */
+    val mutationRequests = mutableListOf<String>()
+    var mutationFailure: Throwable? = null
+
     /** Pedidos de PATCH de estado, na ordem: id da conversa e corpo. */
     val stateRequests = mutableListOf<Pair<String, ConversationStateRequest>>()
     var stateFailure: Throwable? = null
@@ -393,6 +398,22 @@ class ScriptedMessengerApi : MessengerApi {
         body.archived?.let { if (it) archivedIds += id else archivedIds -= id }
         val read = serverRead[id] ?: 0
         return ConversationStateDto(id, epoch, nextVersion(), read, (head - read).toLong(), id in mutedIds, id in archivedIds, id in mutedIds || id in archivedIds)
+    }
+
+    override suspend fun edit(id: String, body: EditMessageRequest): MessageDto {
+        mutationRequests += "edit:$id"
+        mutationFailure?.let { throw it }
+        if (history.none { it.id == id }) throw httpError(404)
+        serverEdit(id, body.content)
+        return history.first { it.id == id }
+    }
+
+    override suspend fun delete(id: String): MessageDto {
+        mutationRequests += "delete:$id"
+        mutationFailure?.let { throw it }
+        if (history.none { it.id == id }) throw httpError(404)
+        serverDelete(id)
+        return history.first { it.id == id }
     }
 
     override suspend fun send(body: SendMessageRequest): MessageDto {
