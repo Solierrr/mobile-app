@@ -464,7 +464,13 @@ class FakeRealtimeClient : RealtimeClient {
     override fun subscribe(destination: String): Flow<String> =
         frames.filter { it.first == destination }.map { it.second }
 
-    override suspend fun send(destination: String, body: String): ApiResult<Unit> = ApiResult.Success(Unit)
+    /** Quadros enviados pelo app, na ordem: destino e corpo. */
+    val sent = mutableListOf<Pair<String, String>>()
+
+    override suspend fun send(destination: String, body: String): ApiResult<Unit> {
+        sent += destination to body
+        return ApiResult.Success(Unit)
+    }
 
     override fun connect() = Unit
 

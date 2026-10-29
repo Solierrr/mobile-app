@@ -19,6 +19,9 @@ interface CommunicationRepository {
     suspend fun setMuted(conversationId: String, muted: Boolean): ApiResult<Unit>
     suspend fun setArchived(conversationId: String, archived: Boolean): ApiResult<Unit>
     suspend fun startDirect(recipientAuthId: String): ApiResult<String>
+    fun presence(conversationId: String): Flow<ChatPresence>
+    fun typing(conversationId: String)
+    fun stopTyping(conversationId: String)
     suspend fun editMessage(messageId: String, text: String): ApiResult<Unit>
     suspend fun deleteMessage(messageId: String): ApiResult<Unit>
     suspend fun calls(): ApiResult<List<ServiceCall>>

@@ -8,6 +8,7 @@ import com.project.solaria_mobile.core.common.ErrorKind
 import com.project.solaria_mobile.core.common.UiState
 import com.project.solaria_mobile.core.common.toUiState
 import com.project.solaria_mobile.feature.communication.domain.ChatMessage
+import com.project.solaria_mobile.feature.communication.domain.ChatPresence
 import com.project.solaria_mobile.feature.communication.domain.CommunicationRepository
 import com.project.solaria_mobile.feature.communication.domain.Conversation
 import com.project.solaria_mobile.feature.communication.domain.canChange
@@ -54,6 +55,7 @@ enum class ChatNotice {
  * @property online `true` se há internet.
  * @property editing mensagem em edição, ou `null`. Enquanto existe, o envio do campo de texto edita em vez de enviar.
  * @property notice aviso a mostrar, ou `null`.
+ * @property presence presença do outro participante e quem está digitando.
  */
 data class ChatUiState(
     val conversation: Conversation,
@@ -62,12 +64,14 @@ data class ChatUiState(
     val online: Boolean = true,
     val editing: ChatMessage? = null,
     val notice: ChatNotice? = null,
+    val presence: ChatPresence = ChatPresence(),
 )
 
 private data class Live(
     val conversation: Conversation?,
     val messages: List<ChatMessage>,
     val online: Boolean,
+    val presence: ChatPresence,
 )
 
 private data class Local(
@@ -111,7 +115,8 @@ class ChatViewModel @Inject constructor(
         repository.conversation(conversationId),
         repository.messages(conversationId),
         repository.online,
-    ) { conversation, messages, online -> Live(conversation, messages, online) }
+        repository.presence(conversationId),
+    ) { conversation, messages, online, presence -> Live(conversation, messages, online, presence) }
 
     private val local = combine(opened, draft, editing, notice) { open, text, edited, aviso -> Local(open, text, edited, aviso) }
 
@@ -127,6 +132,7 @@ class ChatViewModel @Inject constructor(
                     online = data.online,
                     editing = state.editing,
                     notice = state.notice,
+                    presence = data.presence,
                 ),
             )
             else -> UiState.Loading
@@ -146,6 +152,10 @@ class ChatViewModel @Inject constructor(
         }
     }
 
+    override fun onCleared() {
+        repository.stopTyping(conversationId)
+    }
+
     fun load() {
         viewModelScope.launch {
             opened.value = UiState.Loading
@@ -153,11 +163,19 @@ class ChatViewModel @Inject constructor(
         }
     }
 
-    fun onDraftChange(value: String) { draft.value = value }
+    fun onDraftChange(value: String) {
+        draft.value = value
+        if (value.isNotEmpty() && editing.value == null && canSignalTyping()) {
+            repository.typing(conversationId)
+        } else {
+            repository.stopTyping(conversationId)
+        }
+    }
 
     fun send() {
         val text = draft.value
         if (text.isBlank()) return
+        repository.stopTyping(conversationId)
         val target = editing.value
         if (target != null) {
             saveEdit(target, text)
@@ -187,6 +205,7 @@ class ChatViewModel @Inject constructor(
         val message = currentMessages().firstOrNull { it.id == messageId && it.changeable } ?: return
         editing.value = message
         draft.value = message.text
+        repository.stopTyping(conversationId)
     }
 
     /** Sai do modo de edição e limpa o campo de texto. */
@@ -245,6 +264,9 @@ class ChatViewModel @Inject constructor(
             }
         }
     }
+
+    // Conversa com o chatbot ou sem acesso não tem "digitando" para os outros
+    private fun canSignalTyping(): Boolean = currentConversation()?.let { !it.chatbot && !it.accessLost } ?: false
 
     private fun currentConversation(): Conversation? = (uiState.value as? UiState.Content)?.data?.conversation
 

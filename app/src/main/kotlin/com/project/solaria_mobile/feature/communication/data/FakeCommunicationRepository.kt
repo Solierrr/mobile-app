@@ -1,5 +1,6 @@
 package com.project.solaria_mobile.feature.communication.data
 
+import com.project.solaria_mobile.feature.communication.domain.ChatPresence
 import kotlinx.coroutines.flow.first
 import com.project.solaria_mobile.core.common.ApiResult
 import com.project.solaria_mobile.core.common.ErrorKind
@@ -82,6 +83,12 @@ class FakeCommunicationRepository @Inject constructor() : CommunicationRepositor
     override suspend fun setArchived(conversationId: String, archived: Boolean): ApiResult<Unit> = ApiResult.Success(Unit)
 
     override suspend fun startDirect(recipientAuthId: String): ApiResult<String> = ApiResult.Success(conversations.first().id)
+
+    override fun presence(conversationId: String): Flow<ChatPresence> = flowOf(ChatPresence())
+
+    override fun typing(conversationId: String) = Unit
+
+    override fun stopTyping(conversationId: String) = Unit
 
     override suspend fun editMessage(messageId: String, text: String): ApiResult<Unit> = ApiResult.Success(Unit)
 

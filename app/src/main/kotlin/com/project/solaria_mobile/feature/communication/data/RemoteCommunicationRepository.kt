@@ -1,5 +1,6 @@
 package com.project.solaria_mobile.feature.communication.data
 
+import com.project.solaria_mobile.feature.communication.domain.ChatPresence
 import kotlinx.coroutines.flow.first
 import com.project.solaria_mobile.core.auth.currentUserId
 import com.project.solaria_mobile.core.common.ApiResult
@@ -33,6 +34,7 @@ class RemoteCommunicationRepository @Inject constructor(
     private val sync: MessageSync,
     private val serviceCalls: FakeCommunicationRepository,
     private val stateSync: ConversationStateSync,
+    private val livePresence: ConversationPresence,
 ) : CommunicationRepository {
     override val online: Flow<Boolean> get() = networkMonitor.isOnline
 
@@ -118,6 +120,25 @@ class RemoteCommunicationRepository @Inject constructor(
         return executor.execute { api.delete(messageId) }.map { store.apply(listOf(it)) }
     }
 
+    override fun presence(conversationId: String): Flow<ChatPresence> =
+        combine(livePresence.observe(conversationId), conversationDao.observe(conversationId), users.observe()) { live, conversation, names ->
+            if (conversation == null || conversation.isChatbot || conversation.accessLost) {
+                ChatPresence()
+            } else {
+                val peers = conversation.peerIds(credentials.currentUserId()).map { it.lowercase() }.toSet()
+                ChatPresence(
+                    known = live.known,
+                    peerOnline = if (live.known && conversation.conversationType == DIRECT_TYPE) live.online.any { it in peers } else null,
+                    onlineCount = live.online.size,
+                    typingNames = live.typing.map { names[it]?.username ?: UNKNOWN_TYPING_NAME },
+                )
+            }
+        }
+
+    override fun typing(conversationId: String) = livePresence.typing(conversationId)
+
+    override fun stopTyping(conversationId: String) = livePresence.stopTyping(conversationId)
+
     override suspend fun calls(): ApiResult<List<ServiceCall>> = serviceCalls.calls()
 
     override suspend fun call(id: String): ApiResult<ServiceCall> = serviceCalls.call(id)
@@ -126,5 +147,6 @@ class RemoteCommunicationRepository @Inject constructor(
 
     private companion object {
         const val CHATBOT_HISTORY = 100
+        const val UNKNOWN_TYPING_NAME = "Alguém"
     }
 }
