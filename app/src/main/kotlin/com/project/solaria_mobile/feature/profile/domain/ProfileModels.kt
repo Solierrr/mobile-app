@@ -10,6 +10,7 @@ data class UserProfile(
     val phone: String,
     val avatarUrl: String? = null,
     val bannerUrl: String? = null,
+    val authId: String? = null,
 )
 
-data class Connection(val id: String, val initials: String, val name: String, val handle: String)
+data class Connection(val id: String, val initials: String, val name: String, val handle: String, val authId: String? = null)

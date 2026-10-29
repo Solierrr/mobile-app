@@ -1,5 +1,6 @@
 package com.project.solaria_mobile
 
+import com.project.solaria_mobile.feature.communication.data.DirectConversationRequest
 import com.project.solaria_mobile.feature.communication.data.EditMessageRequest
 import com.project.solaria_mobile.core.auth.AuthTokens
 import com.project.solaria_mobile.feature.communication.data.ConversationStateRequest
@@ -319,6 +320,10 @@ class ScriptedMessengerApi : MessengerApi {
     val mutationRequests = mutableListOf<String>()
     var mutationFailure: Throwable? = null
 
+    /** Ids de destinatário dos pedidos de conversa direta. */
+    val directRequests = mutableListOf<String>()
+    var directFailure: Throwable? = null
+
     /** Pedidos de PATCH de estado, na ordem: id da conversa e corpo. */
     val stateRequests = mutableListOf<Pair<String, ConversationStateRequest>>()
     var stateFailure: Throwable? = null
@@ -414,6 +419,16 @@ class ScriptedMessengerApi : MessengerApi {
         if (history.none { it.id == id }) throw httpError(404)
         serverDelete(id)
         return history.first { it.id == id }
+    }
+
+    override suspend fun direct(body: DirectConversationRequest): ConversationDto {
+        directRequests += body.recipientId
+        directFailure?.let { throw it }
+        return ConversationDto(
+            id = "d-${body.recipientId}",
+            conversationType = "DIRECT",
+            participantIds = listOf("user-1", body.recipientId),
+        )
     }
 
     override suspend fun send(body: SendMessageRequest): MessageDto {

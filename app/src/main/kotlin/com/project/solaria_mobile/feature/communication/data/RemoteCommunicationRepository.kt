@@ -91,6 +91,20 @@ class RemoteCommunicationRepository @Inject constructor(
 
     override suspend fun setArchived(conversationId: String, archived: Boolean) = stateSync.setArchived(conversationId, archived)
 
+    // O servidor devolve a conversa existente se já houver uma com a pessoa. A resposta não traz os cabeçalhos de
+    // sincronização, então só entra no banco se a conversa ainda não está lá; a sincronização completa a refaz com os
+    // dados reais.
+    override suspend fun startDirect(recipientAuthId: String): ApiResult<String> {
+        if (!networkMonitor.isOnline.first()) return ApiResult.Failure(ErrorKind.CONNECTIVITY)
+        return executor.execute { api.direct(DirectConversationRequest(recipientAuthId)) }.map { created ->
+            if (conversationDao.find(created.id) == null) {
+                conversationDao.upsert(listOf(created.toEntity()))
+                sync.refresh()
+            }
+            created.id
+        }
+    }
+
     // Edição e exclusão só com internet: não entram na fila de envio, porque o servidor pode recusá-las (prazo,
     // mensagem já excluída, concorrência) e o usuário precisa ver o motivo na hora. A resposta já traz a versão nova;
     // o evento que chega depois tem a mesma versão e é ignorado pela regra de versão maior vence.

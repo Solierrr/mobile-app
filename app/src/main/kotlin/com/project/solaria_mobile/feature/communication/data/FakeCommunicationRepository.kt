@@ -1,5 +1,6 @@
 package com.project.solaria_mobile.feature.communication.data
 
+import kotlinx.coroutines.flow.first
 import com.project.solaria_mobile.core.common.ApiResult
 import com.project.solaria_mobile.core.common.ErrorKind
 import com.project.solaria_mobile.feature.communication.domain.AvatarTone
@@ -79,6 +80,8 @@ class FakeCommunicationRepository @Inject constructor() : CommunicationRepositor
     override suspend fun setMuted(conversationId: String, muted: Boolean): ApiResult<Unit> = ApiResult.Success(Unit)
 
     override suspend fun setArchived(conversationId: String, archived: Boolean): ApiResult<Unit> = ApiResult.Success(Unit)
+
+    override suspend fun startDirect(recipientAuthId: String): ApiResult<String> = ApiResult.Success(conversations.first().id)
 
     override suspend fun editMessage(messageId: String, text: String): ApiResult<Unit> = ApiResult.Success(Unit)
 
