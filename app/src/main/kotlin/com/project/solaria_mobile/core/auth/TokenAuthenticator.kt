@@ -13,6 +13,7 @@ import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import okhttp3.Response
 import okhttp3.Route
+import java.io.IOException
 import java.time.Duration
 
 @Singleton
@@ -46,13 +47,16 @@ class TokenAuthenticator @Inject constructor(
         val body = json.encodeToString(RefreshRequest.serializer(), RefreshRequest(refreshToken))
             .toRequestBody("application/json".toMediaType())
         val request = Request.Builder().url(BuildConfig.AUTH_BASE_URL + REFRESH_PATH.removePrefix("/")).post(body).build()
-        return runCatching {
+        return try {
             client.newCall(request).execute().use { result ->
+                if (result.code >= SERVER_ERROR) throw IOException("Auth indisponível: ${result.code}")
                 if (!result.isSuccessful) return null
                 val parsed = json.decodeFromString(TokenResponse.serializer(), result.body.string())
                 AuthTokens(parsed.accessToken, parsed.refreshToken, parsed.accessTokenExpiresAt)
             }
-        }.getOrNull()
+        } catch (e: IllegalArgumentException) {
+            null
+        }
     }
 
     private fun responseCount(response: Response): Int {
@@ -69,5 +73,6 @@ class TokenAuthenticator @Inject constructor(
         const val AUTHORIZATION = "Authorization"
         const val REFRESH_PATH = "/auth/refresh"
         const val MAX_ATTEMPTS = 2
+        const val SERVER_ERROR = 500
     }
 }

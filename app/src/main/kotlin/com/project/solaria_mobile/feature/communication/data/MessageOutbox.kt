@@ -17,9 +17,6 @@ import javax.inject.Singleton
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.MutableSharedFlow
-import kotlinx.coroutines.flow.SharedFlow
-import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
@@ -42,6 +39,7 @@ import kotlin.coroutines.cancellation.CancellationException
  * Depende de:
  * - [PendingMessageDao] -> fila local.
  * - [MessengerApi] -> envio e histórico.
+ * - [MessageStore] -> recebe a mensagem confirmada, antes de ela sair da fila.
  * - [ApiCallExecutor] -> executa a chamada e devolve o [ApiResult], com o [ErrorKind] na falha.
  * - [NetworkMonitor] -> avisa quando a internet volta.
  * - [CredentialProvider] -> `sub` do usuário logado.
@@ -53,7 +51,6 @@ import kotlin.coroutines.cancellation.CancellationException
  * - [observe] -> acompanha as mensagens pendentes de uma conversa.
  * - [retry] -> libera uma mensagem recusada para novo envio.
  * - [discard] -> apaga uma mensagem da fila sem enviá-la.
- * - [delivered] -> avisa cada mensagem confirmada pelo servidor.
  */
 @Singleton
 class MessageOutbox @Inject constructor(
@@ -62,15 +59,9 @@ class MessageOutbox @Inject constructor(
     private val executor: ApiCallExecutor,
     private val networkMonitor: NetworkMonitor,
     private val credentials: CredentialProvider,
+    private val store: MessageStore,
     @ApplicationScope private val scope: CoroutineScope,
 ) {
-    private val _delivered = MutableSharedFlow<MessageDto>(extraBufferCapacity = DELIVERED_BUFFER)
-    /**
-     * Mensagens confirmadas pelo servidor. Cada uma é emitida antes de a linha sair da fila, para o chat trocar
-     * a bolha pendente pela definitiva sem piscar.
-     */
-    val delivered: SharedFlow<MessageDto> = _delivered.asSharedFlow()
-
     private val drainRequests = Channel<Unit>(Channel.CONFLATED)
     private val started = AtomicBoolean(false)
 
@@ -220,7 +211,7 @@ class MessageOutbox @Inject constructor(
             .map { recent -> recent.firstOrNull { it.clientMessageId.equals(message.clientMessageId, ignoreCase = true) } }
 
     private suspend fun confirm(message: PendingMessageEntity, sent: MessageDto): Outcome {
-        _delivered.emit(sent)
+        if (credentials.currentUserId() == message.senderId) store.apply(listOf(sent))
         dao.delete(message.clientMessageId)
         return Outcome.DELIVERED
     }
@@ -249,8 +240,6 @@ class MessageOutbox @Inject constructor(
         (RETRY_BASE_MILLIS shl (failures - 1).coerceAtMost(4)).coerceAtMost(RETRY_MAX_MILLIS)
 
     private companion object {
-        /** Confirmações que podem aguardar no buffer de [delivered] sem bloquear o envio. */
-        const val DELIVERED_BUFFER = 64
         /** Quantas mensagens recentes da conversa são conferidas antes de um reenvio. */
         const val HISTORY_CHECK_LIMIT = 100
         /** Primeira espera entre tentativas de envio: 15 s. */

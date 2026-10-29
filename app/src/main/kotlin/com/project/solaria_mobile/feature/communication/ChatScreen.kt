@@ -7,29 +7,32 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.key
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.composables.icons.lucide.R as LucideR
 import com.project.solaria_mobile.core.designsystem.components.RoundIconButton
@@ -76,18 +79,24 @@ fun ChatScreen(
         }
         Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(AppTheme.colors.outline))
         if (!state.online) OfflineBanner()
-        Column(
-            modifier = Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = Spacing.screen).padding(vertical = Spacing.lg),
+        val listState = rememberLazyListState()
+        LaunchedEffect(state.messages.lastOrNull()?.id) {
+            if (state.messages.isNotEmpty()) listState.scrollToItem(state.messages.size)
+        }
+        LazyColumn(
+            state = listState,
+            modifier = Modifier.weight(1f).fillMaxWidth(),
+            contentPadding = PaddingValues(horizontal = Spacing.screen, vertical = Spacing.lg),
             verticalArrangement = Arrangement.spacedBy(Spacing.md),
         ) {
-            Text("Hoje", modifier = Modifier.align(Alignment.CenterHorizontally), color = AppTheme.colors.onSurfaceMuted, style = androidx.compose.material3.MaterialTheme.typography.labelMedium)
-            state.messages.forEach { message ->
-                key(message.id) {
-                    MessageBubble(message, onRetry = { onRetry(message.id) }, onDiscard = { onDiscard(message.id) })
-                }
+            item {
+                Text("Hoje", modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center, color = AppTheme.colors.onSurfaceMuted, style = androidx.compose.material3.MaterialTheme.typography.labelMedium)
+            }
+            items(state.messages, key = { it.id }) { message ->
+                MessageBubble(message, onRetry = { onRetry(message.id) }, onDiscard = { onDiscard(message.id) })
             }
         }
-        Row(
+        if (state.conversation.accessLost) ReadOnlyNotice() else Row(
             modifier = Modifier.fillMaxWidth().padding(horizontal = Spacing.screen).padding(top = Spacing.sm, bottom = Spacing.md),
             horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
             verticalAlignment = Alignment.CenterVertically,
@@ -126,6 +135,13 @@ fun ChatScreen(
     }
 }
 
+/**
+ * Faixa mostrada quando o aparelho está sem internet.
+ *
+ * Avisa que as mensagens na tela são as salvas no aparelho e podem estar desatualizadas, e que o que o usuário enviar
+ * sai quando a internet voltar. Sem rede, o app não recebe mensagens novas, edições nem exclusões. Elas entram na
+ * próxima sincronização, quando a conexão volta. O chat abre pelo Room, então a faixa não impede a leitura.
+ */
 @Composable
 private fun OfflineBanner() {
     Row(
@@ -134,8 +150,19 @@ private fun OfflineBanner() {
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Icon(painter = painterResource(LucideR.drawable.lucide_ic_wifi_off), contentDescription = null, tint = AppTheme.colors.onSurfaceMuted, modifier = Modifier.size(Sizing.iconSmall))
-        Text("Sem conexão. As mensagens serão enviadas quando a internet voltar.", color = AppTheme.colors.onSurfaceMuted, style = androidx.compose.material3.MaterialTheme.typography.labelMedium)
+        Text("Sem conexão. Você vê as mensagens salvas no aparelho, que podem estar desatualizadas. O que você enviar sai quando a internet voltar.", color = AppTheme.colors.onSurfaceMuted, style = androidx.compose.material3.MaterialTheme.typography.labelMedium)
     }
+}
+
+@Composable
+private fun ReadOnlyNotice() {
+    Text(
+        "Você não participa mais desta conversa.",
+        modifier = Modifier.fillMaxWidth().background(AppTheme.colors.inputFill).padding(horizontal = Spacing.screen, vertical = Spacing.md),
+        textAlign = TextAlign.Center,
+        color = AppTheme.colors.onSurfaceMuted,
+        style = androidx.compose.material3.MaterialTheme.typography.labelMedium,
+    )
 }
 
 @Composable
@@ -145,6 +172,9 @@ private fun MessageBubble(message: ChatMessage, onRetry: () -> Unit, onDiscard: 
         modifier = Modifier.fillMaxWidth(),
         horizontalAlignment = if (mine) Alignment.End else Alignment.Start,
     ) {
+        message.sender?.let { sender ->
+            Text(sender, modifier = Modifier.padding(bottom = 3.dp), color = AppTheme.colors.onSurfaceMuted, style = androidx.compose.material3.MaterialTheme.typography.labelMedium)
+        }
         Surface(
             color = if (mine) AppTheme.colors.ownMessage else AppTheme.colors.inputFill,
             shape = RoundedCornerShape(topStart = 18.dp, topEnd = 18.dp, bottomStart = if (mine) 18.dp else 4.dp, bottomEnd = if (mine) 4.dp else 18.dp),
@@ -152,7 +182,7 @@ private fun MessageBubble(message: ChatMessage, onRetry: () -> Unit, onDiscard: 
             Text(message.text, modifier = Modifier.padding(horizontal = Spacing.md, vertical = Spacing.sm), color = AppTheme.colors.onSurface, style = androidx.compose.material3.MaterialTheme.typography.bodyMedium)
         }
         when (message.status) {
-            MessageStatus.SENT -> Text(message.time, modifier = Modifier.padding(top = 3.dp), color = AppTheme.colors.onSurfaceMuted, style = androidx.compose.material3.MaterialTheme.typography.labelMedium)
+            MessageStatus.SENT -> Text(if (message.edited) "${message.time} · editada" else message.time, modifier = Modifier.padding(top = 3.dp), color = AppTheme.colors.onSurfaceMuted, style = androidx.compose.material3.MaterialTheme.typography.labelMedium)
             MessageStatus.PENDING -> Row(
                 modifier = Modifier.padding(top = 3.dp),
                 horizontalArrangement = Arrangement.spacedBy(Spacing.xxs),

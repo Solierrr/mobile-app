@@ -6,6 +6,11 @@
    See https://developer.android.com/about/versions/12/backup-restore
 -->
 <full-backup-content>
+    <!-- O banco guarda mensagens e a fila de envio. O logout apaga tudo, e o backup não pode restaurar o que ele apagou. -->
+    <exclude domain="database" path="solaria.db" />
+    <exclude domain="database" path="solaria.db-wal" />
+    <exclude domain="database" path="solaria.db-shm" />
+    <exclude domain="database" path="solaria.db-journal" />
     <!--
    <include domain="sharedpref" path="."/>
    <exclude domain="sharedpref" path="device.xml"/>

@@ -2,33 +2,22 @@ package com.project.solaria_mobile.feature.communication.data
 
 import com.project.solaria_mobile.core.auth.currentUserId
 import com.project.solaria_mobile.core.common.ApiResult
+import com.project.solaria_mobile.core.common.ErrorKind
 import com.project.solaria_mobile.core.common.map
-import com.project.solaria_mobile.core.common.onSuccess
-import com.project.solaria_mobile.core.database.PendingMessageEntity
-import com.project.solaria_mobile.core.format.formatTimestamp
-import com.project.solaria_mobile.core.format.initialsOf
+import com.project.solaria_mobile.core.database.ConversationDao
+import com.project.solaria_mobile.core.database.isChatbot
 import com.project.solaria_mobile.core.network.ApiCallExecutor
 import com.project.solaria_mobile.core.network.CredentialProvider
 import com.project.solaria_mobile.core.network.NetworkMonitor
-import com.project.solaria_mobile.core.network.realtime.RealtimeClient
-import com.project.solaria_mobile.core.network.realtime.RealtimeState
-import com.project.solaria_mobile.feature.communication.domain.AvatarTone
 import com.project.solaria_mobile.feature.communication.domain.ChatMessage
 import com.project.solaria_mobile.feature.communication.domain.CommunicationRepository
 import com.project.solaria_mobile.feature.communication.domain.Conversation
-import com.project.solaria_mobile.feature.communication.domain.MessageStatus
 import com.project.solaria_mobile.feature.communication.domain.NotificationGroup
 import com.project.solaria_mobile.feature.communication.domain.ServiceCall
-import java.util.concurrent.ConcurrentHashMap
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.drop
-import kotlinx.coroutines.flow.filter
-import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.mapNotNull
-import kotlinx.coroutines.flow.merge
-import kotlinx.serialization.json.Json
+import kotlinx.coroutines.flow.combine
 
 @Singleton
 class RemoteCommunicationRepository @Inject constructor(
@@ -36,65 +25,59 @@ class RemoteCommunicationRepository @Inject constructor(
     private val executor: ApiCallExecutor,
     private val credentials: CredentialProvider,
     private val outbox: MessageOutbox,
-    private val realtime: RealtimeClient,
     private val networkMonitor: NetworkMonitor,
-    private val json: Json,
+    private val store: MessageStore,
+    private val conversationDao: ConversationDao,
+    private val users: UserDirectory,
+    private val sync: MessageSync,
     private val serviceCalls: FakeCommunicationRepository,
 ) : CommunicationRepository {
-    private val messageTypes = ConcurrentHashMap<String, String>()
-
     override val online: Flow<Boolean> get() = networkMonitor.isOnline
 
-    override suspend fun conversations(): ApiResult<List<Conversation>> =
-        executor.execute { api.conversations() }
-            .onSuccess { items -> items.forEach(::rememberType) }
-            .map { items -> items.map { it.toConversation() } }
+    override val syncResult: Flow<ApiResult<Unit>?> get() = sync.result
 
-    override suspend fun conversation(id: String): ApiResult<Conversation> =
-        executor.execute { api.conversation(id) }
-            .onSuccess(::rememberType)
-            .map { it.toConversation() }
+    override fun conversations(): Flow<List<Conversation>> =
+        combine(conversationDao.observeList(), users.observe()) { rows, names ->
+            val me = credentials.currentUserId()
+            rows.map { it.toConversation(me, names) }
+        }
 
-    override suspend fun messages(conversationId: String, afterSequence: Int?): ApiResult<List<ChatMessage>> {
-        val me = credentials.currentUserId()
-        val page = if (afterSequence == null) executor.execute { api.messages(conversationId) } else messagesSince(conversationId, afterSequence)
-        return page.map { items -> items.sortedBy { it.sequence }.map { it.toMessage(me) } }
-    }
+    override fun conversation(id: String): Flow<Conversation?> =
+        combine(conversationDao.observe(id), users.observe()) { row, names ->
+            row?.toConversation(credentials.currentUserId(), names)
+        }
 
-    private suspend fun messagesSince(conversationId: String, sequence: Int): ApiResult<List<MessageDto>> {
-        val all = mutableListOf<MessageDto>()
-        var cursor = sequence
-        while (true) {
-            val page = when (val result = executor.execute { api.messages(conversationId, sinceSequence = cursor, limit = PAGE_SIZE) }) {
-                is ApiResult.Failure -> return result
-                is ApiResult.Success -> result.data
+    override fun messages(conversationId: String): Flow<List<ChatMessage>> =
+        combine(
+            store.observe(conversationId),
+            outbox.observe(conversationId),
+            conversationDao.observe(conversationId),
+            users.observe(),
+        ) { stored, pending, conversation, names ->
+            val me = credentials.currentUserId()
+            val group = conversation?.conversationType == GROUP_TYPE
+            timelineOf(stored.map { it.toMessage(me, names, group) }, pending.map { it.toMessage() })
+        }
+
+    override suspend fun open(conversationId: String): ApiResult<Unit> {
+        val conversation = conversationDao.find(conversationId)
+            ?: when (val fetched = executor.execute { api.conversation(conversationId) }) {
+                is ApiResult.Failure -> return fetched
+                is ApiResult.Success -> fetched.data.toEntity().also { conversationDao.upsert(listOf(it)) }
             }
-            all += page
-            if (page.size < PAGE_SIZE) return ApiResult.Success(all)
-            cursor = page.maxOf { it.sequence }
-        }
+        if (!conversation.isChatbot) return ApiResult.Success(Unit)
+        return executor.execute { api.messages(conversationId, limit = CHATBOT_HISTORY) }.map { store.apply(it) }
     }
 
-    override fun liveMessages(conversationId: String): Flow<ChatMessage> {
-        val me = credentials.currentUserId()
-        val published = realtime.subscribe("/topic/conversations.$conversationId").mapNotNull(::messageEventOf)
-        val confirmed = outbox.delivered.filter { it.conversationId == conversationId }
-        return merge(published, confirmed).map { it.toMessage(me) }
+    override fun refresh() = sync.refresh()
+
+    override suspend fun refreshNames(conversationId: String?) = users.refreshFor(conversationId, credentials.currentUserId())
+
+    override suspend fun sendMessage(conversationId: String, text: String): ApiResult<Unit> {
+        val conversation = conversationDao.find(conversationId) ?: return ApiResult.Failure(ErrorKind.NOT_FOUND)
+        if (conversation.accessLost) return ApiResult.Failure(ErrorKind.FORBIDDEN)
+        return outbox.enqueue(conversationId, conversation.messageType(), text)
     }
-
-    override fun pendingMessages(conversationId: String): Flow<List<ChatMessage>> =
-        outbox.observe(conversationId).map { rows -> rows.map { it.toMessage() } }
-
-    override fun reconnections(): Flow<Unit> = merge(
-        realtime.state.filter { it == RealtimeState.Connected }.map { },
-        networkMonitor.isOnline.drop(1).filter { it }.map { },
-    )
-
-    override suspend fun sendMessage(conversationId: String, text: String): ApiResult<Unit> =
-        when (val type = messageTypeOf(conversationId)) {
-            is ApiResult.Failure -> type
-            is ApiResult.Success -> outbox.enqueue(conversationId, type.data, text)
-        }
 
     override suspend fun retryMessage(messageId: String) = outbox.retry(messageId)
 
@@ -106,69 +89,7 @@ class RemoteCommunicationRepository @Inject constructor(
 
     override suspend fun notifications(): ApiResult<List<NotificationGroup>> = serviceCalls.notifications()
 
-    private suspend fun messageTypeOf(conversationId: String): ApiResult<String> {
-        messageTypes[conversationId]?.let { return ApiResult.Success(it) }
-        return executor.execute { api.conversation(conversationId) }
-            .onSuccess(::rememberType)
-            .map { it.messageType() }
-    }
-
-    private fun rememberType(conversation: ConversationDto) {
-        messageTypes[conversation.id] = conversation.messageType()
-    }
-
-    private fun messageEventOf(body: String): MessageDto? {
-        val event = runCatching { json.decodeFromString(RealtimeEventDto.serializer(), body) }.getOrNull()
-            ?: return null
-        if (event.type !in MESSAGE_EVENTS) return null
-        val payload = event.payload ?: return null
-        return runCatching { json.decodeFromJsonElement(MessageDto.serializer(), payload) }.getOrNull()
-    }
-
     private companion object {
-        val MESSAGE_EVENTS = setOf("MESSAGE_CREATED", "MESSAGE_EDITED", "MESSAGE_DELETED")
-        const val PAGE_SIZE = 100
+        const val CHATBOT_HISTORY = 100
     }
 }
-
-private val tones = AvatarTone.entries
-
-private const val DELETED_MESSAGE_TEXT = "Mensagem apagada"
-
-private fun ConversationDto.messageType(): String = when (conversationType) {
-    "GROUP" -> "USER_TO_GROUP"
-    "CHAT_BOT" -> "USER_TO_CHATBOT"
-    else -> "USER_TO_USER"
-}
-
-internal fun ConversationDto.toConversation(): Conversation {
-    val name = title?.takeIf { it.isNotBlank() } ?: "Conversa"
-    return Conversation(
-        id = id,
-        initials = initialsOf(name),
-        name = name,
-        preview = "",
-        time = formatTimestamp(lastInteractionAt),
-        tone = tones[(name.hashCode() and Int.MAX_VALUE) % tones.size],
-    )
-}
-
-internal fun MessageDto.toMessage(currentUserId: String?): ChatMessage =
-    ChatMessage(
-        id = id,
-        text = if (deleted) DELETED_MESSAGE_TEXT else content,
-        mine = currentUserId != null && senderId.equals(currentUserId, ignoreCase = true),
-        time = formatTimestamp(timestamp),
-        sequence = sequence,
-        clientMessageId = clientMessageId,
-    )
-
-internal fun PendingMessageEntity.toMessage(): ChatMessage =
-    ChatMessage(
-        id = clientMessageId,
-        text = content,
-        mine = true,
-        time = formatTimestamp(createdAt),
-        clientMessageId = clientMessageId,
-        status = if (failed) MessageStatus.FAILED else MessageStatus.PENDING,
-    )
