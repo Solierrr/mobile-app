@@ -3,6 +3,7 @@ package com.project.solaria_mobile.feature.communication.data
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonElement
 import retrofit2.http.Body
+import retrofit2.http.DELETE
 import retrofit2.http.GET
 import retrofit2.http.PATCH
 import retrofit2.http.POST
@@ -93,6 +94,9 @@ data class ConversationStateDto(
 )
 
 @Serializable
+data class EditMessageRequest(val content: String)
+
+@Serializable
 data class RealtimeEventDto(
     val type: String,
     val conversationId: String? = null,
@@ -122,4 +126,10 @@ interface MessengerApi {
 
     @PATCH("messaging/conversations/{id}/state")
     suspend fun patchState(@Path("id") id: String, @Body body: ConversationStateRequest): ConversationStateDto
+
+    @PATCH("messaging/messages/{id}")
+    suspend fun edit(@Path("id") id: String, @Body body: EditMessageRequest): MessageDto
+
+    @DELETE("messaging/messages/{id}")
+    suspend fun delete(@Path("id") id: String): MessageDto
 }

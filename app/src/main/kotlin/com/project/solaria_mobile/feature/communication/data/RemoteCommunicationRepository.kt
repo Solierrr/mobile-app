@@ -1,5 +1,6 @@
 package com.project.solaria_mobile.feature.communication.data
 
+import kotlinx.coroutines.flow.first
 import com.project.solaria_mobile.core.auth.currentUserId
 import com.project.solaria_mobile.core.common.ApiResult
 import com.project.solaria_mobile.core.common.ErrorKind
@@ -89,6 +90,19 @@ class RemoteCommunicationRepository @Inject constructor(
     override suspend fun setMuted(conversationId: String, muted: Boolean) = stateSync.setMuted(conversationId, muted)
 
     override suspend fun setArchived(conversationId: String, archived: Boolean) = stateSync.setArchived(conversationId, archived)
+
+    // Edição e exclusão só com internet: não entram na fila de envio, porque o servidor pode recusá-las (prazo,
+    // mensagem já excluída, concorrência) e o usuário precisa ver o motivo na hora. A resposta já traz a versão nova;
+    // o evento que chega depois tem a mesma versão e é ignorado pela regra de versão maior vence.
+    override suspend fun editMessage(messageId: String, text: String): ApiResult<Unit> {
+        if (!networkMonitor.isOnline.first()) return ApiResult.Failure(ErrorKind.CONNECTIVITY)
+        return executor.execute { api.edit(messageId, EditMessageRequest(text)) }.map { store.apply(listOf(it)) }
+    }
+
+    override suspend fun deleteMessage(messageId: String): ApiResult<Unit> {
+        if (!networkMonitor.isOnline.first()) return ApiResult.Failure(ErrorKind.CONNECTIVITY)
+        return executor.execute { api.delete(messageId) }.map { store.apply(listOf(it)) }
+    }
 
     override suspend fun calls(): ApiResult<List<ServiceCall>> = serviceCalls.calls()
 

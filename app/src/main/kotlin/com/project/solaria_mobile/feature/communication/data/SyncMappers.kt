@@ -138,6 +138,8 @@ internal fun MessageEntity.toMessage(me: String?, names: Map<String, UserEntity>
         clientMessageId = clientMessageId,
         sender = if (showSender && !mine) senderId?.let { names[it.lowercase()]?.username } else null,
         edited = edited && !deleted,
+        deleted = deleted,
+        sentAt = timestamp.takeIf { it > 0 },
     )
 }
 
