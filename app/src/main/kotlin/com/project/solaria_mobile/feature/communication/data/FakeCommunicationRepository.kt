@@ -46,7 +46,7 @@ class FakeCommunicationRepository @Inject constructor() : CommunicationRepositor
 
     override val syncResult: Flow<ApiResult<Unit>?> = flowOf(ApiResult.Success(Unit))
 
-    override fun conversations(): Flow<List<Conversation>> = flowOf(conversations)
+    override fun conversations(archived: Boolean): Flow<List<Conversation>> = flowOf(if (archived) emptyList() else conversations)
 
     override fun conversation(id: String): Flow<Conversation?> = flowOf(conversations.firstOrNull { it.id == id })
 
@@ -73,6 +73,12 @@ class FakeCommunicationRepository @Inject constructor() : CommunicationRepositor
     override suspend fun retryMessage(messageId: String) = Unit
 
     override suspend fun discardMessage(messageId: String) = Unit
+
+    override suspend fun markRead(conversationId: String) = Unit
+
+    override suspend fun setMuted(conversationId: String, muted: Boolean): ApiResult<Unit> = ApiResult.Success(Unit)
+
+    override suspend fun setArchived(conversationId: String, archived: Boolean): ApiResult<Unit> = ApiResult.Success(Unit)
 
     private fun messagesOf(conversationId: String) = messages.value[conversationId] ?: initialMessages(conversationId)
 

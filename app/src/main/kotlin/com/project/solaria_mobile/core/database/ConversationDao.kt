@@ -15,17 +15,26 @@ import kotlinx.coroutines.flow.Flow
  *
  * Principais operações:
  * - [observeList] -> acompanha a lista, da interação mais recente para a mais antiga, sem as arquivadas.
+ * - [observeArchivedList] -> acompanha só as arquivadas.
  * - [observe] -> acompanha uma conversa.
  * - [upsert] -> grava as conversas que são mais novas que as guardadas.
  * - [applyList] -> aplica a lista completa do servidor e marca as conversas que sumiram.
  * - [remove] -> marca a conversa como sem acesso, a pedido do servidor.
  * - [refreshPreview] -> corrige a prévia quando a última mensagem muda.
+ * - [markReadLocally] -> registra no aparelho até onde o usuário leu.
+ * - [setLocalRead] -> corrige a leitura local quando o servidor a recusa.
+ * - [pendingReads] -> lista as conversas cuja leitura ainda não foi enviada.
+ * - [applyState] -> grava o estado pessoal devolvido pelo servidor depois de um PATCH.
  */
 @Dao
 abstract class ConversationDao {
     /** Emite as conversas não arquivadas, da interação mais recente para a mais antiga. */
     @Query("SELECT * FROM conversations WHERE archived = 0 ORDER BY lastInteractionAt DESC")
     abstract fun observeList(): Flow<List<ConversationEntity>>
+
+    /** Emite as conversas arquivadas, da interação mais recente para a mais antiga. */
+    @Query("SELECT * FROM conversations WHERE archived = 1 ORDER BY lastInteractionAt DESC")
+    abstract fun observeArchivedList(): Flow<List<ConversationEntity>>
 
     /** Emite a conversa pelo id, ou `null` enquanto ela não está no banco. */
     @Query("SELECT * FROM conversations WHERE id = :id")
@@ -56,6 +65,37 @@ abstract class ConversationDao {
             "WHERE id = :conversationId AND lastMessageId = :messageId",
     )
     abstract suspend fun refreshPreview(conversationId: String, messageId: String, content: String?, deleted: Boolean)
+
+    /**
+     * Registra que o usuário viu a conversa até [sequence]. O valor só sobe, nunca desce.
+     *
+     * Não mexe em `syncVersion`: a marcação é do aparelho e o servidor ainda não sabe dela.
+     */
+    @Query("UPDATE conversations SET localReadSequence = MAX(localReadSequence, :sequence) WHERE id = :conversationId")
+    abstract suspend fun markReadLocally(conversationId: String, sequence: Int)
+
+    /** Troca a leitura local, inclusive para baixo. Serve só quando o servidor recusa um valor acima do que ele tem. */
+    @Query("UPDATE conversations SET localReadSequence = :sequence WHERE id = :conversationId")
+    abstract suspend fun setLocalRead(conversationId: String, sequence: Int)
+
+    /** Lista as conversas humanas, com acesso, cuja leitura local passou da que o servidor conhece. */
+    @Query(
+        "SELECT * FROM conversations WHERE localReadSequence > lastReadSequence AND accessLost = 0 " +
+            "AND conversationType != 'CHAT_BOT'",
+    )
+    abstract suspend fun pendingReads(): List<ConversationEntity>
+
+    /**
+     * Grava o estado pessoal devolvido pelo PATCH de estado da conversa.
+     *
+     * Não mexe em `syncEpoch` nem em `syncVersion`: o `CONVERSATION_UPDATED` que o servidor publica logo depois traz a
+     * versão nova, e adiantá-la faria uma atualização de prévia ainda em trânsito ser ignorada.
+     */
+    @Query(
+        "UPDATE conversations SET lastReadSequence = :lastReadSequence, unreadCount = :unreadCount, muted = :muted, " +
+            "archived = :archived, localReadSequence = MAX(localReadSequence, :lastReadSequence) WHERE id = :conversationId",
+    )
+    abstract suspend fun applyState(conversationId: String, lastReadSequence: Int, unreadCount: Long, muted: Boolean, archived: Boolean)
 
     /**
      * Grava as conversas que são mais novas que as guardadas, numa transação.

@@ -14,6 +14,11 @@ data class Conversation(
     val time: String,
     val tone: AvatarTone,
     val accessLost: Boolean = false,
+    val unreadCount: Int = 0,
+    val muted: Boolean = false,
+    val archived: Boolean = false,
+    val group: Boolean = false,
+    val chatbot: Boolean = false,
 )
 
 data class ChatMessage(

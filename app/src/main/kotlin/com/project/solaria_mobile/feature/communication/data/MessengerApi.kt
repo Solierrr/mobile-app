@@ -4,6 +4,7 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonElement
 import retrofit2.http.Body
 import retrofit2.http.GET
+import retrofit2.http.PATCH
 import retrofit2.http.POST
 import retrofit2.http.Path
 import retrofit2.http.Query
@@ -27,6 +28,9 @@ data class ConversationDto(
     val archived: Boolean? = null,
     val lastInteractionAt: String? = null,
     val lastMessage: LastMessageDto? = null,
+    val lastReadSequence: Int? = null,
+    val unreadCount: Long? = null,
+    val muted: Boolean? = null,
 )
 
 @Serializable
@@ -66,6 +70,28 @@ data class SendMessageRequest(
     val clientMessageId: String,
 )
 
+/**
+ * Corpo do PATCH de estado da conversa. Campo `null` não vai no JSON, e o servidor lê campo ausente como "não mudar".
+ */
+@Serializable
+data class ConversationStateRequest(
+    val lastReadSequence: Int? = null,
+    val muted: Boolean? = null,
+    val archived: Boolean? = null,
+)
+
+@Serializable
+data class ConversationStateDto(
+    val conversationId: String,
+    val syncEpoch: String? = null,
+    val syncVersion: Long = 0,
+    val lastReadSequence: Int = 0,
+    val unreadCount: Long = 0,
+    val muted: Boolean = false,
+    val archived: Boolean = false,
+    val effectiveMuted: Boolean = false,
+)
+
 @Serializable
 data class RealtimeEventDto(
     val type: String,
@@ -93,4 +119,7 @@ interface MessengerApi {
 
     @POST("messaging/messages")
     suspend fun send(@Body body: SendMessageRequest): MessageDto
+
+    @PATCH("messaging/conversations/{id}/state")
+    suspend fun patchState(@Path("id") id: String, @Body body: ConversationStateRequest): ConversationStateDto
 }

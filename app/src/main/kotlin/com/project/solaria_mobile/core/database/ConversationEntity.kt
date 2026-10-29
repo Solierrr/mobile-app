@@ -23,6 +23,11 @@ import androidx.room.PrimaryKey
  * @property lastMessageContent texto da prévia. `null` se a última mensagem foi excluída ou não existe.
  * @property lastMessageDeleted `true` se a última mensagem foi excluída.
  * @property accessLost `true` se o usuário perdeu o acesso à conversa. Ela fica em somente leitura e não sincroniza mais.
+ * @property lastReadSequence cursor de leitura que o servidor guarda para o usuário. `0` sem leitura ou no chatbot.
+ * @property localReadSequence maior `sequence` que o usuário já viu neste aparelho. Passa de [lastReadSequence] enquanto a
+ *   leitura espera para ser enviada, e a diferença entre os dois é a fila de leitura, sem tabela própria.
+ * @property unreadCount quantas mensagens o servidor conta como não lidas. `0` no chatbot.
+ * @property muted `true` se o usuário silenciou a conversa.
  */
 @Entity(tableName = "conversations")
 data class ConversationEntity(
@@ -39,7 +44,24 @@ data class ConversationEntity(
     val lastMessageContent: String?,
     val lastMessageDeleted: Boolean,
     val accessLost: Boolean,
+    val lastReadSequence: Int = 0,
+    val localReadSequence: Int = 0,
+    val unreadCount: Long = 0,
+    val muted: Boolean = false,
 )
+
+/**
+ * Quantas mensagens a lista deve mostrar como não lidas.
+ *
+ * Zero quando o usuário já viu a última mensagem neste aparelho, mesmo que o servidor ainda não saiba. Fora disso vale
+ * a contagem do servidor.
+ */
+val ConversationEntity.displayedUnread: Long
+    get() = if (localReadSequence >= lastMessageSequence) 0L else unreadCount
+
+/** `true` se há leitura feita neste aparelho que o servidor ainda não recebeu. */
+val ConversationEntity.hasPendingRead: Boolean
+    get() = localReadSequence > lastReadSequence
 
 /** Valor de [ConversationEntity.conversationType] das conversas com o chatbot. */
 const val CHATBOT_TYPE = "CHAT_BOT"

@@ -1,6 +1,7 @@
 package com.project.solaria_mobile
 
 import com.project.solaria_mobile.core.common.ApiResult
+import com.project.solaria_mobile.feature.communication.data.ConversationStateSync
 import com.project.solaria_mobile.core.common.ErrorKind
 import com.project.solaria_mobile.core.database.ConversationEntity
 import com.project.solaria_mobile.core.database.LocalDataWiper
@@ -93,7 +94,8 @@ class RemoteCommunicationRepositoryTest {
             wiper = LocalDataWiper { },
             scope = backgroundScope,
         )
-        return RemoteCommunicationRepository(api, executor, credentials, outbox, networkMonitor, store, conversationDao, users, sync, FakeCommunicationRepository())
+        val stateSync = ConversationStateSync(api, executor, networkMonitor, conversationDao, messageDao, backgroundScope)
+        return RemoteCommunicationRepository(api, executor, credentials, outbox, networkMonitor, store, conversationDao, users, sync, FakeCommunicationRepository(), stateSync)
     }
 
     @Test fun listShowsStoredConversationsWithoutNetworkAndHidesArchivedOnes() = runTest {
