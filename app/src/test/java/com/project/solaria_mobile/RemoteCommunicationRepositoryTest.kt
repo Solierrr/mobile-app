@@ -1,5 +1,9 @@
 package com.project.solaria_mobile
 
+import kotlinx.coroutines.launch
+import com.project.solaria_mobile.core.network.realtime.RealtimeState
+import com.project.solaria_mobile.feature.communication.domain.ChatPresence
+import com.project.solaria_mobile.feature.communication.data.ConversationPresence
 import com.project.solaria_mobile.core.common.ApiResult
 import com.project.solaria_mobile.feature.communication.data.ConversationStateSync
 import com.project.solaria_mobile.core.common.ErrorKind
@@ -50,6 +54,7 @@ class RemoteCommunicationRepositoryTest {
     private val api = ScriptedMessengerApi()
     private val profile = FakeProfileApi()
     private val network = MutableStateFlow(true)
+    private val realtime = FakeRealtimeClient()
     private val store = MessageStore(messageDao, conversationDao)
 
     private fun conversation(
@@ -83,7 +88,7 @@ class RemoteCommunicationRepositoryTest {
             api = api,
             executor = executor,
             tokens = FakeTokenStore(),
-            realtime = FakeRealtimeClient(),
+            realtime = realtime,
             networkMonitor = networkMonitor,
             json = ApiJson.instance,
             store = store,
@@ -95,7 +100,8 @@ class RemoteCommunicationRepositoryTest {
             scope = backgroundScope,
         )
         val stateSync = ConversationStateSync(api, executor, networkMonitor, conversationDao, messageDao, backgroundScope)
-        return RemoteCommunicationRepository(api, executor, credentials, outbox, networkMonitor, store, conversationDao, users, sync, FakeCommunicationRepository(), stateSync)
+        val presence = ConversationPresence(realtime, ApiJson.instance, credentials, backgroundScope)
+        return RemoteCommunicationRepository(api, executor, credentials, outbox, networkMonitor, store, conversationDao, users, sync, FakeCommunicationRepository(), stateSync, presence)
     }
 
     @Test fun listShowsStoredConversationsWithoutNetworkAndHidesArchivedOnes() = runTest {
@@ -292,5 +298,35 @@ class RemoteCommunicationRepositoryTest {
         network.value = true
         api.directFailure = httpError(403)
         assertEquals(ApiResult.Failure(ErrorKind.FORBIDDEN), repository().startDirect("user-9"))
+    }
+
+    @Test fun presenceOfADirectChatShowsThePeerAndWhoIsTyping() = runTest {
+        conversationDao.put(conversation("c1", type = "DIRECT", title = null, participants = "user-1,user-2"))
+        userDao.put(UserEntity("user-2", "Ana Bia", null))
+        realtime.connection.value = RealtimeState.Connected
+        val repository = repository()
+        val seen = mutableListOf<ChatPresence>()
+        backgroundScope.launch { repository.presence("c1").collect { seen += it } }
+        runCurrent()
+        assertFalse(seen.last().known)
+
+        realtime.frames.tryEmit(
+            "/topic/conversations.c1" to
+                """{"type":"PRESENCE_SNAPSHOT","payload":{"presenceEpoch":"p","presenceVersion":1,"users":{"user-1":true,"user-2":true}}}""",
+        )
+        realtime.frames.tryEmit("/topic/conversations.c1" to """{"type":"TYPING_STARTED","payload":{"userId":"user-2"}}""")
+        runCurrent()
+
+        val state = seen.last()
+        assertTrue(state.known)
+        assertEquals(true, state.peerOnline)
+        assertEquals(listOf("Ana Bia"), state.typingNames)
+    }
+
+    @Test fun chatbotConversationsHaveNoPresence() = runTest {
+        conversationDao.put(conversation("bot", type = "CHAT_BOT", title = null, participants = "user-1"))
+        realtime.connection.value = RealtimeState.Connected
+
+        assertEquals(ChatPresence(), repository().presence("bot").first())
     }
 }

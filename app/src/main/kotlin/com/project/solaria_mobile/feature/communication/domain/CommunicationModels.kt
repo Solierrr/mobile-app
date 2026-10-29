@@ -39,3 +39,20 @@ data class ChatMessage(
 data class ServiceCall(val id: String, val title: String, val detail: String, val icon: ServiceCallIcon, val badge: String? = null)
 
 data class NotificationGroup(val title: String, val calls: List<ServiceCall>)
+
+/**
+ * O que a tela mostra de ao vivo numa conversa.
+ *
+ * @property known `false` enquanto não há conexão em tempo real ou o servidor ainda não mandou o retrato da presença.
+ *   A tela não deve mostrar "offline" nesse caso, só esconder a informação.
+ * @property peerOnline na conversa direta, se o outro participante está online. `null` fora da conversa direta ou com
+ *   [known] falso.
+ * @property onlineCount no grupo, quantos participantes além do usuário estão online.
+ * @property typingNames nomes de quem está digitando agora, sem o usuário.
+ */
+data class ChatPresence(
+    val known: Boolean = false,
+    val peerOnline: Boolean? = null,
+    val onlineCount: Int = 0,
+    val typingNames: List<String> = emptyList(),
+)

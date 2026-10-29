@@ -1,5 +1,6 @@
 package com.project.solaria_mobile
 
+import com.project.solaria_mobile.feature.communication.domain.ChatPresence
 import com.project.solaria_mobile.feature.profile.ProfileViewModel
 import com.project.solaria_mobile.feature.profile.domain.UserProfile
 import com.project.solaria_mobile.feature.profile.domain.ProfileRepository
@@ -89,6 +90,9 @@ class ChatSyncTest {
         var refreshes = 0
         var opens = 0
         val namesRequests = mutableListOf<String?>()
+        val typingCalls = mutableListOf<String>()
+        val stopTypingCalls = mutableListOf<String>()
+        val livePresence = MutableStateFlow(ChatPresence())
         var directResult: ApiResult<String> = ApiResult.Success("d1")
         val edits = mutableListOf<Pair<String, String>>()
         val deletes = mutableListOf<String>()
@@ -119,6 +123,13 @@ class ChatSyncTest {
         override suspend fun retryMessage(messageId: String) = Unit
         override suspend fun discardMessage(messageId: String) = Unit
         override suspend fun startDirect(recipientAuthId: String): ApiResult<String> = directResult
+        override fun presence(conversationId: String): Flow<ChatPresence> = livePresence
+        override fun typing(conversationId: String) {
+            typingCalls += conversationId
+        }
+        override fun stopTyping(conversationId: String) {
+            stopTypingCalls += conversationId
+        }
         override suspend fun markRead(conversationId: String) = Unit
         override suspend fun setMuted(conversationId: String, muted: Boolean): ApiResult<Unit> = ApiResult.Success(Unit)
         override suspend fun setArchived(conversationId: String, archived: Boolean): ApiResult<Unit> = ApiResult.Success(Unit)
@@ -499,4 +510,46 @@ class ChatSyncTest {
         advanceUntilIdle()
         assertEquals(ErrorKind.CONNECTIVITY, (with.uiState.value as UiState.Content).data.chatFailure)
     }
+
+    // ---- digitando e presença
+
+    @Test fun typingIsSignalledWhileTheDraftHasTextAndStoppedWhenItEmptiesOrSends() = runTest {
+        val repository = ControllableRepository().apply { stored.value = conversation() }
+        val (viewModel, _) = chatAt(repository)
+
+        viewModel.onDraftChange("o")
+        assertEquals(listOf("c1"), repository.typingCalls)
+
+        viewModel.onDraftChange("")
+        assertEquals(1, repository.stopTypingCalls.size)
+
+        viewModel.onDraftChange("oi")
+        viewModel.send()
+        advanceUntilIdle()
+        assertEquals(2, repository.stopTypingCalls.size)
+    }
+
+    @Test fun chatbotAndLostAccessConversationsNeverSignalTyping() = runTest {
+        val bot = ControllableRepository().apply { stored.value = Conversation("c1", "SB", "Solaria", "", "", AvatarTone.BLUE, chatbot = true) }
+        val (botModel, _) = chatAt(bot)
+        botModel.onDraftChange("oi")
+        assertTrue(bot.typingCalls.isEmpty())
+
+        val lost = ControllableRepository().apply { stored.value = conversation(accessLost = true) }
+        val (lostModel, _) = chatAt(lost)
+        lostModel.onDraftChange("oi")
+        assertTrue(lost.typingCalls.isEmpty())
+    }
+
+    @Test fun presenceFromTheRepositoryReachesTheScreenState() = runTest {
+        val repository = ControllableRepository().apply { stored.value = conversation() }
+        val (_, state) = chatAt(repository)
+
+        repository.livePresence.value = ChatPresence(known = true, peerOnline = true, typingNames = listOf("Ana"))
+        advanceUntilIdle()
+
+        assertEquals(true, contentOf(state).presence.peerOnline)
+        assertEquals(listOf("Ana"), contentOf(state).presence.typingNames)
+    }
+
 }

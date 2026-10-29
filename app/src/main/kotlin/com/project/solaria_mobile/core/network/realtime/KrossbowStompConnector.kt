@@ -10,7 +10,7 @@ import org.hildan.krossbow.stomp.StompErrorFrameReceived
 import org.hildan.krossbow.stomp.StompSession
 import org.hildan.krossbow.stomp.config.HeartBeat
 import org.hildan.krossbow.stomp.frame.FrameBody
-import org.hildan.krossbow.stomp.sendText
+import org.hildan.krossbow.stomp.headers.StompSendHeaders
 import org.hildan.krossbow.stomp.subscribeText
 import org.hildan.krossbow.websocket.okhttp.OkHttpWebSocketClient
 import javax.inject.Inject
@@ -71,7 +71,8 @@ private class KrossbowStompLink(
         flow { emitAll(session.subscribeText(destination)) }
 
     override suspend fun send(destination: String, body: String) {
-        session.sendText(destination, body)
+        // O messenger lê o corpo como JSON, então o frame SEND declara o tipo em vez de depender do padrão do servidor
+        session.send(StompSendHeaders(destination) { contentType = "application/json" }, FrameBody.Text(body))
     }
 
     override suspend fun close() {
