@@ -97,6 +97,9 @@ data class ConversationStateDto(
 data class EditMessageRequest(val content: String)
 
 @Serializable
+data class DirectConversationRequest(val recipientId: String)
+
+@Serializable
 data class RealtimeEventDto(
     val type: String,
     val conversationId: String? = null,
@@ -132,4 +135,7 @@ interface MessengerApi {
 
     @DELETE("messaging/messages/{id}")
     suspend fun delete(@Path("id") id: String): MessageDto
+
+    @POST("messaging/conversations/direct")
+    suspend fun direct(@Body body: DirectConversationRequest): ConversationDto
 }

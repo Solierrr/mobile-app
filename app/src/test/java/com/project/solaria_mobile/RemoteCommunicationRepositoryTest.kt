@@ -265,4 +265,32 @@ class RemoteCommunicationRepositoryTest {
         assertEquals(listOf("Ana", "Beto", "Caio"), userDao.rows.map { it.username }.sorted())
         assertFalse("o próprio usuário não é consultado", "user-1" in profile.summaryCalls)
     }
+
+    @Test fun startDirectStoresTheNewConversationAndReturnsItsId() = runTest {
+        val result = repository().startDirect("user-9")
+
+        assertEquals(ApiResult.Success("d-user-9"), result)
+        assertTrue(conversationDao.find("d-user-9") != null)
+        assertEquals(listOf("user-9"), api.directRequests)
+    }
+
+    @Test fun startDirectKeepsTheConversationAlreadyStoredInsteadOfOverwritingIt() = runTest {
+        val existing = conversation("d-user-9", type = "DIRECT", title = null, participants = "user-1,user-9").copy(syncVersion = 40, lastMessageContent = "conteúdo real")
+        conversationDao.put(existing)
+
+        val result = repository().startDirect("user-9")
+
+        assertEquals(ApiResult.Success("d-user-9"), result)
+        assertEquals(existing, conversationDao.find("d-user-9"))
+    }
+
+    @Test fun startDirectNeedsInternetAndShowsServerRefusals() = runTest {
+        network.value = false
+        assertEquals(ApiResult.Failure(ErrorKind.CONNECTIVITY), repository().startDirect("user-9"))
+        assertTrue(api.directRequests.isEmpty())
+
+        network.value = true
+        api.directFailure = httpError(403)
+        assertEquals(ApiResult.Failure(ErrorKind.FORBIDDEN), repository().startDirect("user-9"))
+    }
 }

@@ -1,5 +1,9 @@
 package com.project.solaria_mobile
 
+import com.project.solaria_mobile.feature.profile.ProfileViewModel
+import com.project.solaria_mobile.feature.profile.domain.UserProfile
+import com.project.solaria_mobile.feature.profile.domain.ProfileRepository
+import com.project.solaria_mobile.feature.profile.domain.Connection
 import androidx.lifecycle.SavedStateHandle
 import com.project.solaria_mobile.core.common.ApiResult
 import com.project.solaria_mobile.core.common.ErrorKind
@@ -26,6 +30,7 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceUntilIdle
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -84,6 +89,7 @@ class ChatSyncTest {
         var refreshes = 0
         var opens = 0
         val namesRequests = mutableListOf<String?>()
+        var directResult: ApiResult<String> = ApiResult.Success("d1")
         val edits = mutableListOf<Pair<String, String>>()
         val deletes = mutableListOf<String>()
         var editResult: ApiResult<Unit> = ApiResult.Success(Unit)
@@ -112,6 +118,7 @@ class ChatSyncTest {
         override suspend fun sendMessage(conversationId: String, text: String): ApiResult<Unit> = sendResult
         override suspend fun retryMessage(messageId: String) = Unit
         override suspend fun discardMessage(messageId: String) = Unit
+        override suspend fun startDirect(recipientAuthId: String): ApiResult<String> = directResult
         override suspend fun markRead(conversationId: String) = Unit
         override suspend fun setMuted(conversationId: String, muted: Boolean): ApiResult<Unit> = ApiResult.Success(Unit)
         override suspend fun setArchived(conversationId: String, archived: Boolean): ApiResult<Unit> = ApiResult.Success(Unit)
@@ -423,5 +430,73 @@ class ChatSyncTest {
         viewModel.load()
         assertEquals(1, repository.refreshes)
         assertEquals(listOf<String?>(null), repository.namesRequests)
+    }
+
+    @Test fun startingAChatEmitsTheConversationIdAndFailuresStayInTheState() = runTest {
+        val repository = ControllableRepository().apply {
+            list.value = listOf(conversation())
+            sync.value = ApiResult.Success(Unit)
+        }
+        val (viewModel, state) = conversationsOf(repository)
+        val opened = mutableListOf<String>()
+        backgroundScope.launch { viewModel.openChat.collect { opened += it } }
+
+        viewModel.startChat("user-9")
+        advanceUntilIdle()
+        runCurrent()
+        assertEquals(listOf("d1"), opened)
+
+        repository.directResult = ApiResult.Failure(ErrorKind.FORBIDDEN)
+        viewModel.startChat("user-9")
+        advanceUntilIdle()
+        assertEquals(ErrorKind.FORBIDDEN, (state() as UiState.Content).data.startFailure)
+        assertEquals(1, opened.size)
+    }
+
+
+    private class OneProfile(authId: String?) : ProfileRepository {
+        val profile = UserProfile("u1", "AB", "Ana Bia", "@anabia", "", "", "", authId = authId)
+        override suspend fun ownProfile(): ApiResult<UserProfile> = ApiResult.Success(profile)
+        override suspend fun profile(id: String): ApiResult<UserProfile> = ApiResult.Success(profile)
+        override suspend fun connections(): ApiResult<List<Connection>> = ApiResult.Success(emptyList())
+        override suspend fun isConnected(profileId: String): ApiResult<Boolean> = ApiResult.Success(false)
+        override suspend fun toggleConnection(profileId: String): ApiResult<Boolean> = ApiResult.Success(true)
+    }
+
+    private fun TestScope.profileOf(authId: String?, repository: ControllableRepository): ProfileViewModel {
+        val viewModel = ProfileViewModel(SavedStateHandle(mapOf("id" to "u1")), OneProfile(authId), repository)
+        backgroundScope.launch { viewModel.uiState.collect { } }
+        advanceUntilIdle()
+        return viewModel
+    }
+
+    @Test fun profileOpensTheDirectConversationByAuthId() = runTest {
+        val repository = ControllableRepository()
+        val viewModel = profileOf("auth-9", repository)
+        val opened = mutableListOf<String>()
+        backgroundScope.launch { viewModel.openChat.collect { opened += it } }
+
+        viewModel.startChat()
+        advanceUntilIdle()
+        runCurrent()
+
+        assertEquals(listOf("d1"), opened)
+    }
+
+    @Test fun profileWithoutAuthIdOpensNothingAndFailuresStayInTheState() = runTest {
+        val repository = ControllableRepository()
+        val without = profileOf(null, repository)
+        val opened = mutableListOf<String>()
+        backgroundScope.launch { without.openChat.collect { opened += it } }
+        without.startChat()
+        advanceUntilIdle()
+        runCurrent()
+        assertTrue(opened.isEmpty())
+
+        repository.directResult = ApiResult.Failure(ErrorKind.CONNECTIVITY)
+        val with = profileOf("auth-9", repository)
+        with.startChat()
+        advanceUntilIdle()
+        assertEquals(ErrorKind.CONNECTIVITY, (with.uiState.value as UiState.Content).data.chatFailure)
     }
 }

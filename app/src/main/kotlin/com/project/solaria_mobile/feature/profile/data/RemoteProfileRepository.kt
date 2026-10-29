@@ -64,6 +64,7 @@ internal fun SelfProfileDto.toProfile(): UserProfile {
         phone = person?.phone.orEmpty().trim(),
         avatarUrl = avatar?.takeIf { it.isNotBlank() },
         bannerUrl = banner?.takeIf { it.isNotBlank() },
+        authId = authId?.takeIf { it.isNotBlank() },
     )
 }
 
@@ -75,6 +76,7 @@ internal fun UserDto.toProfile(): UserProfile = UserProfile(
     state = "",
     occupation = "",
     phone = "",
+    authId = authId?.takeIf { it.isNotBlank() },
 )
 
 internal fun UserDto.toConnection(): Connection = Connection(
@@ -82,4 +84,5 @@ internal fun UserDto.toConnection(): Connection = Connection(
     initials = initialsOf(displayName()),
     name = displayName(),
     handle = handle(),
+    authId = authId?.takeIf { it.isNotBlank() },
 )
