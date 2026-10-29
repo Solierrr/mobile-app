@@ -29,7 +29,7 @@ import kotlin.time.Duration.Companion.seconds
  * - `/ws` (local) | `/messaging/ws` (local com kong | QA | prod)
  * - jwt vai no header `Authorization` do frame `CONNECT`
  * - heartbeat de 10 s (Kong derruba conexão ociosa em 60 s)
- * - eventos privados em `/topic/users.{userId}.{acks|errors|conversations}`, com o `sub` do jwt
+ * - eventos privados em `/topic/users.{userId}.{acks|errors|events}`, com o `sub` do jwt
  * - servidor confere expiração do token apenas quando chega um frame
  *
  *

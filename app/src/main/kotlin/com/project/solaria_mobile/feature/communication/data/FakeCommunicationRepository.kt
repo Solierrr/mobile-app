@@ -15,11 +15,10 @@ import java.util.Locale
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.MutableSharedFlow
-import kotlinx.coroutines.flow.emptyFlow
-import kotlinx.coroutines.flow.filter
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.update
 
 @Singleton
 class FakeCommunicationRepository @Inject constructor() : CommunicationRepository {
@@ -34,7 +33,7 @@ class FakeCommunicationRepository @Inject constructor() : CommunicationRepositor
     )
     private val conversations = baseConversations + baseConversations.map { it.copy(id = it.id + "-b") }
 
-    private val messages = mutableMapOf<String, List<ChatMessage>>()
+    private val messages = MutableStateFlow<Map<String, List<ChatMessage>>>(emptyMap())
 
     private val supervisor = ServiceCall("k1", "Chamado atribuído a você pelo seu supervisor", "Alocaram você e sua equipe como responsáveis pelo atendimento do chamado #1048.", ServiceCallIcon.HASH, "!!")
     private val newCall = ServiceCall("k2", "Novo chamado para você!", "A empresa SolarTech abriu um chamado para manutenção em um projeto.", ServiceCallIcon.PHONE, "Novo")
@@ -43,24 +42,23 @@ class FakeCommunicationRepository @Inject constructor() : CommunicationRepositor
     private val baseCalls = listOf(supervisor, newCall, security, olderCall)
     private val calls = baseCalls + baseCalls.map { it.copy(id = it.id + "-b") }
 
-    private val sent = MutableSharedFlow<Pair<String, ChatMessage>>(extraBufferCapacity = 16)
-
     override val online: Flow<Boolean> = flowOf(true)
 
-    override suspend fun conversations(): ApiResult<List<Conversation>> = ApiResult.Success(conversations)
+    override val syncResult: Flow<ApiResult<Unit>?> = flowOf(ApiResult.Success(Unit))
 
-    override suspend fun conversation(id: String): ApiResult<Conversation> =
-        conversations.firstOrNull { it.id == id }?.let { ApiResult.Success(it) } ?: ApiResult.Failure(ErrorKind.NOT_FOUND)
+    override fun conversations(): Flow<List<Conversation>> = flowOf(conversations)
 
-    override suspend fun messages(conversationId: String, afterSequence: Int?): ApiResult<List<ChatMessage>> =
-        ApiResult.Success(messagesOf(conversationId).filter { (it.sequence ?: 0) > (afterSequence ?: 0) })
+    override fun conversation(id: String): Flow<Conversation?> = flowOf(conversations.firstOrNull { it.id == id })
 
-    override fun liveMessages(conversationId: String): Flow<ChatMessage> =
-        sent.filter { it.first == conversationId }.map { it.second }
+    override fun messages(conversationId: String): Flow<List<ChatMessage>> =
+        messages.map { it[conversationId] ?: initialMessages(conversationId) }
 
-    override fun pendingMessages(conversationId: String): Flow<List<ChatMessage>> = flowOf(emptyList())
+    override suspend fun open(conversationId: String): ApiResult<Unit> =
+        if (conversations.any { it.id == conversationId }) ApiResult.Success(Unit) else ApiResult.Failure(ErrorKind.NOT_FOUND)
 
-    override fun reconnections(): Flow<Unit> = emptyFlow()
+    override fun refresh() = Unit
+
+    override suspend fun refreshNames(conversationId: String?) = Unit
 
     override suspend fun sendMessage(conversationId: String, text: String): ApiResult<Unit> {
         if (text.isBlank()) return ApiResult.Failure(ErrorKind.VALIDATION, setOf("text"))
@@ -68,8 +66,7 @@ class FakeCommunicationRepository @Inject constructor() : CommunicationRepositor
         val history = messagesOf(conversationId)
         val sequence = history.size + 1
         val message = ChatMessage("$conversationId-$sequence", text, true, time, sequence)
-        messages[conversationId] = history + message
-        sent.tryEmit(conversationId to message)
+        messages.update { it + (conversationId to (history + message)) }
         return ApiResult.Success(Unit)
     }
 
@@ -77,7 +74,7 @@ class FakeCommunicationRepository @Inject constructor() : CommunicationRepositor
 
     override suspend fun discardMessage(messageId: String) = Unit
 
-    private fun messagesOf(conversationId: String) = messages.getOrPut(conversationId) { initialMessages(conversationId) }
+    private fun messagesOf(conversationId: String) = messages.value[conversationId] ?: initialMessages(conversationId)
 
     override suspend fun calls(): ApiResult<List<ServiceCall>> = ApiResult.Success(calls)
 

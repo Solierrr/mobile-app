@@ -75,6 +75,19 @@ fun ConversationsScreen(
     }
 }
 
+/**
+ * Linha de uma conversa na lista.
+ *
+ * Uma conversa a que o usuário perdeu o acesso (removido do grupo ou fora da comunidade) continua na lista, em somente
+ * leitura, e a linha mostra o aviso "Você não participa mais". Ao abrir, o chat mostra o histórico salvo, sem campo de
+ * envio.
+ * - Por quê: o app guarda o histórico no Room e mantém o que o usuário já baixou, como o WhatsApp faz com grupos de que
+ *   você saiu. O api-messenger nega a leitura depois da remoção, então essa conversa não sincroniza mais.
+ * - De onde vem: `Conversation.accessLost`, lido da coluna `accessLost` da tabela `conversations`. Vira `true` quando a
+ *   conversa some do `GET /messaging/conversations/me` ou chega `CONVERSATION_REMOVED`, e volta a `false` se ela
+ *   reaparecer no `/me` ou chegar um `CONVERSATION_UPDATED` mais novo.
+ * - Contexto completo: `SOLIER/relatorios/mobile-historico-offline-plano-2026-10-28.md`, §8.1.1 e §8.3.
+ */
 @Composable
 private fun ConversationRow(item: Conversation, onClick: () -> Unit) {
     Surface(modifier = Modifier.fillMaxWidth(), onClick = onClick, color = AppTheme.colors.surface) {
@@ -87,6 +100,7 @@ private fun ConversationRow(item: Conversation, onClick: () -> Unit) {
             Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 Text(item.name, color = AppTheme.colors.onSurface, style = androidx.compose.material3.MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 Text(item.preview, color = AppTheme.colors.onSurfaceMuted, style = androidx.compose.material3.MaterialTheme.typography.labelMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                if (item.accessLost) Text("Você não participa mais", color = AppTheme.colors.danger, style = androidx.compose.material3.MaterialTheme.typography.labelMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
             Text(item.time, color = AppTheme.colors.onSurfaceMuted, style = androidx.compose.material3.MaterialTheme.typography.labelMedium)
         }

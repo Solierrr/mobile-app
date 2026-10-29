@@ -40,11 +40,17 @@ data class SelfProfileDto(
 )
 
 @Serializable
+data class UserSummaryDto(val username: String? = null, val avatar: String? = null)
+
+@Serializable
 data class ConnectionRequest(val connectedUserId: String)
 
 interface ProfileApi {
     @GET("api/users/me")
     suspend fun me(): SelfProfileDto
+
+    @GET("api/users/auth/{authId}/summary")
+    suspend fun summary(@Path("authId") authId: String): UserSummaryDto
 
     @GET("api/connections")
     suspend fun connections(): List<UserDto>

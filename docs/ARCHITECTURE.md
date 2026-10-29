@@ -1,11 +1,12 @@
 # Arquitetura do mobile-app
 
-Aplicativo Android em Kotlin e Jetpack Compose, com um módulo Gradle (`:app`), organização por feature e MVVM na camada de apresentação. O estado atual é uma UI demonstrativa: não há autenticação, API conectada nem persistência local nesta entrega.
+Aplicativo Android em Kotlin e Jetpack Compose, com um módulo Gradle (`:app`), organização por feature e MVVM na camada de apresentação. O estado atual é, em grande parte, uma UI demonstrativa. A comunicação (conversas e mensagens) já usa o api-messenger, o WebSocket e um cache em Room, descritos em [docs/FRONTEND_ARCHITECTURE.md](FRONTEND_ARCHITECTURE.md#chat-com-cache-local).
 
 ```text
 app/src/main/kotlin/com/project/solaria_mobile/
 ├── MainActivity.kt
 ├── SolariaApplication.kt
+├── core/database/                      # Room: mensagens, conversas, nomes e fila de envio
 ├── core/designsystem/{theme,components}/
 ├── presentation/navigation/{AppDestination,AppNavHost}.kt
 └── feature/

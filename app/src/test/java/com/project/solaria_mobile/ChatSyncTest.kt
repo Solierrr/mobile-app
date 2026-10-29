@@ -4,18 +4,12 @@ import androidx.lifecycle.SavedStateHandle
 import com.project.solaria_mobile.core.common.ApiResult
 import com.project.solaria_mobile.core.common.ErrorKind
 import com.project.solaria_mobile.core.common.UiState
-import com.project.solaria_mobile.core.network.ApiCallExecutor
-import com.project.solaria_mobile.core.network.ApiErrorParser
-import com.project.solaria_mobile.core.network.ApiJson
-import com.project.solaria_mobile.core.network.CredentialProvider
-import com.project.solaria_mobile.core.network.NetworkMonitor
 import com.project.solaria_mobile.core.network.realtime.websocketUrlOf
 import com.project.solaria_mobile.feature.communication.ChatUiState
 import com.project.solaria_mobile.feature.communication.ChatViewModel
-import com.project.solaria_mobile.feature.communication.data.FakeCommunicationRepository
-import com.project.solaria_mobile.feature.communication.data.MessageDto
-import com.project.solaria_mobile.feature.communication.data.MessageOutbox
-import com.project.solaria_mobile.feature.communication.data.RemoteCommunicationRepository
+import com.project.solaria_mobile.feature.communication.ConversationsUiState
+import com.project.solaria_mobile.feature.communication.ConversationsViewModel
+import com.project.solaria_mobile.feature.communication.data.timelineOf
 import com.project.solaria_mobile.feature.communication.domain.AvatarTone
 import com.project.solaria_mobile.feature.communication.domain.ChatMessage
 import com.project.solaria_mobile.feature.communication.domain.CommunicationRepository
@@ -23,28 +17,28 @@ import com.project.solaria_mobile.feature.communication.domain.Conversation
 import com.project.solaria_mobile.feature.communication.domain.MessageStatus
 import com.project.solaria_mobile.feature.communication.domain.NotificationGroup
 import com.project.solaria_mobile.feature.communication.domain.ServiceCall
-import com.project.solaria_mobile.feature.communication.timelineOf
-import java.io.IOException
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.toList
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceUntilIdle
-import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 
 /**
- * Testes de sincronização do chat: ordem da timeline, fila offline, reconexão e eventos do tempo real.
+ * Testes das telas de conversa sobre um repositório controlado pelo teste: ordem da timeline, fila offline, estados
+ * de abertura do chat e estados da lista (carregando, vazia, com erro e com conteúdo).
  *
- * Roda o [ChatViewModel] e o [RemoteCommunicationRepository] sobre dublês em memória, sem rede nem banco real.
+ * A sincronização com o servidor é testada em [MessageSyncTest] e a leitura do banco em
+ * [RemoteCommunicationRepositoryTest].
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class ChatSyncTest {
@@ -55,6 +49,9 @@ class ChatSyncTest {
 
     private fun queued(clientId: String, status: MessageStatus = MessageStatus.PENDING) =
         ChatMessage(clientId, "na fila $clientId", true, "10:09", clientMessageId = clientId, status = status)
+
+    private fun conversation(id: String = "c1", name: String = "Ana Bia", accessLost: Boolean = false) =
+        Conversation(id, "AB", name, "oi", "10:00", AvatarTone.BLUE, accessLost)
 
     @Test fun timelineOrdersBySequenceAndHidesQueuedMessagesAlreadyConfirmed() {
         val timeline = timelineOf(listOf(sent(2, "a"), sent(1)), listOf(queued("a"), queued("b")))
@@ -69,32 +66,44 @@ class ChatSyncTest {
     }
 
     /**
-     * Dublê de [CommunicationRepository] controlado pelo teste: conexão, mensagens ao vivo, pendentes e reconexões.
+     * Dublê de [CommunicationRepository] controlado pelo teste: conversa guardada, mensagens guardadas, fila de
+     * envio, conexão, resultado da sincronização e o resultado de abrir o chat.
      *
-     * Registra em [catchUpCursors] os cursores pedidos nas buscas de recuperação.
+     * Registra em [refreshes] e [namesRequests] o que os ViewModels pediram.
      */
     private class ControllableRepository : CommunicationRepository {
         val connection = MutableStateFlow(true)
-        val live = MutableSharedFlow<ChatMessage>(extraBufferCapacity = 8)
+        val stored = MutableStateFlow<Conversation?>(null)
+        val list = MutableStateFlow<List<Conversation>>(emptyList())
+        val history = MutableStateFlow<List<ChatMessage>>(emptyList())
         val pending = MutableStateFlow<List<ChatMessage>>(emptyList())
-        val reconnected = MutableSharedFlow<Unit>(extraBufferCapacity = 8)
-        val history = mutableListOf<ChatMessage>()
-        val catchUpCursors = mutableListOf<Int?>()
+        val sync = MutableStateFlow<ApiResult<Unit>?>(null)
+        var openResult: CompletableDeferred<ApiResult<Unit>> = CompletableDeferred(ApiResult.Success(Unit))
         var sendResult: ApiResult<Unit> = ApiResult.Success(Unit)
+        var refreshes = 0
+        var opens = 0
+        val namesRequests = mutableListOf<String?>()
 
         override val online: Flow<Boolean> = connection
-        override suspend fun conversations(): ApiResult<List<Conversation>> = ApiResult.Success(emptyList())
-        override suspend fun conversation(id: String): ApiResult<Conversation> =
-            ApiResult.Success(Conversation(id, "AB", "Ana Bia", "", "", AvatarTone.BLUE))
+        override val syncResult: Flow<ApiResult<Unit>?> = sync
+        override fun conversations(): Flow<List<Conversation>> = list
+        override fun conversation(id: String): Flow<Conversation?> = stored
+        override fun messages(conversationId: String): Flow<List<ChatMessage>> =
+            combine(history, pending) { delivered, queue -> timelineOf(delivered, queue) }
 
-        override suspend fun messages(conversationId: String, afterSequence: Int?): ApiResult<List<ChatMessage>> {
-            if (afterSequence != null) catchUpCursors += afterSequence
-            return ApiResult.Success(history.filter { (it.sequence ?: 0) > (afterSequence ?: 0) })
+        override suspend fun open(conversationId: String): ApiResult<Unit> {
+            opens++
+            return openResult.await()
         }
 
-        override fun liveMessages(conversationId: String): Flow<ChatMessage> = live
-        override fun pendingMessages(conversationId: String): Flow<List<ChatMessage>> = pending
-        override fun reconnections(): Flow<Unit> = reconnected
+        override fun refresh() {
+            refreshes++
+        }
+
+        override suspend fun refreshNames(conversationId: String?) {
+            namesRequests += conversationId
+        }
+
         override suspend fun sendMessage(conversationId: String, text: String): ApiResult<Unit> = sendResult
         override suspend fun retryMessage(messageId: String) = Unit
         override suspend fun discardMessage(messageId: String) = Unit
@@ -103,134 +112,182 @@ class ChatSyncTest {
         override suspend fun notifications(): ApiResult<List<NotificationGroup>> = ApiResult.Success(emptyList())
     }
 
-    private fun TestScope.chatOf(repository: CommunicationRepository): Pair<ChatViewModel, () -> ChatUiState> {
+    private fun TestScope.chatOf(repository: CommunicationRepository): Pair<ChatViewModel, () -> UiState<ChatUiState>> {
         val viewModel = ChatViewModel(SavedStateHandle(mapOf("id" to "c1")), repository)
         backgroundScope.launch { viewModel.uiState.collect { } }
         advanceUntilIdle()
-        return viewModel to { (viewModel.uiState.value as UiState.Content).data }
+        return viewModel to { viewModel.uiState.value }
     }
 
+    private fun TestScope.contentOf(state: () -> UiState<ChatUiState>): ChatUiState = (state() as UiState.Content).data
+
     @Test fun queuedMessagesShowAfterTheDeliveredOnesAndDisappearOnConfirmation() = runTest {
-        val repository = ControllableRepository().apply { history += listOf(sent(1), sent(2)) }
+        val repository = ControllableRepository().apply {
+            stored.value = conversation()
+            history.value = listOf(sent(1), sent(2))
+        }
         val (_, state) = chatOf(repository)
 
         repository.pending.value = listOf(queued("x"))
         advanceUntilIdle()
-        assertEquals(listOf("m1", "m2", "x"), state().messages.map { it.id })
-        assertEquals(MessageStatus.PENDING, state().messages.last().status)
+        assertEquals(listOf("m1", "m2", "x"), contentOf(state).messages.map { it.id })
+        assertEquals(MessageStatus.PENDING, contentOf(state).messages.last().status)
 
-        repository.live.emit(sent(3, "x"))
+        repository.history.value = listOf(sent(1), sent(2), sent(3, "x"))
         advanceUntilIdle()
-        assertEquals(listOf("m1", "m2", "m3"), state().messages.map { it.id })
+        assertEquals(listOf("m1", "m2", "m3"), contentOf(state).messages.map { it.id })
+    }
+
+    @Test fun chatOpensFromTheStoredConversationWhileTheNetworkStepIsStillRunning() = runTest {
+        val repository = ControllableRepository().apply {
+            stored.value = conversation()
+            history.value = listOf(sent(1))
+            openResult = CompletableDeferred()
+        }
+
+        val (_, state) = chatOf(repository)
+
+        assertEquals(listOf("m1"), contentOf(state).messages.map { it.id })
+        assertEquals(1, repository.opens)
+    }
+
+    @Test fun chatShowsLoadingUntilTheConversationExists() = runTest {
+        val repository = ControllableRepository().apply { openResult = CompletableDeferred() }
+        val (_, state) = chatOf(repository)
+        assertEquals(UiState.Loading, state())
+
+        repository.stored.value = conversation()
+        advanceUntilIdle()
+
+        assertTrue(state() is UiState.Content)
+    }
+
+    @Test fun chatShowsTheErrorWhenTheConversationCannotBeLoaded() = runTest {
+        val repository = ControllableRepository().apply { openResult = CompletableDeferred(ApiResult.Failure(ErrorKind.NOT_FOUND)) }
+
+        val (_, state) = chatOf(repository)
+
+        assertEquals(UiState.Error(ErrorKind.NOT_FOUND), state())
+    }
+
+    @Test fun chatbotThatCannotBeOpenedShowsTheErrorEvenWithAStoredConversation() = runTest {
+        val repository = ControllableRepository().apply {
+            stored.value = conversation()
+            openResult = CompletableDeferred(ApiResult.Failure(ErrorKind.CONNECTIVITY))
+        }
+
+        val (_, state) = chatOf(repository)
+
+        assertEquals(UiState.Error(ErrorKind.CONNECTIVITY), state())
+    }
+
+    @Test fun retryOpensTheChatAgain() = runTest {
+        val repository = ControllableRepository().apply { openResult = CompletableDeferred(ApiResult.Failure(ErrorKind.CONNECTIVITY)) }
+        val (viewModel, state) = chatOf(repository)
+        assertEquals(UiState.Error(ErrorKind.CONNECTIVITY), state())
+
+        repository.stored.value = conversation()
+        repository.openResult = CompletableDeferred(ApiResult.Success(Unit))
+        viewModel.load()
+        advanceUntilIdle()
+
+        assertTrue(state() is UiState.Content)
+        assertEquals(2, repository.opens)
+    }
+
+    @Test fun chatAsksForTheNamesOfTheOpenConversationAndShowsTheOfflineState() = runTest {
+        val repository = ControllableRepository().apply {
+            stored.value = conversation(accessLost = true)
+            connection.value = false
+        }
+
+        val (_, state) = chatOf(repository)
+
+        assertEquals(listOf<String?>("c1"), repository.namesRequests)
+        assertFalse(contentOf(state).online)
+        assertTrue(contentOf(state).conversation.accessLost)
     }
 
     @Test fun sendingClearsTheDraftEvenWhileOffline() = runTest {
-        val repository = ControllableRepository().apply { connection.value = false }
+        val repository = ControllableRepository().apply {
+            stored.value = conversation()
+            connection.value = false
+        }
         val (viewModel, state) = chatOf(repository)
 
         viewModel.onDraftChange("vai quando voltar")
         viewModel.send()
         advanceUntilIdle()
 
-        assertEquals("", state().draft)
-        assertEquals(false, state().online)
+        assertEquals("", contentOf(state).draft)
+        assertEquals(false, contentOf(state).online)
     }
 
     @Test fun draftComesBackWhenTheMessageCannotEvenBeQueued() = runTest {
-        val repository = ControllableRepository().apply { sendResult = ApiResult.Failure(ErrorKind.CONNECTIVITY) }
+        val repository = ControllableRepository().apply {
+            stored.value = conversation()
+            sendResult = ApiResult.Failure(ErrorKind.FORBIDDEN)
+        }
         val (viewModel, state) = chatOf(repository)
 
-        viewModel.onDraftChange("sem tipo da conversa")
+        viewModel.onDraftChange("sem acesso")
         viewModel.send()
         advanceUntilIdle()
 
-        assertEquals("sem tipo da conversa", state().draft)
+        assertEquals("sem acesso", contentOf(state).draft)
     }
 
-    @Test fun reconnectionFetchesOnlyWhatArrivedAfterTheLastKnownSequence() = runTest {
-        val repository = ControllableRepository().apply { history += listOf(sent(1), sent(2)) }
-        val (_, state) = chatOf(repository)
+    private fun TestScope.conversationsOf(repository: CommunicationRepository): Pair<ConversationsViewModel, () -> UiState<ConversationsUiState>> {
+        val viewModel = ConversationsViewModel(repository)
+        backgroundScope.launch { viewModel.uiState.collect { } }
+        advanceUntilIdle()
+        return viewModel to { viewModel.uiState.value }
+    }
 
-        repository.history += sent(3)
-        repository.reconnected.emit(Unit)
+    @Test fun emptyListShowsLoadingUntilTheFirstSyncEnds() = runTest {
+        val repository = ControllableRepository()
+        val (_, state) = conversationsOf(repository)
+        assertEquals(UiState.Loading, state())
+
+        repository.sync.value = ApiResult.Success(Unit)
         advanceUntilIdle()
 
-        assertEquals(listOf(2), repository.catchUpCursors)
-        assertEquals(listOf("m1", "m2", "m3"), state().messages.map { it.id })
+        assertEquals(UiState.Empty, state())
     }
 
-    @Test fun laterMessageArrivingFirstDoesNotHideAGapBeforeIt() = runTest {
-        val repository = ControllableRepository().apply { history += sent(1) }
-        val (_, state) = chatOf(repository)
+    @Test fun emptyListAfterAFailedSyncShowsTheError() = runTest {
+        val repository = ControllableRepository().apply { sync.value = ApiResult.Failure(ErrorKind.CONNECTIVITY) }
 
-        // m4 chega ao vivo (própria mensagem confirmada) enquanto m2 e m3 ficaram para trás
-        repository.history += listOf(sent(2), sent(3), sent(4))
-        repository.live.emit(sent(4))
-        repository.reconnected.emit(Unit)
+        val (_, state) = conversationsOf(repository)
+
+        assertEquals(UiState.Error(ErrorKind.CONNECTIVITY), state())
+    }
+
+    @Test fun storedConversationsShowEvenWhenTheLastSyncFailed() = runTest {
+        val repository = ControllableRepository().apply {
+            list.value = listOf(conversation("c1", "Ana Bia"), conversation("c2", "Beto", accessLost = true))
+            sync.value = ApiResult.Failure(ErrorKind.CONNECTIVITY)
+        }
+
+        val (_, state) = conversationsOf(repository)
+
+        val content = (state() as UiState.Content).data
+        assertEquals(listOf("Ana Bia", "Beto"), content.conversations.map { it.name })
+        assertTrue(content.conversations[1].accessLost)
+    }
+
+    @Test fun listFiltersByNameAndPreviewAndRetryAsksForANewSync() = runTest {
+        val repository = ControllableRepository().apply {
+            list.value = listOf(conversation("c1", "Ana Bia"), conversation("c2", "Beto"))
+        }
+        val (viewModel, state) = conversationsOf(repository)
+
+        viewModel.onQueryChange("beto")
         advanceUntilIdle()
+        assertEquals(listOf("Beto"), (state() as UiState.Content).data.conversations.map { it.name })
 
-        assertEquals(listOf(1), repository.catchUpCursors)
-        assertEquals(listOf("m1", "m2", "m3", "m4"), state().messages.map { it.id })
-    }
-
-    private fun TestScope.remoteRepository(
-        api: ScriptedMessengerApi,
-        realtime: FakeRealtimeClient,
-        online: Boolean,
-        dao: InMemoryPendingMessageDao = InMemoryPendingMessageDao(),
-    ): RemoteCommunicationRepository {
-        val executor = ApiCallExecutor(ApiErrorParser(ApiJson.instance))
-        val credentials = object : CredentialProvider { override fun accessToken() = tokenFor("user-1") }
-        val network = object : NetworkMonitor { override val isOnline = MutableStateFlow(online) }
-        val outbox = MessageOutbox(dao, api, executor, network, credentials, backgroundScope)
-        return RemoteCommunicationRepository(api, executor, credentials, outbox, realtime, network, ApiJson.instance, FakeCommunicationRepository())
-    }
-
-    @Test fun catchUpFollowsThePagesUntilTheLastOne() = runTest {
-        val api = ScriptedMessengerApi().apply { history += (1..250).map { MessageDto("m$it", "c1", sequence = it) } }
-        val repository = remoteRepository(api, FakeRealtimeClient(), online = true)
-
-        val result = repository.messages("c1", afterSequence = 0)
-
-        assertEquals((1..250).map { "m$it" }, (result as ApiResult.Success).data.map { it.id })
-        assertEquals(3, api.historyCalls)
-    }
-
-    @Test fun realtimeMessageEventsBecomeChatMessagesAndOtherEventsAreIgnored() = runTest {
-        val realtime = FakeRealtimeClient()
-        val repository = remoteRepository(ScriptedMessengerApi(), realtime, online = true)
-        val received = mutableListOf<ChatMessage>()
-        backgroundScope.launch { repository.liveMessages("c1").toList(received) }
-        runCurrent()
-
-        val topic = "/topic/conversations.c1"
-        realtime.frames.emit(topic to """{"type":"USER_ONLINE","conversationId":"c1","payload":{"userId":"u2"}}""")
-        realtime.frames.emit(topic to "não é json")
-        realtime.frames.emit(topic to """{"type":"MESSAGE_CREATED","conversationId":"c1","eventId":"m9","payload":{"id":"m9","conversationId":"c1","senderId":"USER-1","content":"olá","sequence":9,"timestamp":"2026-10-28T10:00:00Z"}}""")
-        realtime.frames.emit(topic to """{"type":"MESSAGE_DELETED","conversationId":"c1","payload":{"id":"m8","conversationId":"c1","senderId":"u2","content":null,"deleted":true,"sequence":8}}""")
-        runCurrent()
-
-        assertEquals(listOf("m9", "m8"), received.map { it.id })
-        assertTrue(received[0].mine)
-        assertEquals("Mensagem apagada", received[1].text)
-    }
-
-    @Test fun conversationTypeLearnedOnlineIsReusedToQueueWhileOffline() = runTest {
-        val api = ScriptedMessengerApi().apply { conversationTypes["g1"] = "GROUP" }
-        val dao = InMemoryPendingMessageDao()
-        val repository = remoteRepository(api, FakeRealtimeClient(), online = false, dao = dao)
-
-        repository.conversation("g1")
-        api.conversationFailure = IOException("sem rede")
-        val result = repository.sendMessage("g1", "oi grupo")
-        val pending = mutableListOf<List<ChatMessage>>()
-        backgroundScope.launch { repository.pendingMessages("g1").toList(pending) }
-        runCurrent()
-
-        assertEquals(ApiResult.Success(Unit), result)
-        assertEquals("USER_TO_GROUP", dao.rows.single().messageType)
-        assertTrue(api.sendRequests.isEmpty())
-        assertEquals(listOf("oi grupo"), pending.last().map { it.text })
-        assertEquals(MessageStatus.PENDING, pending.last().single().status)
+        viewModel.load()
+        assertEquals(1, repository.refreshes)
+        assertEquals(listOf<String?>(null), repository.namesRequests)
     }
 }

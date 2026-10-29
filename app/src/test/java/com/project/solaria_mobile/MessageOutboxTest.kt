@@ -6,34 +6,30 @@ import com.project.solaria_mobile.core.network.ApiErrorParser
 import com.project.solaria_mobile.core.network.ApiJson
 import com.project.solaria_mobile.core.network.CredentialProvider
 import com.project.solaria_mobile.core.network.NetworkMonitor
-import com.project.solaria_mobile.feature.communication.data.MessageDto
 import com.project.solaria_mobile.feature.communication.data.MessageOutbox
+import com.project.solaria_mobile.feature.communication.data.MessageStore
 import java.io.IOException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.toList
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
-import okhttp3.MediaType.Companion.toMediaType
-import okhttp3.ResponseBody.Companion.toResponseBody
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
-import retrofit2.HttpException
-import retrofit2.Response
 
 /**
  * Testes da fila de envio ([MessageOutbox]): envio offline, ordem, reenvio, confirmação pelo histórico, recusas,
  * troca de conta e 401.
  *
- * Usa [ScriptedMessengerApi] e [InMemoryPendingMessageDao] como dublês.
+ * Usa [ScriptedMessengerApi], [InMemoryPendingMessageDao] e o cache de mensagens em memória como dublês.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class MessageOutboxTest {
     private val dao = InMemoryPendingMessageDao()
+    private val conversations = InMemoryConversationDao()
+    private val cache = InMemoryMessageDao(conversations)
     private val api = ScriptedMessengerApi()
     private val network = MutableStateFlow(false)
     private var token: String? = tokenFor("user-1")
@@ -45,13 +41,12 @@ class MessageOutboxTest {
             executor = ApiCallExecutor(ApiErrorParser(ApiJson.instance)),
             networkMonitor = object : NetworkMonitor { override val isOnline = network },
             credentials = object : CredentialProvider { override fun accessToken() = token },
+            store = MessageStore(cache, conversations),
             scope = backgroundScope,
         ).also {
             it.start()
             runCurrent()
         }
-
-    private fun httpError(code: Int) = HttpException(Response.error<Any>(code, "{}".toResponseBody("application/json".toMediaType())))
 
     @Test fun offlineMessageWaitsInTheQueueAndIsSentWhenTheConnectionReturns() = runTest {
         val outbox = startOutbox()
@@ -67,18 +62,29 @@ class MessageOutboxTest {
         assertTrue(dao.rows.isEmpty())
     }
 
-    @Test fun onlineMessageIsSentRightAwayAndAnnouncedAsDelivered() = runTest {
+    @Test fun onlineMessageIsSentRightAwayAndStoredInTheCacheBeforeLeavingTheQueue() = runTest {
         network.value = true
         val outbox = startOutbox()
-        val delivered = mutableListOf<MessageDto>()
-        backgroundScope.launch { outbox.delivered.toList(delivered) }
-        runCurrent()
 
         outbox.enqueue("c1", "USER_TO_USER", "oi")
         runCurrent()
 
-        assertEquals(1, delivered.size)
-        assertEquals(api.sendRequests.single().clientMessageId, delivered.single().clientMessageId)
+        val confirmed = cache.rows.single()
+        assertEquals(api.sendRequests.single().clientMessageId, confirmed.clientMessageId)
+        assertEquals("oi", confirmed.content)
+        assertTrue(dao.rows.isEmpty())
+    }
+
+    @Test fun messageConfirmedAfterTheSessionEndedIsNotWrittenToTheCache() = runTest {
+        network.value = true
+        val outbox = startOutbox()
+        // O logout acontece enquanto o POST está no ar, depois de o banco já ter sido apagado
+        api.beforeReply = { token = null }
+
+        outbox.enqueue("c1", "USER_TO_USER", "oi")
+        runCurrent()
+
+        assertTrue(cache.rows.isEmpty())
         assertTrue(dao.rows.isEmpty())
     }
 
