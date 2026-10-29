@@ -16,6 +16,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
@@ -52,6 +54,14 @@ class ChatViewModel @Inject constructor(
     init {
         load()
         viewModelScope.launch { repository.refreshNames(conversationId) }
+        // Cada mensagem confirmada nova, vista com o chat aberto, avança a leitura. Funciona offline: o Room guarda e o
+        // envio ao servidor sai quando a internet volta.
+        viewModelScope.launch {
+            repository.messages(conversationId)
+                .map { list -> list.maxOfOrNull { it.sequence ?: 0 } ?: 0 }
+                .distinctUntilChanged()
+                .collect { if (it > 0) repository.markRead(conversationId) }
+        }
     }
 
     fun load() {
@@ -79,5 +89,17 @@ class ChatViewModel @Inject constructor(
 
     fun discard(messageId: String) {
         viewModelScope.launch { repository.discardMessage(messageId) }
+    }
+
+    /** Silencia a conversa, ou reativa se já está silenciada. Só com internet. */
+    fun toggleMute() {
+        val current = (uiState.value as? UiState.Content)?.data?.conversation ?: return
+        viewModelScope.launch { repository.setMuted(conversationId, !current.muted) }
+    }
+
+    /** Arquiva a conversa, ou tira do arquivo se já está arquivada. Só com internet. */
+    fun toggleArchive() {
+        val current = (uiState.value as? UiState.Content)?.data?.conversation ?: return
+        viewModelScope.launch { repository.setArchived(conversationId, !current.archived) }
     }
 }

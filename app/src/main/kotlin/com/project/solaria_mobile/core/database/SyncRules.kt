@@ -26,12 +26,18 @@ fun mergeMessage(stored: MessageEntity?, incoming: MessageEntity): MessageEntity
  * versão é maior. Como a linha recebida traz `accessLost = false`, uma conversa que voltou a aparecer na lista deixa de
  * estar sem acesso.
  *
+ * A leitura feita no aparelho nunca é perdida: [ConversationEntity.localReadSequence] fica com o maior entre o valor
+ * guardado e o cursor que o servidor informou. Assim uma atualização que chega antes do envio da leitura não desfaz a
+ * marcação.
+ *
  * @param stored linha que já está no banco, ou `null` se a conversa é nova.
  * @param incoming conversa recebida.
  * @return a linha a gravar, ou `null` se [incoming] não é mais nova que [stored] e nada muda.
  */
 fun mergeConversation(stored: ConversationEntity?, incoming: ConversationEntity): ConversationEntity? {
-    if (stored == null) return incoming
+    if (stored == null) return incoming.copy(localReadSequence = maxOf(incoming.localReadSequence, incoming.lastReadSequence))
     val newer = incoming.syncEpoch != stored.syncEpoch || incoming.syncVersion > stored.syncVersion
-    return if (newer) incoming else null
+    if (!newer) return null
+    val seen = maxOf(stored.localReadSequence, incoming.lastReadSequence, incoming.localReadSequence)
+    return incoming.copy(localReadSequence = seen)
 }

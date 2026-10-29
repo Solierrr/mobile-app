@@ -31,13 +31,14 @@ class RemoteCommunicationRepository @Inject constructor(
     private val users: UserDirectory,
     private val sync: MessageSync,
     private val serviceCalls: FakeCommunicationRepository,
+    private val stateSync: ConversationStateSync,
 ) : CommunicationRepository {
     override val online: Flow<Boolean> get() = networkMonitor.isOnline
 
     override val syncResult: Flow<ApiResult<Unit>?> get() = sync.result
 
-    override fun conversations(): Flow<List<Conversation>> =
-        combine(conversationDao.observeList(), users.observe()) { rows, names ->
+    override fun conversations(archived: Boolean): Flow<List<Conversation>> =
+        combine(if (archived) conversationDao.observeArchivedList() else conversationDao.observeList(), users.observe()) { rows, names ->
             val me = credentials.currentUserId()
             rows.map { it.toConversation(me, names) }
         }
@@ -82,6 +83,12 @@ class RemoteCommunicationRepository @Inject constructor(
     override suspend fun retryMessage(messageId: String) = outbox.retry(messageId)
 
     override suspend fun discardMessage(messageId: String) = outbox.discard(messageId)
+
+    override suspend fun markRead(conversationId: String) = stateSync.markRead(conversationId)
+
+    override suspend fun setMuted(conversationId: String, muted: Boolean) = stateSync.setMuted(conversationId, muted)
+
+    override suspend fun setArchived(conversationId: String, archived: Boolean) = stateSync.setArchived(conversationId, archived)
 
     override suspend fun calls(): ApiResult<List<ServiceCall>> = serviceCalls.calls()
 

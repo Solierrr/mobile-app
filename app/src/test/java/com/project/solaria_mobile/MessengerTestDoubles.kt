@@ -1,6 +1,8 @@
 package com.project.solaria_mobile
 
 import com.project.solaria_mobile.core.auth.AuthTokens
+import com.project.solaria_mobile.feature.communication.data.ConversationStateRequest
+import com.project.solaria_mobile.feature.communication.data.ConversationStateDto
 import com.project.solaria_mobile.core.auth.PendingLogin
 import com.project.solaria_mobile.core.auth.TokenStore
 import com.project.solaria_mobile.core.common.ApiResult
@@ -166,6 +168,38 @@ class InMemoryConversationDao : ConversationDao() {
         }
     }
 
+    override fun observeArchivedList(): Flow<List<ConversationEntity>> =
+        table.map { all -> all.filter { it.archived }.sortedByDescending { it.lastInteractionAt ?: Long.MIN_VALUE } }
+
+    override suspend fun markReadLocally(conversationId: String, sequence: Int) {
+        table.update { all -> all.map { if (it.id == conversationId) it.copy(localReadSequence = maxOf(it.localReadSequence, sequence)) else it } }
+    }
+
+    override suspend fun setLocalRead(conversationId: String, sequence: Int) {
+        table.update { all -> all.map { if (it.id == conversationId) it.copy(localReadSequence = sequence) else it } }
+    }
+
+    override suspend fun pendingReads(): List<ConversationEntity> =
+        table.value.filter { it.localReadSequence > it.lastReadSequence && !it.accessLost && it.conversationType != "CHAT_BOT" }
+
+    override suspend fun applyState(conversationId: String, lastReadSequence: Int, unreadCount: Long, muted: Boolean, archived: Boolean) {
+        table.update { all ->
+            all.map {
+                if (it.id == conversationId) {
+                    it.copy(
+                        lastReadSequence = lastReadSequence,
+                        unreadCount = unreadCount,
+                        muted = muted,
+                        archived = archived,
+                        localReadSequence = maxOf(it.localReadSequence, lastReadSequence),
+                    )
+                } else {
+                    it
+                }
+            }
+        }
+    }
+
     fun clear() {
         table.value = emptyList()
     }
@@ -280,6 +314,13 @@ class ScriptedMessengerApi : MessengerApi {
     var version = 0L
     var updateCalls = 0
 
+    /** Pedidos de PATCH de estado, na ordem: id da conversa e corpo. */
+    val stateRequests = mutableListOf<Pair<String, ConversationStateRequest>>()
+    var stateFailure: Throwable? = null
+    private val serverRead = mutableMapOf<String, Int>()
+    private val mutedIds = mutableSetOf<String>()
+    private val archivedIds = mutableSetOf<String>()
+
     /** Um pedido de histórico, como o app o fez. */
     data class MessageRequest(val conversationId: String, val sinceSequence: Int?, val beforeSequence: Int?, val limit: Int)
 
@@ -336,6 +377,22 @@ class ScriptedMessengerApi : MessengerApi {
         val size = limit ?: 100
         val page = changed.take(size)
         return MessageUpdatesDto(epoch, page.lastOrNull()?.changeVersion ?: since, changed.size > size, page)
+    }
+
+    // Como o messenger: o cursor só avança, valor acima da última mensagem é 400 e conversa sem acesso é 403
+    override suspend fun patchState(id: String, body: ConversationStateRequest): ConversationStateDto {
+        stateRequests += id to body
+        stateFailure?.let { throw it }
+        if (id in forbidden) throw httpError(403)
+        val head = history.filter { it.conversationId == id }.maxOfOrNull { it.sequence } ?: 0
+        body.lastReadSequence?.let {
+            if (it > head) throw httpError(400)
+            serverRead[id] = maxOf(serverRead[id] ?: 0, it)
+        }
+        body.muted?.let { if (it) mutedIds += id else mutedIds -= id }
+        body.archived?.let { if (it) archivedIds += id else archivedIds -= id }
+        val read = serverRead[id] ?: 0
+        return ConversationStateDto(id, epoch, nextVersion(), read, (head - read).toLong(), id in mutedIds, id in archivedIds, id in mutedIds || id in archivedIds)
     }
 
     override suspend fun send(body: SendMessageRequest): MessageDto {

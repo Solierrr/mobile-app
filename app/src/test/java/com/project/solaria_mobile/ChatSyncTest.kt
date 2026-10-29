@@ -86,7 +86,7 @@ class ChatSyncTest {
 
         override val online: Flow<Boolean> = connection
         override val syncResult: Flow<ApiResult<Unit>?> = sync
-        override fun conversations(): Flow<List<Conversation>> = list
+        override fun conversations(archived: Boolean): Flow<List<Conversation>> = list
         override fun conversation(id: String): Flow<Conversation?> = stored
         override fun messages(conversationId: String): Flow<List<ChatMessage>> =
             combine(history, pending) { delivered, queue -> timelineOf(delivered, queue) }
@@ -107,6 +107,9 @@ class ChatSyncTest {
         override suspend fun sendMessage(conversationId: String, text: String): ApiResult<Unit> = sendResult
         override suspend fun retryMessage(messageId: String) = Unit
         override suspend fun discardMessage(messageId: String) = Unit
+        override suspend fun markRead(conversationId: String) = Unit
+        override suspend fun setMuted(conversationId: String, muted: Boolean): ApiResult<Unit> = ApiResult.Success(Unit)
+        override suspend fun setArchived(conversationId: String, archived: Boolean): ApiResult<Unit> = ApiResult.Success(Unit)
         override suspend fun calls(): ApiResult<List<ServiceCall>> = ApiResult.Success(emptyList())
         override suspend fun call(id: String): ApiResult<ServiceCall> = ApiResult.Failure(ErrorKind.NOT_FOUND)
         override suspend fun notifications(): ApiResult<List<NotificationGroup>> = ApiResult.Success(emptyList())

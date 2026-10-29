@@ -1,6 +1,8 @@
 package com.project.solaria_mobile.feature.communication.data
 
 import com.project.solaria_mobile.core.database.ConversationEntity
+import com.project.solaria_mobile.core.database.displayedUnread
+import com.project.solaria_mobile.core.database.isChatbot
 import com.project.solaria_mobile.core.database.MessageEntity
 import com.project.solaria_mobile.core.database.PendingMessageEntity
 import com.project.solaria_mobile.core.database.UserEntity
@@ -65,6 +67,10 @@ internal fun ConversationDto.toEntity(): ConversationEntity =
         lastMessageContent = lastMessage?.takeUnless { it.deleted }?.content,
         lastMessageDeleted = lastMessage?.deleted == true,
         accessLost = false,
+        lastReadSequence = lastReadSequence ?: 0,
+        localReadSequence = lastReadSequence ?: 0,
+        unreadCount = unreadCount ?: 0,
+        muted = muted == true,
     )
 
 /** Tipo que o servidor exige nas mensagens enviadas para a conversa. */
@@ -106,6 +112,11 @@ internal fun ConversationEntity.toConversation(me: String?, names: Map<String, U
         time = lastInteractionAt?.let { formatTimestamp(it) }.orEmpty(),
         tone = tones[(name.hashCode() and Int.MAX_VALUE) % tones.size],
         accessLost = accessLost,
+        unreadCount = displayedUnread.coerceAtMost(Int.MAX_VALUE.toLong()).toInt(),
+        muted = muted,
+        archived = archived,
+        group = conversationType == GROUP_TYPE,
+        chatbot = isChatbot,
     )
 }
 
