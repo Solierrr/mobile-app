@@ -2,6 +2,7 @@ package com.project.solaria_mobile.di
 
 import com.project.solaria_mobile.BuildConfig
 import com.project.solaria_mobile.core.network.RetrofitFactory
+import com.project.solaria_mobile.feature.communication.data.CommunityApi
 import com.project.solaria_mobile.feature.communication.data.MessengerApi
 import com.project.solaria_mobile.feature.discovery.data.RegistryApi
 import com.project.solaria_mobile.feature.profile.data.ProfileApi
@@ -31,6 +32,11 @@ object ApiModule {
     @Singleton
     fun provideMessengerApi(factory: RetrofitFactory): MessengerApi =
         factory.create(BuildConfig.MESSENGER_BASE_URL).create(MessengerApi::class.java)
+
+    @Provides
+    @Singleton
+    fun provideCommunityApi(factory: RetrofitFactory): CommunityApi =
+        factory.create(BuildConfig.MESSENGER_BASE_URL).create(CommunityApi::class.java)
 
     @Provides
     @Singleton

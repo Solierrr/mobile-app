@@ -31,6 +31,7 @@ import kotlinx.coroutines.flow.map
  * Principais operações:
  * - [observe] -> acompanha as pessoas guardadas, pelo `authId` em minúsculas.
  * - [refreshFor] -> atualiza do api-core as pessoas que uma tela vai mostrar.
+ * - [refreshIds] -> atualiza do api-core as pessoas informadas.
  * - [forget] -> esquece quando cada pessoa foi consultada. Chamado no logout.
  */
 @Singleton
@@ -69,6 +70,17 @@ class UserDirectory @Inject constructor(
             conversation.peerIds(me) + messages.senders(conversationId).filterNot { it.equals(me, ignoreCase = true) }
         }
         for (id in ids.map { it.lowercase() }.distinct()) refresh(id)
+    }
+
+    /**
+     * Atualiza do api-core as pessoas informadas, uma chamada por pessoa e sem repetir quem foi consultado há menos de 30 s.
+     *
+     * Serve às telas cujas pessoas não vêm de uma conversa, como os membros de uma comunidade.
+     *
+     * @param authIds `sub` das pessoas, em qualquer caixa.
+     */
+    suspend fun refreshIds(authIds: Collection<String>) {
+        for (id in authIds.map { it.lowercase() }.distinct()) refresh(id)
     }
 
     private suspend fun refresh(authId: String) {
