@@ -98,6 +98,7 @@ private val BRAND_BOTTOM = Color(0xFFE85900)
 /** Degradê vertical da marca (como no web) com uma sombra bem difusa, sem contornos. */
 private fun DrawScope.drawBrandShape(path: Path) {
     val unit = size.minDimension
+    if (unit <= 0f) return
     drawIntoCanvas { canvas ->
         val shadow = Paint().asFrameworkPaint().apply {
             isAntiAlias = true
