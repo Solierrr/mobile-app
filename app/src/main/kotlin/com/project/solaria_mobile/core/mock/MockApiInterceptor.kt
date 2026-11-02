@@ -440,6 +440,8 @@ class MockApiData internal constructor(private val profileStore: MockProfileStor
     }.toMutableMap()
     /** Quem quiser reagir a uma mensagem enviada pela pessoa (o cliente de tempo real falso, para simular respostas). */
     @Volatile var messageListener: ((MessageDto) -> Unit)? = null
+    /** Avisado com o id da conversa quando algo nela muda para a conta (mensagem, leitura, estado), como o `CONVERSATION_UPDATED` do messenger. */
+    @Volatile var conversationListener: ((String) -> Unit)? = null
     private var nextProject = 4
     private var nextMessage = 1000
     private val selfId = "qa-mock-user"
@@ -800,6 +802,10 @@ class MockApiData internal constructor(private val profileStore: MockProfileStor
         MessagePreviewDto(message.id, message.senderId, if (message.deleted) "" else listOfNotNull(label, message.content.takeIf { it.isNotBlank() }).joinToString(": "), message.deleted)
     }
 
+    /** A conversa como a lista a mostra agora, com a última interação na hora da última mensagem; nulo se foi arquivada. */
+    @Synchronized fun liveConversation(id: String): ConversationDto? =
+        conversations().firstOrNull { it.id == id }?.let { it.copy(lastInteractionAt = conversationMessages[id]?.lastOrNull()?.timestamp ?: it.lastInteractionAt) }
+
     /** Quem está online, como o retrato de presença que o messenger manda ao assinar a conversa. */
     fun presence(conversationId: String): Map<String, Boolean> = MockChatSeed.presence[conversationId].orEmpty()
 
@@ -863,6 +869,7 @@ class MockApiData internal constructor(private val profileStore: MockProfileStor
         patch.muted?.let { if (it) mutedConversations += id else mutedConversations -= id }
         patch.archived?.let { if (it) archivedConversations += id else archivedConversations -= id }
         patch.lastReadSequence?.let { lastRead[id] = maxOf(lastRead[id] ?: 0, it) }
+        conversationListener?.invoke(id)
         return ConversationStateDto(id, id in mutedConversations, id in archivedConversations)
     }
 
@@ -877,6 +884,7 @@ class MockApiData internal constructor(private val profileStore: MockProfileStor
             if (content != null && current.deleted) return 422 to "{}"
             val updated = if (content == null) current.copy(content = "", deleted = true) else current.copy(content = content, edited = true)
             messages[index] = updated
+            conversationListener?.invoke(updated.conversationId)
             return 200 to ApiJson.instance.encodeToString(MessageDto.serializer(), updated)
         }
         return 404 to "{}"
@@ -897,6 +905,7 @@ class MockApiData internal constructor(private val profileStore: MockProfileStor
         list.add(message)
         lastRead[request.conversationId] = message.sequence
         messageListener?.invoke(message)
+        conversationListener?.invoke(message.conversationId)
         return message
     }
 

@@ -21,7 +21,7 @@ data class ConversationDto(
     val lastMessage: MessagePreviewDto? = null,
     /** Detalhes que quem cria a conversa informa; o ai-assistant guarda aqui o `threadId` da sessão. */
     val userDetails: Map<String, kotlinx.serialization.json.JsonElement>? = null,
-    /** `authId` de quem participa; é a única pista de quem são as pessoas, porque o messenger não manda nomes. */
+    /** `authId` de quem participa: cruzado com a presença e usado para buscar os nomes, que o messenger não manda. */
     val participantIds: List<String> = emptyList(),
 )
 
@@ -45,9 +45,24 @@ data class MessageDto(
     val clientMessageId: String? = null,
     val edited: Boolean = false,
     val deleted: Boolean = false,
+    /** Versão do relógio de sincronização em que a mensagem mudou pela última vez; ordena o catch-up. Zero em mensagem antiga. */
+    val changeVersion: Long = 0,
     /** Só o modo de demonstração preenche estes dois; o messenger real não envia nome (ele vem de [ParticipantNames]). */
     val senderName: String? = null,
     val attachment: AttachmentDto? = null,
+)
+
+/**
+ * Resposta de `GET /messaging/updates`: o estado atual das mensagens que mudaram depois do `since`, em ordem de [MessageDto.changeVersion].
+ * [cursor] é o `since` da próxima chamada; sem `since` na chamada ele é a versão atual e [messages] vem vazia. Se [syncEpoch] muda, as
+ * versões guardadas deixaram de valer.
+ */
+@Serializable
+data class MessageUpdatesDto(
+    val syncEpoch: String = "",
+    val cursor: Long = 0,
+    val hasMore: Boolean = false,
+    val messages: List<MessageDto> = emptyList(),
 )
 
 /** Anexo de uma mensagem, `type` em `IMAGE`, `FILE` ou `LOCATION`. Proposta de contrato, ainda sem suporte no servidor. */
@@ -87,6 +102,10 @@ interface MessengerApi {
         @Query("sinceSequence") sinceSequence: Int? = null,
         @Query("beforeSequence") beforeSequence: Int? = null,
     ): List<MessageDto>
+
+    /** Mensagens de todas as conversas da conta que mudaram depois de `since`; sem `since` devolve só o ponto de partida. */
+    @GET("messaging/updates")
+    suspend fun updates(@Query("since") since: Long? = null, @Query("limit") limit: Int = 500): MessageUpdatesDto
 
     @POST("messaging/messages")
     suspend fun send(@Body body: SendMessageRequest): MessageDto

@@ -17,8 +17,11 @@ import com.project.solaria_mobile.feature.communication.domain.MessageAttachment
 import com.project.solaria_mobile.feature.communication.data.ChatCapabilities
 import com.project.solaria_mobile.feature.communication.data.ChatEvent
 import com.project.solaria_mobile.feature.communication.data.ChatRealtime
+import com.project.solaria_mobile.feature.communication.data.MessageDto
 import com.project.solaria_mobile.feature.communication.data.NoChatRealtime
 import com.project.solaria_mobile.feature.communication.data.PAGE_SIZE
+import com.project.solaria_mobile.feature.communication.data.PresenceState
+import com.project.solaria_mobile.feature.communication.data.conversationId
 import com.project.solaria_mobile.feature.communication.data.toMessage
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -30,6 +33,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import com.project.solaria_mobile.feature.communication.data.MessageOutbox
 import com.project.solaria_mobile.feature.communication.data.PendingState
@@ -88,7 +92,7 @@ private data class ChatContent(
     val firstUnreadSequence: Int? = null,
 )
 
-private data class LivePresence(val typing: Set<String> = emptySet(), val online: Map<String, Boolean> = emptyMap(), val loadingOlder: Boolean = false, val thinking: Boolean = false)
+private data class LivePresence(val typing: Set<String> = emptySet(), val presence: PresenceState = PresenceState(), val loadingOlder: Boolean = false, val thinking: Boolean = false)
 
 private data class ChatControls(
     val editingId: String?,
@@ -137,7 +141,6 @@ class ChatViewModel @Inject constructor(
     private val composer = combine(draft, sendFailure, draftLimitExceeded) { text, failure, exceeded -> Triple(text, failure, exceeded) }
     private val live = MutableStateFlow(LivePresence())
     private val myId = repository.currentUserId()
-    private val typingTimeouts = mutableMapOf<String, Job>()
 
     private val allOutgoing = combine(outgoing, assistantPending) { queued, assistant -> queued + assistant }
 
@@ -151,7 +154,9 @@ class ChatViewModel @Inject constructor(
                     if (message.mine || !message.senderName.isNullOrBlank() || name == null) message else message.copy(senderName = name)
                 }
                 val names = known + messages.mapNotNull { message -> message.senderId?.let { id -> message.senderName?.takeIf(String::isNotBlank)?.let { id to it } } }
-                val others = presence.online.filterKeys { it != myId }
+                // Participantes da conversa menos a própria conta, cruzados com a presença global dos contatos.
+                val others = loaded.data.conversation.participants.filterNot { it == myId?.lowercase() }
+                val onlineOthers = others.filter { it in presence.presence.online }
                 UiState.Content(
                     ChatUiState(
                         loaded.data.conversation, text, messages, failure, exceeded, queued,
@@ -159,8 +164,8 @@ class ChatViewModel @Inject constructor(
                         hasMore = loaded.data.hasMore, loadingOlder = presence.loadingOlder, firstUnreadSequence = loaded.data.firstUnreadSequence,
                         typingNames = presence.typing.mapNotNull { names[it] },
                         typingCount = presence.typing.size,
-                        online = if (loaded.data.conversation.group || others.isEmpty()) null else others.values.any { it },
-                        onlineCount = others.values.count { it },
+                        online = if (!presence.presence.known || loaded.data.conversation.group || others.isEmpty()) null else onlineOthers.isNotEmpty(),
+                        onlineCount = onlineOthers.size,
                         attachmentsEnabled = capabilities.attachments() && !loaded.data.conversation.assistant,
                         assistantThinking = presence.thinking,
                     ),
@@ -180,13 +185,12 @@ class ChatViewModel @Inject constructor(
                 if (message == null) refreshMessages() else appendMessage(message)
             }
         }
-        if (!newSession) viewModelScope.launch { realtime.conversationEvents(conversationId).collect(::onEvent) }
-        viewModelScope.launch {
-            // Quem estava fora do ar recupera o que perdeu assim que a conexão volta.
-            var wasDown = false
-            realtime.connected.collect { connected ->
-                if (!connected) wasDown = true else if (wasDown) { wasDown = false; catchUp() }
-            }
+        if (!newSession) {
+            // Um canal só traz as conversas todas; aqui ficam os eventos desta, e a presença e o "digitando" vêm do estado global.
+            // O que passou com a conexão fora chega como `MessageRecovered`, recuperado pelo próprio tempo real; `Resynced` vale para todas.
+            viewModelScope.launch { realtime.events.filter { it.conversationId() == conversationId || it is ChatEvent.Resynced }.collect(::onEvent) }
+            viewModelScope.launch { realtime.presence.collect { state -> live.update { it.copy(presence = state) } } }
+            viewModelScope.launch { realtime.typingByConversation.collect { all -> live.update { it.copy(typing = all[conversationId].orEmpty()) } } }
         }
     }
 
@@ -284,10 +288,12 @@ class ChatViewModel @Inject constructor(
         when (event) {
             // Numa sessão do assistente a resposta vem no retorno do turno; o evento só duplicaria a mensagem.
             is ChatEvent.MessageCreated, is ChatEvent.MessageChanged -> if (!isAssistant()) onMessageEvent(event)
-            is ChatEvent.Typing -> onTyping(event.userId, event.started)
-            is ChatEvent.Presence -> live.value = live.value.copy(online = live.value.online + (event.userId to event.online))
-            is ChatEvent.PresenceSnapshot -> live.value = live.value.copy(online = event.users)
+            is ChatEvent.MessageRecovered -> if (!isAssistant()) onRecovered(event.message)
+            // O servidor perdeu a contagem de versões: o que está na tela pode estar velho, então lê o histórico de novo.
+            is ChatEvent.Resynced -> if (!isAssistant()) refreshMessages()
             is ChatEvent.ConversationRemoved -> controls.value = controls.value.copy(removed = true)
+            // Presença e "digitando" chegam pelo estado global do tempo real, não por este fluxo.
+            else -> Unit
         }
     }
 
@@ -295,31 +301,48 @@ class ChatViewModel @Inject constructor(
         when (event) {
             is ChatEvent.MessageCreated -> {
                 val message = event.message.toMessage(myId)
+                val lastKnown = currentMessages().maxOfOrNull { it.sequence } ?: 0
                 appendMessage(message)
-                if (!message.mine && message.sequence > 0) viewModelScope.launch { repository.conversationState(remote(), lastReadSequence = message.sequence) }
+                // Entre instâncias uma inserção pode ficar para trás: ela aparece como um pulo na sequência, e aí busca o que falta.
+                if (hasSequenceGap(lastKnown, message.sequence)) catchUp(lastKnown)
+                markRead(message)
             }
             is ChatEvent.MessageChanged -> replaceOrAppend(event.message.toMessage(myId))
             else -> Unit
         }
     }
 
-    private fun onTyping(userId: String, started: Boolean) {
-        if (userId == myId) return
-        typingTimeouts.remove(userId)?.cancel()
-        live.value = live.value.copy(typing = if (started) live.value.typing + userId else live.value.typing - userId)
-        if (started) typingTimeouts[userId] = viewModelScope.launch {
-            // Sem renovação, o aviso some sozinho, mesmo que o "parou de digitar" se perca.
-            delay(TYPING_EXPIRE_MILLIS)
-            live.value = live.value.copy(typing = live.value.typing - userId)
+    private fun onRecovered(dto: MessageDto) {
+        val message = dto.toMessage(myId)
+        replaceOrAppend(message)
+        markRead(message)
+    }
+
+    /** Busca o que foi publicado depois de [after], quando uma mensagem ao vivo chegou com a sequência pulada. */
+    private fun catchUp(after: Int) {
+        viewModelScope.launch {
+            val missed = repository.messagesSince(remote(), after) as? ApiResult.Success ?: return@launch
+            missed.data.forEach(::replaceOrAppend)
         }
     }
 
-    /** Busca o que foi publicado depois da última mensagem conhecida, depois de uma queda da conexão. */
-    private fun catchUp() {
-        val last = currentMessages().maxOfOrNull { it.sequence } ?: return
-        viewModelScope.launch {
-            val missed = repository.messagesSince(remote(), last) as? ApiResult.Success ?: return@launch
-            missed.data.forEach(::replaceOrAppend)
+    private fun markRead(message: ChatMessage) {
+        if (!message.mine && message.sequence > 0) scheduleRead(message.sequence)
+    }
+
+    private var readJob: Job? = null
+    private var pendingRead = 0
+
+    /**
+     * Junta uma rajada de mensagens numa leitura só: espera um instante sem novidade e marca como lida a maior sequência vista. Se a
+     * tela fechar nesse instante, a marcação se perde e a lista mostra a mensagem como não lida até a próxima abertura.
+     */
+    private fun scheduleRead(sequence: Int) {
+        pendingRead = maxOf(pendingRead, sequence)
+        readJob?.cancel()
+        readJob = viewModelScope.launch {
+            delay(READ_DEBOUNCE_MILLIS)
+            repository.conversationState(remote(), lastReadSequence = pendingRead)
         }
     }
 
@@ -500,7 +523,7 @@ class ChatViewModel @Inject constructor(
 
 private const val TYPING_RENEW_MILLIS = 3_000L
 private const val TYPING_IDLE_MILLIS = 4_000L
-private const val TYPING_EXPIRE_MILLIS = 8_000L
+private const val READ_DEBOUNCE_MILLIS = 500L
 
 /** Texto curto para o resultado de uma ação da conversa. */
 internal fun ChatAction.message(resources: android.content.res.Resources): String = when (this) {

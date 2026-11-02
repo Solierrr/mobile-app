@@ -165,6 +165,13 @@ private fun ConversationDto.messageType(): String = when (conversationType) {
     else -> "USER_TO_USER"
 }
 
+/** A conversa como linha da lista, com a prévia da última mensagem que o servidor já manda na projeção. */
+internal fun ConversationDto.toListConversation(currentUserId: String?, names: Map<String, String> = emptyMap()): Conversation {
+    val conversation = toConversation(currentUserId, names)
+    val last = lastMessage ?: return conversation
+    return conversation.copy(preview = previewText(last.content.orEmpty(), last.deleted, last.senderId, currentUserId))
+}
+
 /** Na conversa direta, a outra pessoa: quem participa e não sou eu. */
 internal fun ConversationDto.otherParticipant(me: String?): String? =
     if (conversationType == "DIRECT") participantIds.firstOrNull { it != me } else null
@@ -184,6 +191,8 @@ internal fun ConversationDto.toConversation(me: String? = null, names: Map<Strin
         group = conversationType == "GROUP",
         assistant = conversationType == "CHAT_BOT",
         threadId = (userDetails?.get("threadId") as? kotlinx.serialization.json.JsonPrimitive)?.content,
+        participants = participantIds.map(String::lowercase).toSet(),
+        activityAt = lastInteractionAt,
         participantNames = names.filterKeys { it in participantIds },
     )
 }

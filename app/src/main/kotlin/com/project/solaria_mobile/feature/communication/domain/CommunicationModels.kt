@@ -11,6 +11,10 @@ data class Conversation(val id: String, val initials: String, val name: String, 
     val geo: Boolean = false,
     /** Identificador da sessão no ai-assistant, guardado pela conversa em `userDetails.threadId`. */
     val threadId: String? = null,
+    /** Participantes pelo identificador de login, em minúsculas; vazio quando o servidor não informa. */
+    val participants: Set<String> = emptySet(),
+    /** Data ISO da última interação, como o servidor a manda; ordena a lista quando chega uma atualização ao vivo. */
+    val activityAt: String? = null,
     /** Nome de quem participa, por `authId`, quando foi possível resolver; usado nos remetentes de grupo e em "digitando". */
     val participantNames: Map<String, String> = emptyMap())
 

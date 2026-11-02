@@ -17,7 +17,7 @@ import javax.inject.Singleton
 @Singleton
 class FakeCommunicationRepository @Inject constructor() : CommunicationRepository, com.project.solaria_mobile.feature.communication.domain.ServiceCallRepository {
     private val baseConversations = listOf(
-        Conversation("c1", "RD", "Ricardo Dostoiévski", "O Will Smith, aquela lá do holiud", "17:40", AvatarTone.ORANGE),
+        Conversation("c1", "RD", "Ricardo Dostoiévski", "O Will Smith, aquela lá do holiud", "17:40", AvatarTone.ORANGE, participants = setOf("ana")),
         Conversation("c2", "AM", "Alexandre de Moraes", "Tu vai apagar agora aquela mensagem?", "16:32", AvatarTone.BLUE),
         Conversation("c3", "BB", "Bruce Banner", "Cara, minha mão deu até hoje slk", "16:20", AvatarTone.GREEN),
         Conversation("c4", "AS", "Anthony Stark", "mas o thanos é um filho da mãe", "Há 20 dias", AvatarTone.ORANGE),

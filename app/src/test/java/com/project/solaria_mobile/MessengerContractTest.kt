@@ -20,6 +20,7 @@ import com.project.solaria_mobile.feature.communication.data.GroupCreationDto
 import com.project.solaria_mobile.feature.communication.data.MessageDto
 import com.project.solaria_mobile.feature.communication.data.MessengerApi
 import com.project.solaria_mobile.feature.communication.data.ParticipantNames
+import com.project.solaria_mobile.feature.communication.data.PresenceState
 import com.project.solaria_mobile.feature.communication.data.RemoteCommunicationRepository
 import com.project.solaria_mobile.feature.communication.data.testOutbox
 import com.project.solaria_mobile.feature.communication.domain.AvatarTone
@@ -33,6 +34,7 @@ import java.util.Base64
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runCurrent
@@ -173,9 +175,11 @@ class ChatNamesAndRemovalTest {
     @get:Rule val mainDispatcher = MainDispatcherRule()
 
     private class FakeRealtime : ChatRealtime {
-        val events = MutableSharedFlow<ChatEvent>(extraBufferCapacity = 16)
+        override val events = MutableSharedFlow<ChatEvent>(extraBufferCapacity = 16)
+        val typingState = MutableStateFlow<Map<String, Set<String>>>(emptyMap())
         override val connected: Flow<Boolean> = flowOf(true)
-        override fun conversationEvents(conversationId: String): Flow<ChatEvent> = events
+        override val presence: Flow<PresenceState> = flowOf(PresenceState())
+        override val typingByConversation: Flow<Map<String, Set<String>>> = typingState
         override suspend fun typing(conversationId: String, started: Boolean) = Unit
     }
 
@@ -195,7 +199,7 @@ class ChatNamesAndRemovalTest {
         viewModel.uiState.test {
             advanceUntilIdle()
             realtime.events.emit(ChatEvent.MessageCreated(MessageDto("live-1", "g1", "ana", "oi", "2026-10-20T09:00:00Z", 50)))
-            realtime.events.emit(ChatEvent.Typing("ana", true))
+            realtime.typingState.value = mapOf("g1" to setOf("ana"))
             runCurrent()
             val state = (expectMostRecentItem() as UiState.Content).data
             assertEquals("Ana Souza", state.messages.single { it.id == "live-1" }.senderName)

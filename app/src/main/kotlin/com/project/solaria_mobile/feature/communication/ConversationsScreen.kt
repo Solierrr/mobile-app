@@ -59,10 +59,11 @@ fun ConversationsRoute(
     onStartConversation: () -> Unit = {},
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
-    // Ao voltar de uma conversa, recarrega para refletir envio, edição, exclusão e arquivamento; a primeira abertura já carrega no ViewModel.
+    // Com o tempo real ligado a lista já reflete envio, edição, exclusão e arquivamento; ao voltar só lê de novo se ele estava fora.
+    // A primeira abertura já carrega no ViewModel.
     var returning by remember { mutableStateOf(false) }
     LifecycleResumeEffect(viewModel) {
-        if (returning) viewModel.load() else returning = true
+        if (returning) viewModel.onResume() else returning = true
         onPauseOrDispose {}
     }
     val title = stringResource(if (assistant) R.string.as_assistente else R.string.pd_conversas)
@@ -104,21 +105,21 @@ fun ConversationsScreen(
                         icon = if (assistant) AppIcons.sparkles else AppIcons.messages_square,
                         actions = if (state.query.isNotBlank()) { { PrimaryButton(stringResource(R.string.settings_clear_search), { onQueryChange("") }, secondary = true, compact = true) } } else null,
                     ) } }
-            items(state.conversations) { item ->
-                ConversationRow(item = item, onClick = { onOpenChat(item.id) })
+            items(state.conversations, key = { it.id }) { item ->
+                ConversationRow(item = item, online = item.id in state.online, typing = item.id in state.typing, onClick = { onOpenChat(item.id) })
             }
         }
     }
 }
 
 @Composable
-private fun ConversationRow(item: Conversation, onClick: () -> Unit) {
+private fun ConversationRow(item: Conversation, online: Boolean, typing: Boolean, onClick: () -> Unit) {
     ListRow(
         title = item.name.ifBlank { stringResource(R.string.as_sessao) },
         supporting = if (item.geo) stringResource(R.string.geo_assistente) else null,
-        subtitle = item.preview,
+        subtitle = if (typing) stringResource(R.string.ch_digitando) else item.preview,
         onClick = onClick,
-        leading = { Avatar(item.initials, color = item.tone.toColor(), textColor = item.tone.toContentColor(), placeholderIcon = if (item.geo) AppIcons.globe else if (item.assistant) AppIcons.sparkles_filled else if (item.group) AppIcons.group_silhouette else AppIcons.user_silhouette) },
+        leading = { Avatar(item.initials, online = online, color = item.tone.toColor(), textColor = item.tone.toContentColor(), placeholderIcon = if (item.geo) AppIcons.globe else if (item.assistant) AppIcons.sparkles_filled else if (item.group) AppIcons.group_silhouette else AppIcons.user_silhouette) },
         trailing = {
             Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(Spacing.xxs)) {
                 Text(item.time, color = if (item.unread > 0) AppTheme.colors.brandStrong else AppTheme.colors.onSurfaceMuted, style = androidx.compose.material3.MaterialTheme.typography.labelMedium)

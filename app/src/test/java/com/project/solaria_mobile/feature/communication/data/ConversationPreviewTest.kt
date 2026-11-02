@@ -27,6 +27,7 @@ class ConversationPreviewTest {
                 else -> throw IOException("sem rede")
             }
         }
+        override suspend fun updates(since: Long?, limit: Int) = MessageUpdatesDto()
         override suspend fun direct(body: DirectConversationRequest) = ConversationDto("direct")
         override suspend fun send(body: SendMessageRequest) = MessageDto("m", body.conversationId, content = body.content)
         override suspend fun editMessage(id: String, body: EditMessageRequest) = MessageDto(id, "c1", content = body.content, edited = true)

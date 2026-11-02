@@ -72,12 +72,15 @@ internal object MockChatSeed {
         ```
     """.trimIndent()
 
+    /** Os outros participantes de uma conversa, que são quem a presença da demonstração descreve. */
+    private fun others(conversationId: String): List<String> = presence[conversationId].orEmpty().keys.toList()
+
     fun conversations(now: OffsetDateTime): List<ConversationDto> = listOf(
-        ConversationDto(CONVERSATION_ANA, "USER", names.getValue(ANA), now.minusMinutes(25).toString()),
-        ConversationDto(CONVERSATION_TEAM, "GROUP", "Equipe de demonstração", now.minusMinutes(50).toString()),
-        ConversationDto(CONVERSATION_RAFAEL, "USER", names.getValue(RAFAEL), now.minusDays(2).toString()),
-        ConversationDto(CONVERSATION_MARINA, "USER", names.getValue(MARINA), now.minusHours(3).toString()),
-        ConversationDto(CONVERSATION_EMPTY, "USER", names.getValue(BEATRIZ), now.minusDays(9).toString()),
+        ConversationDto(CONVERSATION_ANA, "USER", names.getValue(ANA), now.minusMinutes(25).toString(), participantIds = others(CONVERSATION_ANA)),
+        ConversationDto(CONVERSATION_TEAM, "GROUP", "Equipe de demonstração", now.minusMinutes(50).toString(), participantIds = others(CONVERSATION_TEAM)),
+        ConversationDto(CONVERSATION_RAFAEL, "USER", names.getValue(RAFAEL), now.minusDays(2).toString(), participantIds = others(CONVERSATION_RAFAEL)),
+        ConversationDto(CONVERSATION_MARINA, "USER", names.getValue(MARINA), now.minusHours(3).toString(), participantIds = others(CONVERSATION_MARINA)),
+        ConversationDto(CONVERSATION_EMPTY, "USER", names.getValue(BEATRIZ), now.minusDays(9).toString(), participantIds = others(CONVERSATION_EMPTY)),
         // Sessão do assistente: a conversa guarda o identificador da sessão em `userDetails.threadId`, como o ai-assistant faz.
         ConversationDto(
             CONVERSATION_ASSISTANT, "CHAT_BOT", null, now.minusDays(1).toString(),
