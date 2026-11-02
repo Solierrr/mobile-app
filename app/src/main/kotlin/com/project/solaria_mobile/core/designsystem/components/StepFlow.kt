@@ -19,8 +19,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -73,16 +71,15 @@ fun StepProgress(step: Int, total: Int, furthest: Int, onSelect: (Int) -> Unit, 
  * botões de baixo ficam fixos. O último passo troca "Continuar" por [finishLabel], e [onContinue] valida o passo antes de
  * avançar.
  *
- * - [stepTitles]: o título da tela é o nome do passo em vez de [title].
- * - [showStepLabel]: mostra "Passo X de N · nome" sob a barra.
- * - [bottomBack]: mostra o botão "Voltar" embaixo; sem ele, só a seta do topo volta.
+ * O título da tela é o nome do passo e só a seta do topo volta, como no onboarding; não há texto "Passo X de N" nem
+ * botão "Voltar" embaixo.
+ *
  * - [canExit]: permite sair no primeiro passo. Sem isso, o primeiro passo não tem seta nem aceita o botão voltar do
  *   sistema (fluxos obrigatórios); a partir do segundo, a seta volta um passo.
  * - [confirmExit]: ao sair no primeiro passo, pede confirmação para não perder o que foi digitado.
  */
 @Composable
 fun StepFlow(
-    title: String,
     steps: List<String>,
     step: Int,
     onStepChange: (Int) -> Unit,
@@ -94,9 +91,6 @@ fun StepFlow(
     busy: Boolean = false,
     canFinish: Boolean = true,
     confirmExit: Boolean = false,
-    stepTitles: Boolean = false,
-    showStepLabel: Boolean = true,
-    bottomBack: Boolean = true,
     canExit: Boolean = true,
     footer: (@Composable ColumnScope.() -> Unit)? = null,
     content: @Composable ColumnScope.(Int) -> Unit,
@@ -124,13 +118,8 @@ fun StepFlow(
                 Modifier.fillMaxWidth().padding(horizontal = Spacing.screen).padding(top = Spacing.screenTop),
                 verticalArrangement = Arrangement.spacedBy(Spacing.sm),
             ) {
-                ScreenTitle(if (stepTitles) steps[step] else title, if (step > 0 || canExit) back else null)
+                ScreenTitle(steps[step], if (step > 0 || canExit) back else null)
                 StepProgress(step, steps.size, furthest, { if (!busy) onStepChange(it) })
-                if (showStepLabel) Text(
-                    stringResource(R.string.step_flow_step_label, step + 1, steps.size, steps[step]),
-                    color = AppTheme.colors.onSurfaceMuted,
-                    style = MaterialTheme.typography.bodyMedium,
-                )
             }
             Column(
                 Modifier.fillMaxWidth().padding(horizontal = Spacing.screen).padding(vertical = Spacing.md),
@@ -146,7 +135,6 @@ fun StepFlow(
         ) {
             footer?.invoke(this)
             Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm), verticalAlignment = Alignment.CenterVertically) {
-                if (bottomBack && step > 0) AppButton(stringResource(R.string.common_back), { onStepChange(step - 1) }, Modifier.weight(1f), variant = ButtonVariant.Secondary, enabled = !busy)
                 AppButton(
                     text = if (last) finishLabel else stringResource(R.string.common_continue),
                     onClick = { if (last) onFinish() else if (onContinue(step)) onStepChange(step + 1) },
