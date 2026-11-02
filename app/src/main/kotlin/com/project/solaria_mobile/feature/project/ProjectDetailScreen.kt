@@ -42,6 +42,7 @@ import androidx.compose.ui.unit.dp
 import com.project.solaria_mobile.core.designsystem.icons.AppIcons
 import com.project.solaria_mobile.core.designsystem.components.ActionRow
 import com.project.solaria_mobile.core.designsystem.components.RemoteImage
+import com.project.solaria_mobile.core.designsystem.components.MissingImage
 import com.project.solaria_mobile.core.designsystem.components.AppDialog
 import com.project.solaria_mobile.core.designsystem.components.RoundIconButton
 import com.project.solaria_mobile.core.designsystem.components.ScreenTitle
@@ -58,10 +59,7 @@ import com.project.solaria_mobile.feature.project.domain.ProjectSummary
 import com.project.solaria_mobile.core.designsystem.components.SkeletonGroup
 import com.project.solaria_mobile.core.designsystem.components.SkeletonText
 import com.project.solaria_mobile.core.designsystem.theme.Sizing
-import androidx.compose.material3.Icon
-import androidx.compose.ui.res.painterResource
 import androidx.compose.foundation.layout.size
-import androidx.compose.ui.Alignment
 import androidx.compose.runtime.saveable.rememberSaveable
 import com.project.solaria_mobile.core.designsystem.components.SheetSize
 import com.project.solaria_mobile.core.designsystem.components.rememberSheetState
@@ -131,6 +129,10 @@ fun ProjectDetailScreen(
             .background(AppTheme.colors.surface)
             .verticalScroll(rememberScrollState()),
     ) {
+        var coverFailed by remember { mutableStateOf(false) }
+        // Sem imagem na capa, os botões ficam sólidos em vez de translúcidos, que sumiriam no fundo claro.
+        val noCover = coverFailed || (coverId == null && photosState !is UiState.Loading)
+        val coverButton = if (noCover) AppTheme.colors.surface else AppTheme.colors.surface.copy(alpha = 0.86f)
         Box(modifier = Modifier.fillMaxWidth().height(Sizing.coverHeight)) {
             if (coverId != null) {
                 RemoteImage(
@@ -138,12 +140,11 @@ fun ProjectDetailScreen(
                     load = sections::photoContent,
                     description = project.name,
                     modifier = Modifier.fillMaxSize(),
+                    onMissing = { coverFailed = it },
                 )
             } else {
                 if (photosState is UiState.Loading) Skeleton(Modifier.fillMaxSize())
-                else Box(Modifier.fillMaxSize().background(AppTheme.colors.mapPlaceholder), contentAlignment = Alignment.Center) {
-                    Icon(painterResource(AppIcons.images), stringResource(R.string.pd_sem_imagem_cadastrada), Modifier.size(Sizing.icon * 1.5f), tint = AppTheme.colors.onSurfaceSubtle)
-                }
+                else MissingImage(Modifier.fillMaxSize())
             }
             Row(
                 modifier = Modifier
@@ -152,10 +153,11 @@ fun ProjectDetailScreen(
                     .padding(top = Spacing.lg),
                 horizontalArrangement = Arrangement.SpaceBetween,
             ) {
-                RoundIconButton(AppIcons.chevron_left, stringResource(R.string.common_back), onBack, background = AppTheme.colors.surface.copy(alpha = 0.86f))
+                RoundIconButton(AppIcons.chevron_left, stringResource(R.string.common_back), onBack, background = coverButton)
                 Row(horizontalArrangement = Arrangement.spacedBy(Spacing.xs)) {
-                    RefreshButton(onRefresh, resource?.refreshing == true, stringResource(R.string.pd_atualizar_projeto))
-                    RoundIconButton(AppIcons.ellipsis, stringResource(R.string.pd_mais_opcoes), { onClearAction(); menuStep = MenuStep.MAIN; menuOpen = true })
+                    // Sobre a foto os dois ficam no cinza padrão; sem foto, sólidos como o de voltar.
+                    RefreshButton(onRefresh, resource?.refreshing == true, stringResource(R.string.pd_atualizar_projeto), background = if (noCover) coverButton else AppTheme.colors.inputFill)
+                    RoundIconButton(AppIcons.ellipsis, stringResource(R.string.pd_mais_opcoes), { onClearAction(); menuStep = MenuStep.MAIN; menuOpen = true }, background = if (noCover) coverButton else AppTheme.colors.inputFill)
                 }
             }
         }

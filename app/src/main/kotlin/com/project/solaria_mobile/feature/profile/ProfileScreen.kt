@@ -37,8 +37,10 @@ import androidx.compose.ui.text.style.TextOverflow
 import com.project.solaria_mobile.core.designsystem.icons.AppIcons
 import com.project.solaria_mobile.core.designsystem.components.ActionRow
 import com.project.solaria_mobile.core.designsystem.components.AvatarPalette
-import com.project.solaria_mobile.core.designsystem.components.ExpressiveShapes
 import com.project.solaria_mobile.core.designsystem.theme.Sizing
+import com.project.solaria_mobile.core.designsystem.components.MissingImage
+import com.project.solaria_mobile.core.designsystem.components.MorphingShapeHost
+import com.project.solaria_mobile.core.designsystem.components.StateNotice
 import com.project.solaria_mobile.core.designsystem.components.RemoteImage
 import com.project.solaria_mobile.core.designsystem.components.RoundIconButton
 import com.project.solaria_mobile.core.images.ImageLoaderViewModel
@@ -101,18 +103,22 @@ fun ProfileScreen(
     val editSheetState = rememberSheetState()
 
     Column(modifier = Modifier.fillMaxSize().background(AppTheme.colors.surface).verticalScroll(rememberScrollState())) {
+        var bannerFailed by remember { mutableStateOf(false) }
+        val noBanner = profile.bannerUrl == null || loadImage == null || bannerFailed
+        // Sem imagem, o botão padrão tem a mesma cor do fundo e some; por isso fica sólido.
+        val bannerButton = if (noBanner) AppTheme.colors.surface else AppTheme.colors.inputFill
         Box(modifier = Modifier.fillMaxWidth().height(Sizing.profileBannerHeight).background(AppTheme.colors.inputFill)) {
             if (profile.bannerUrl != null && loadImage != null) {
-                RemoteImage(profile.bannerUrl, loadImage, null, Modifier.fillMaxSize())
-            }
+                RemoteImage(profile.bannerUrl, loadImage, null, Modifier.fillMaxSize(), onMissing = { bannerFailed = it })
+            } else MissingImage(Modifier.fillMaxSize(), AppTheme.colors.inputFill)
             Row(
                 modifier = Modifier.fillMaxWidth().padding(horizontal = Spacing.screen).padding(top = Spacing.lg),
                 horizontalArrangement = Arrangement.SpaceBetween,
             ) {
-                RoundIconButton(AppIcons.chevron_left, stringResource(R.string.common_back), onBack)
+                RoundIconButton(AppIcons.chevron_left, stringResource(R.string.common_back), onBack, background = bannerButton)
                 Row(horizontalArrangement = Arrangement.spacedBy(Spacing.xs)) {
-                    if (self) RoundIconButton(AppIcons.pencil, stringResource(R.string.pf_editar_perfil), { onEditOpen(); editOpen = true })
-                    RoundIconButton(AppIcons.info, stringResource(R.string.pf_ver_informacoes), onClick = { infoOpen = true })
+                    if (self) RoundIconButton(AppIcons.pencil, stringResource(R.string.pf_editar_perfil), { onEditOpen(); editOpen = true }, background = bannerButton)
+                    RoundIconButton(AppIcons.info, stringResource(R.string.pf_ver_informacoes), onClick = { infoOpen = true }, background = bannerButton)
                 }
             }
         }
@@ -121,7 +127,9 @@ fun ProfileScreen(
             verticalArrangement = Arrangement.spacedBy(Spacing.md),
         ) {
             Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm), verticalAlignment = Alignment.CenterVertically) {
-                Avatar(profile.initials, size = Sizing.avatarLarge, color = AvatarPalette(if (self) 0 else 1), imageUrl = profile.avatarUrl, loadImage = loadImage, shape = if (self) ExpressiveShapes.cookie else ExpressiveShapes.clover)
+                MorphingShapeHost { shape ->
+                    Avatar(profile.initials, size = Sizing.avatarLarge, color = AvatarPalette(if (self) 0 else 1), imageUrl = profile.avatarUrl, loadImage = loadImage, shape = shape)
+                }
                 Column(modifier = Modifier.weight(1f)) {
                     Text(profile.name, color = AppTheme.colors.onSurface, style = androidx.compose.material3.MaterialTheme.typography.headlineMedium, maxLines = 2, overflow = TextOverflow.Ellipsis)
                     if (profile.handle.isNotBlank()) {
@@ -147,9 +155,7 @@ fun ProfileScreen(
     if (infoOpen) {
         BottomSheet(onDismiss = { infoOpen = false }, state = sheetState) {
             Column(modifier = Modifier.fillMaxWidth().padding(horizontal = Spacing.screen).padding(top = Spacing.sm, bottom = Spacing.screenBottom), verticalArrangement = Arrangement.spacedBy(Spacing.md)) {
-                Text(profile.name, color = AppTheme.colors.onSurface, style = androidx.compose.material3.MaterialTheme.typography.headlineMedium)
-                Text(stringResource(R.string.pf_perfil_publico), color = AppTheme.colors.onSurfaceMuted, style = androidx.compose.material3.MaterialTheme.typography.bodyMedium)
-                ProfileInfoFields(profile, state.stats, full = true)
+                ProfileInfoContent(profile, state.stats, self)
             }
         }
     }
@@ -164,6 +170,23 @@ fun ProfileScreen(
         }
     }
 }
+
+/** Conteúdo da sheet de informações: nome e dados, ou só o aviso quando a pessoa não compartilhou nada. */
+@Composable
+private fun ProfileInfoContent(profile: UserProfile, stats: ProfileStats?, self: Boolean) {
+    if (profile.hasInfo(stats)) {
+        Text(profile.name, color = AppTheme.colors.onSurface, style = androidx.compose.material3.MaterialTheme.typography.headlineMedium)
+        ProfileInfoFields(profile, stats, full = true)
+    } else StateNotice(
+        stringResource(R.string.pf_sem_informacoes),
+        stringResource(if (self) R.string.pf_sem_informacoes_propria else R.string.pf_sem_informacoes_outra_pessoa),
+        icon = AppIcons.info,
+    )
+}
+
+/** Se há algo para mostrar na sheet de informações: um dado do perfil ou a quantidade de projetos ou conexões. */
+private fun UserProfile.hasInfo(stats: ProfileStats?): Boolean =
+    occupation.isNotBlank() || affiliation.isNotBlank() || phone.isNotBlank() || email.isNotBlank() || stats?.projects != null || stats?.connections != null
 
 /**
  * As informações do perfil, cada uma só aparece se o valor existir. A página mostra o essencial (profissão, telefone e

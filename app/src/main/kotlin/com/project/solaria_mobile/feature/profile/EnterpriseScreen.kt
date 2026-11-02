@@ -16,7 +16,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -28,7 +27,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalUriHandler
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -38,6 +36,10 @@ import com.project.solaria_mobile.core.designsystem.components.Avatar
 import com.project.solaria_mobile.core.designsystem.components.PrimaryButton
 import com.project.solaria_mobile.core.designsystem.components.RefreshButton
 import com.project.solaria_mobile.core.designsystem.components.RemoteImage
+import com.project.solaria_mobile.core.designsystem.components.MissingImage
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import com.project.solaria_mobile.core.designsystem.components.ResourceStatus
 import com.project.solaria_mobile.core.designsystem.components.RoundIconButton
 import com.project.solaria_mobile.core.designsystem.components.ScreenTitle
@@ -85,22 +87,21 @@ fun EnterpriseRoute(
         val resource = state as? UiState.Content
         val webUrl = companyWebUrl(BuildConfig.WEB_BASE_URL, company.slug)
         Column(Modifier.fillMaxSize().background(AppTheme.colors.surface).verticalScroll(rememberScrollState())) {
+            var coverFailed by remember { mutableStateOf(false) }
+            // Sem imagem na capa, os botões ficam sólidos em vez de translúcidos, que sumiriam no fundo claro.
+            val coverButton = if (company.bannerUrl == null || coverFailed) AppTheme.colors.surface else AppTheme.colors.surface.copy(alpha = 0.86f)
             Box(Modifier.fillMaxWidth().height(Sizing.coverHeight)) {
                 if (company.bannerUrl != null) {
-                    RemoteImage(key = company.bannerUrl, load = images::bytes, description = "Capa de ${company.name}", modifier = Modifier.fillMaxSize())
-                } else {
-                    Box(Modifier.fillMaxSize().background(AppTheme.colors.mapPlaceholder), contentAlignment = Alignment.Center) {
-                        Icon(painterResource(AppIcons.building), stringResource(R.string.en_sem_capa_cadastrada), Modifier.size(Sizing.icon * 1.5f), tint = AppTheme.colors.onSurfaceSubtle)
-                    }
-                }
+                    RemoteImage(key = company.bannerUrl, load = images::bytes, description = "Capa de ${company.name}", modifier = Modifier.fillMaxSize(), onMissing = { coverFailed = it })
+                } else MissingImage(Modifier.fillMaxSize())
                 Row(
                     Modifier.fillMaxWidth().padding(horizontal = Spacing.screen).padding(top = Spacing.lg),
                     horizontalArrangement = Arrangement.SpaceBetween,
                 ) {
-                    RoundIconButton(AppIcons.chevron_left, stringResource(R.string.common_back), onBack, background = AppTheme.colors.surface.copy(alpha = 0.86f))
+                    RoundIconButton(AppIcons.chevron_left, stringResource(R.string.common_back), onBack, background = coverButton)
                     Row(horizontalArrangement = Arrangement.spacedBy(Spacing.xs)) {
-                        if (webUrl != null) RoundIconButton(AppIcons.globe, stringResource(R.string.en_abrir_a_pagina_da_empresa), { uriHandler.openUri(webUrl) }, background = AppTheme.colors.surface.copy(alpha = 0.86f))
-                        RefreshButton(viewModel::load, resource?.refreshing == true, stringResource(R.string.en_atualizar_empresa), background = AppTheme.colors.surface.copy(alpha = 0.86f))
+                        if (webUrl != null) RoundIconButton(AppIcons.globe, stringResource(R.string.en_abrir_a_pagina_da_empresa), { uriHandler.openUri(webUrl) }, background = coverButton)
+                        RefreshButton(viewModel::load, resource?.refreshing == true, stringResource(R.string.en_atualizar_empresa), background = coverButton)
                     }
                 }
             }
