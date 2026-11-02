@@ -43,7 +43,8 @@ import com.project.solaria_mobile.core.designsystem.components.ActionRow
 import com.project.solaria_mobile.core.designsystem.components.ResourceStatus
 import com.project.solaria_mobile.core.designsystem.components.RoundIconButton
 import com.project.solaria_mobile.core.designsystem.components.SearchField
-import com.project.solaria_mobile.core.designsystem.components.SegmentedControl
+import com.project.solaria_mobile.core.designsystem.components.BottomSheet
+import com.project.solaria_mobile.core.designsystem.components.LocalSheetDismiss
 import com.project.solaria_mobile.core.designsystem.components.StateNotice
 import com.project.solaria_mobile.core.designsystem.components.userMessage
 import com.project.solaria_mobile.core.designsystem.icons.AppIcons
@@ -78,9 +79,9 @@ internal fun MapProjectPanel(state: MapUiState, resource: UiState.Content<*>?, s
     onOpen: (String) -> Unit, onDirections: (ProjectSummary) -> Unit, onExpand: () -> Unit,
     expanded: Boolean, onTogglePanel: () -> Unit, onAssistant: (ProjectSummary) -> Unit = {}) {
     var query by rememberSaveable { mutableStateOf("") }
-    var savedOnly by rememberSaveable { mutableStateOf(false) }
-    val filtered = state.projects.filter { (!savedOnly || it.id in saved) &&
-        "${it.name} ${it.address} ${it.companyName}".contains(query.trim(), ignoreCase = true) }
+    var savedOpen by rememberSaveable { mutableStateOf(false) }
+    val filtered = state.projects.filter { "${it.name} ${it.address} ${it.companyName}".contains(query.trim(), ignoreCase = true) }
+    if (savedOpen) SavedLocationsSheet(state.projects.filter { it.id in saved }, onSelect, onDismiss = { savedOpen = false })
     LazyColumn(Modifier.fillMaxWidth().heightIn(max = (LocalConfiguration.current.screenHeightDp * .6f).dp),
         contentPadding = PaddingValues(start = Spacing.screen, end = Spacing.screen, bottom = Spacing.screenBottom),
         verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
@@ -90,11 +91,11 @@ internal fun MapProjectPanel(state: MapUiState, resource: UiState.Content<*>?, s
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(Spacing.xxs)) {
                     Text(selected?.name ?: stringResource(R.string.pl_seus_projetos), style = MaterialTheme.typography.headlineSmall, color = AppTheme.colors.onSurface,
                         maxLines = 2, overflow = TextOverflow.Ellipsis)
-                    Text(selected?.address?.ifBlank { stringResource(R.string.onboarding_review_no_address) } ?: if (savedOnly) stringResource(R.string.mp_locais_salvos_neste_aparelho) else stringResource(R.string.mp_seus_locais_em_um_so),
+                    Text(selected?.address?.ifBlank { stringResource(R.string.onboarding_review_no_address) } ?: stringResource(R.string.mp_seus_locais_em_um_so),
                         style = MaterialTheme.typography.bodyMedium, color = AppTheme.colors.onSurfaceMuted, maxLines = 2, overflow = TextOverflow.Ellipsis)
                 }
                 if (selected != null) RoundIconButton(AppIcons.x, stringResource(R.string.mp_fechar_projeto_e_voltar_a), onClose)
-                else RoundIconButton(AppIcons.chevron_up, if (expanded) stringResource(R.string.mp_recolher_painel) else stringResource(R.string.mp_abrir_painel), onTogglePanel,
+                else if (state.projects.isNotEmpty()) RoundIconButton(AppIcons.chevron_up, if (expanded) stringResource(R.string.mp_recolher_painel) else stringResource(R.string.mp_abrir_painel), onTogglePanel,
                     Modifier.rotate(if (expanded) 180f else 0f))
             }
             if (selected != null) {
@@ -127,13 +128,14 @@ internal fun MapProjectPanel(state: MapUiState, resource: UiState.Content<*>?, s
                 AppButton(stringResource(R.string.mp_tracar_rota), { onDirections(selected) }, Modifier.fillMaxWidth(), variant = ButtonVariant.Secondary, size = ButtonSize.Medium, leadingIcon = AppIcons.navigation)
             }
         } else {
-            item { SearchField(stringResource(R.string.mp_buscar_projeto_ou_endereco), query, { query = it; onExpand() }) }
-            item { SegmentedControl(listOf(stringResource(R.string.pl_projetos), stringResource(R.string.mp_salvos)), if (savedOnly) 1 else 0, { savedOnly = it == 1; onExpand() }) }
+            if (state.projects.isNotEmpty()) {
+                item { SearchField(stringResource(R.string.mp_buscar_projeto_ou_endereco), query, { query = it; onExpand() }) }
+                item { ActionRow(stringResource(R.string.mp_locais_salvos_neste_aparelho), AppIcons.bookmark, { savedOpen = true }, trailing = saved.size.takeIf { it > 0 }?.toString(), compact = true) }
+            }
             if (state.projects.isEmpty()) item {
                 StateNotice(stringResource(R.string.mp_nenhum_projeto_por_enquanto), "Os projetos aos quais você tem acesso aparecerão aqui.", icon = AppIcons.map_pin)
             } else if (filtered.isEmpty()) item {
-                StateNotice(if (query.isNotBlank()) stringResource(R.string.pl_nenhum_projeto_encontrado) else stringResource(R.string.mp_seus_locais_ficam_aqui),
-                    if (query.isNotBlank()) stringResource(R.string.mp_tente_outro_nome_ou_endereco) else stringResource(R.string.mp_salve_o_local_pelo_resumo), icon = AppIcons.bookmark)
+                StateNotice(stringResource(R.string.pl_nenhum_projeto_encontrado), stringResource(R.string.mp_tente_outro_nome_ou_endereco), icon = AppIcons.search)
             }
             items(filtered, key = { it.id }) { project ->
                 ActionRow(project.name, AppIcons.map_pin, { onSelect(project.id) },
@@ -145,3 +147,22 @@ internal fun MapProjectPanel(state: MapUiState, resource: UiState.Content<*>?, s
 }
 
 private val PANEL_PHOTO_HEIGHT = 160.dp
+
+/** Locais salvos neste aparelho; tocar em um fecha a folha e seleciona o projeto no mapa. */
+@Composable
+private fun SavedLocationsSheet(projects: List<ProjectSummary>, onSelect: (String) -> Unit, onDismiss: () -> Unit) {
+    BottomSheet(onDismiss = onDismiss) {
+        val dismiss = LocalSheetDismiss.current
+        Column(
+            Modifier.fillMaxWidth().padding(horizontal = Spacing.screen).padding(top = Spacing.xs, bottom = Spacing.screenBottom),
+            verticalArrangement = Arrangement.spacedBy(Spacing.sm),
+        ) {
+            Text(stringResource(R.string.mp_locais_salvos_neste_aparelho), color = AppTheme.colors.onSurface, style = MaterialTheme.typography.titleLarge)
+            if (projects.isEmpty()) StateNotice(stringResource(R.string.mp_seus_locais_ficam_aqui), stringResource(R.string.mp_salve_o_local_pelo_resumo), icon = AppIcons.bookmark)
+            else projects.forEach { project ->
+                ActionRow(project.name, AppIcons.map_pin, { dismiss(); onSelect(project.id) },
+                    subtitle = listOf(project.companyName, project.address.ifBlank { stringResource(R.string.onboarding_review_no_address) }).filter { it.isNotBlank() }.joinToString("\n"), compact = true)
+            }
+        }
+    }
+}
