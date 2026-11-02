@@ -399,6 +399,7 @@ class MockApiData internal constructor(private val profileStore: MockProfileStor
         ProjectDto("qa-project-2", "Residencial Ipê", "Modernização do sistema de energia.", "Equipe de demonstração", "qa-company-1", ownerCompanyLogoUrl = "mock-asset:company-logo-1.webp", createdAt = "2026-09-23T12:00:00Z", status = "OPEN", location = location(-23.5614, -46.6559, "São Paulo", "SP", "Pinheiros")),
         ProjectDto("qa-project-3", "Sítio Boa Vista", "Projeto de geração distribuída.", "Equipe de demonstração", "qa-company-2", createdAt = "2026-10-01T12:00:00Z", status = "COMPLETED", location = location(-23.5880, -46.6790, "São Paulo", "SP", "Morumbi")),
     )
+    private val demoProjectIds = projects.map { it.id }.toSet()
     private val people = mutableListOf(
         UserDto("qa-person-1", "Ana Oliveira", username = "ana.oliveira", avatar = "mock-asset:avatar-ana.webp", authId = "qa-person-1"),
         UserDto("qa-person-2", "Rafael Costa", username = "rafael.costa", avatar = "mock-asset:avatar-rafael.webp", authId = "qa-person-2"),
@@ -443,11 +444,13 @@ class MockApiData internal constructor(private val profileStore: MockProfileStor
     private var nextMessage = 1000
     private val selfId = "qa-mock-user"
 
-    /** Conta recém-criada: sem projetos, chamados, conversas, conexões nem notificações, para ver o app vazio. */
+    /** Conta recém-criada: sem os projetos, chamados, conversas, conexões e notificações de demonstração; o que a pessoa cria continua aparecendo. */
     val emptyAccount = kotlinx.coroutines.flow.MutableStateFlow(false)
 
-    @Synchronized fun projects() = if (emptyAccount.value) emptyList() else projects.toList()
-    @Synchronized fun project(id: String) = if (emptyAccount.value) null else projects.firstOrNull { it.id == id }?.copy(role = "OWNER")
+    private fun visibleProjects() = if (emptyAccount.value) projects.filterNot { it.id in demoProjectIds } else projects.toList()
+
+    @Synchronized fun projects() = visibleProjects()
+    @Synchronized fun project(id: String) = visibleProjects().firstOrNull { it.id == id }?.copy(role = "OWNER")
 
     @Synchronized fun createProject(draft: ProjectRequestDto): ProjectDto {
         val id = "qa-project-${nextProject++}"
