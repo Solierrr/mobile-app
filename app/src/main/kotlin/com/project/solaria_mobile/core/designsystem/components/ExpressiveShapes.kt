@@ -9,11 +9,16 @@ import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.graphics.shapes.CornerRounding
 import androidx.graphics.shapes.RoundedPolygon
+import androidx.graphics.shapes.TransformResult
 import androidx.graphics.shapes.rectangle
 import androidx.graphics.shapes.star
 import androidx.graphics.shapes.toPath
 
 private const val HEXAGON_VERTICES = 6
+
+// Medidas do hexágono do Figma já com o contorno externo: lados verticais e pontas arredondadas e suavizadas.
+private const val HEXAGON_ROUNDING = 0.3815f
+private const val HEXAGON_SMOOTHING = 1f
 private const val PENTAGON_VERTICES = 5
 private const val CLOVER_LEAVES = 4
 private const val COOKIE_LOBES = 9
@@ -21,7 +26,9 @@ private const val BURST_POINTS = 12
 private const val SUN_RAYS = 8
 
 object MorphShapes {
-    val hexagon: RoundedPolygon = RoundedPolygon(HEXAGON_VERTICES, rounding = CornerRounding(0.18f)).normalized()
+    val hexagon: RoundedPolygon = RoundedPolygon(HEXAGON_VERTICES, rounding = CornerRounding(HEXAGON_ROUNDING, HEXAGON_SMOOTHING))
+        .transformed { x, y -> TransformResult(-y, x) }
+        .normalized()
     val pentagon: RoundedPolygon = RoundedPolygon(PENTAGON_VERTICES, rounding = CornerRounding(0.2f)).normalized()
     val clover: RoundedPolygon = RoundedPolygon.star(
         CLOVER_LEAVES,

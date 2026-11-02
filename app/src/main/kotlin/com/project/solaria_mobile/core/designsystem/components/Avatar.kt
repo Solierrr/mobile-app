@@ -4,6 +4,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -22,11 +24,16 @@ fun Avatar(
     initials: String,
     modifier: Modifier = Modifier,
     size: Dp = Sizing.avatar,
-    color: Color = AppTheme.colors.secondary,
+    color: Color = AppTheme.colors.inputFill,
     online: Boolean = false,
     shape: Shape = CircleShape,
     imageUrl: String? = null,
     loadImage: (suspend (String) -> ByteArray?)? = null,
+    textColor: Color = AppTheme.colors.onSurface,
+    imageContentScale: ContentScale = ContentScale.Crop,
+    contentPadding: Dp = 0.dp,
+    /** Silhueta no lugar das iniciais, para quem ainda não tem foto: um modelo vazio de usuário. */
+    @androidx.annotation.DrawableRes placeholderIcon: Int? = null,
 ) {
     Box(modifier = modifier.size(size)) {
         Box(
@@ -36,13 +43,16 @@ fun Avatar(
                 .background(color),
             contentAlignment = Alignment.Center,
         ) {
-            Text(
-                text = initials,
-                color = AppTheme.colors.onAccent,
-                style = androidx.compose.material3.MaterialTheme.typography.titleMedium,
-            )
+            val fallback: @Composable () -> Unit = {
+                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    if (placeholderIcon != null) androidx.compose.material3.Icon(androidx.compose.ui.res.painterResource(placeholderIcon), null, Modifier.size(size * 0.6f), tint = textColor)
+                    else Text(initials, color = textColor, style = androidx.compose.material3.MaterialTheme.typography.titleMedium)
+                }
+            }
             if (imageUrl != null && loadImage != null) {
-                RemoteImage(imageUrl, loadImage, null, Modifier.matchParentSize(), placeholder = false)
+                RemoteImage(imageUrl, loadImage, null, Modifier.matchParentSize().padding(contentPadding), contentScale = imageContentScale, placeholder = false, fallback = fallback)
+            } else {
+                fallback()
             }
         }
         if (online) {
@@ -54,16 +64,11 @@ fun Avatar(
                     .background(AppTheme.colors.surface)
                     .padding(2.dp)
                     .clip(CircleShape)
-                    .background(AppTheme.colors.primary),
+                    .background(AppTheme.colors.success),
             )
         }
     }
 }
 
 @Composable
-fun AvatarPalette(index: Int): Color = when (index % 4) {
-    0 -> AppTheme.colors.secondary
-    1 -> AppTheme.colors.info
-    2 -> AppTheme.colors.primary
-    else -> AppTheme.colors.danger
-}
+fun AvatarPalette(index: Int): Color = AppTheme.colors.inputFill

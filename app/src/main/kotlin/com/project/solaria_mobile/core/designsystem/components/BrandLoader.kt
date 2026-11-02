@@ -1,14 +1,18 @@
 package com.project.solaria_mobile.core.designsystem.components
 
 import androidx.compose.foundation.Image
-import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.size
+import android.os.Build
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.BlurredEdgeTreatment
+import androidx.compose.ui.draw.blur
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
@@ -21,9 +25,25 @@ import com.project.solaria_mobile.R
 @Composable
 fun BrandLoader(
     modifier: Modifier = Modifier,
+    rotateShape: Boolean = false,
+    millisPerShape: Int = DEFAULT_MORPH_MILLIS,
 ) {
-    Box(modifier = modifier.aspectRatio(1f), contentAlignment = Alignment.Center) {
-        MorphingHexagon(Modifier.fillMaxSize())
+    BoxWithConstraints(modifier = modifier.aspectRatio(1f), contentAlignment = Alignment.Center) {
+        val shapeHeight = maxWidth * BRAND_SHAPE_SCALE
+        MorphingHexagon(Modifier.fillMaxSize(), rotateShape = rotateShape, millisPerShape = millisPerShape)
+        // A sombra das mãos usa o desfoque do sistema, que existe a partir do Android 12; antes disso as mãos ficam sem sombra.
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            Image(
+                painter = painterResource(R.drawable.ic_hands),
+                contentDescription = null,
+                modifier = Modifier
+                    .fillMaxSize(HANDS_SCALE)
+                    .offset(y = shapeHeight * HANDS_SHADOW_SHIFT)
+                    .blur(shapeHeight * HANDS_SHADOW_BLUR, BlurredEdgeTreatment.Unbounded),
+                contentScale = ContentScale.Fit,
+                colorFilter = ColorFilter.tint(Color.Black.copy(alpha = HANDS_SHADOW_ALPHA)),
+            )
+        }
         Image(
             painter = painterResource(R.drawable.ic_hands),
             contentDescription = null,
@@ -33,20 +53,13 @@ fun BrandLoader(
     }
 }
 
-private const val HANDS_SCALE = 0.52f
+private const val DEFAULT_MORPH_MILLIS = 1400
 
-/** Tamanho proporcional à largura da tela, para a marca ter a mesma presença em qualquer aparelho. */
-@Composable
-fun BrandLoader(
-    widthFraction: Float,
-    modifier: Modifier = Modifier,
-    minSize: Int = MIN_SIZE_DP,
-) {
-    val screenWidth = LocalConfiguration.current.screenWidthDp
-    val side = maxOf((screenWidth * widthFraction).toInt(), minSize).dp
-    BrandLoader(modifier.size(side))
-}
+/** As mãos ocupam 70% da largura do hexágono no Figma. */
+private const val HANDS_SCALE = 0.585f
+private const val HANDS_SHADOW_SHIFT = 0.0175f
+private const val HANDS_SHADOW_BLUR = 0.0436f
+private const val HANDS_SHADOW_ALPHA = 0.1f
 
-const val SPLASH_WIDTH_FRACTION = 0.5f
-const val LOADING_WIDTH_FRACTION = 0.34f
-private const val MIN_SIZE_DP = 96
+/** Tamanho da marca na splash. O vetor `splash_emblem` da splash nativa usa a mesma medida, para não haver salto na troca. */
+val SPLASH_BRAND_SIZE = 180.dp
