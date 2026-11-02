@@ -11,6 +11,7 @@ import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.fillMaxSize
 import com.project.solaria_mobile.core.designsystem.theme.Spacing
@@ -115,7 +116,9 @@ private fun <T> UiStateBody(
         return
     }
     when (state) {
-        is UiState.Content -> content(state.data)
+        // O Crossfade empilha os filhos numa caixa; dentro de uma sheet, o conteúdo em linha precisa de uma coluna para
+        // os itens não ficarem uns sobre os outros.
+        is UiState.Content -> if (inline) Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(Spacing.sm)) { content(state.data) } else content(state.data)
         UiState.Loading -> loading()
         UiState.Empty -> Unit
         is UiState.Error -> {
