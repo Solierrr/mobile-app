@@ -96,7 +96,7 @@ fun SettingsScreen(state: SettingsUiState, onQueryChange: (String) -> Unit, onMo
                         AppSwitchRow("Modo mock", state.mockModeEnabled, onMockModeChange, description = "Usar dados locais sem acessar os serviços de QA.")
                         if (state.mockModeEnabled) {
                             AppSwitchRow("Imagens de demonstração", state.mockImagesEnabled, onMockImagesChange, description = "Fotos de exemplo nas galerias dos projetos. Desligue para testar o estado sem imagens.")
-                            AppSwitchRow("Conta sem projetos", state.mockEmptyAccount, onMockEmptyAccountChange, description = "Simula uma conta nova, para ver o início vazio. Volta ao normal quando o app fecha.")
+                            AppSwitchRow("Conta sem projetos", state.mockEmptyAccount, onMockEmptyAccountChange, description = "Simula uma conta recém-criada, sem projetos, chamados, conversas, conexões nem notificações. Fica ligada até você desligar.")
                         }
                     }
                     group.actions.forEach { action -> ActionRow(stringResource(action.title), action.icon, {

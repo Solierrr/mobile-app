@@ -7,6 +7,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -56,10 +57,14 @@ fun CallsScreen(
     ) {
         ScreenTitle(stringResource(R.string.hm_chamados), onBack, actions = { RefreshButton(onRefresh, resource?.refreshing == true) })
         resource?.let { ResourceStatus(it) }
-        SearchField(stringResource(R.string.cl_buscar_chamado), state.query, onQueryChange)
+        if (state.calls.isNotEmpty() || state.query.isNotBlank()) SearchField(stringResource(R.string.cl_buscar_chamado), state.query, onQueryChange)
         LazyColumn(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-            if (state.calls.isEmpty()) item { StateNotice(stringResource(R.string.cl_nenhum_servico_encontrado), stringResource(R.string.settings_no_results_description)) }
-            item { SectionHeading(stringResource(R.string.cl_recentes), faded = true) }
+            if (state.calls.isEmpty()) item {
+                androidx.compose.foundation.layout.Box(Modifier.fillParentMaxHeight(0.8f).fillMaxWidth(), contentAlignment = androidx.compose.ui.Alignment.Center) {
+                    if (state.query.isBlank()) StateNotice(stringResource(R.string.ui_nada_por_aqui_ainda), stringResource(R.string.cl_nenhum_servico_tecnico_por_enquanto))
+                    else StateNotice(stringResource(R.string.cl_nenhum_servico_encontrado), stringResource(R.string.settings_no_results_description))
+                }
+            } else item { SectionHeading(stringResource(R.string.cl_recentes), faded = true) }
             items(state.calls) { call ->
                 CallCard(call, onClick = { onOpenCall(call.id) })
             }

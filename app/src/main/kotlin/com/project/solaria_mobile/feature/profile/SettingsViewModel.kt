@@ -70,6 +70,7 @@ class SettingsViewModel @Inject constructor(private val mockMode: MockModeStore,
 
     fun onMockEmptyAccountChange(enabled: Boolean) {
         mockData.emptyAccount.value = enabled
+        viewModelScope.launch { mockMode.setEmptyAccount(enabled) }
     }
 
     fun onMockImagesChange(enabled: Boolean) {

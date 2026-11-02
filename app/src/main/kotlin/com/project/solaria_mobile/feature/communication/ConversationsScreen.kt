@@ -94,15 +94,16 @@ fun ConversationsScreen(
             com.project.solaria_mobile.core.designsystem.components.ActionTile(stringResource(R.string.ps_minhas_conexoes), AppIcons.users, onOpenConnections, Modifier.weight(1f).fillMaxHeight())
             com.project.solaria_mobile.core.designsystem.components.ActionTile(stringResource(R.string.cv_iniciar_conversa), AppIcons.message_circle, onStartConversation, Modifier.weight(1f).fillMaxHeight())
         }
-        SearchField(stringResource(R.string.cv_buscar_conversa), state.query, onQueryChange)
+        // Sem nenhuma conversa não há o que buscar; a busca volta quando houver conversa ou texto digitado.
+        if (state.conversations.isNotEmpty() || state.query.isNotBlank()) SearchField(stringResource(R.string.cv_buscar_conversa), state.query, onQueryChange)
         if (resource != null) ResourceStatus(resource)
         LazyColumn(verticalArrangement = Arrangement.spacedBy(Spacing.xs), contentPadding = PaddingValues(bottom = com.project.solaria_mobile.core.designsystem.theme.LocalBottomBarInset.current)) {
-            if (state.conversations.isEmpty()) item { StateNotice(
+            if (state.conversations.isEmpty()) item { androidx.compose.foundation.layout.Box(Modifier.fillParentMaxHeight(0.8f).fillMaxWidth(), contentAlignment = Alignment.Center) { StateNotice(
                         if (state.query.isNotBlank()) stringResource(R.string.cv_nenhuma_conversa_encontrada) else stringResource(if (assistant) R.string.as_nenhuma_sessao else R.string.pc_nenhuma_conversa_ainda),
                         if (state.query.isNotBlank()) stringResource(R.string.cv_tente_buscar_por_outro_nome) else stringResource(if (assistant) R.string.as_nenhuma_sessao_desc else R.string.cv_as_conversas_da_sua_conta),
                         icon = if (assistant) AppIcons.sparkles else AppIcons.messages_square,
                         actions = if (state.query.isNotBlank()) { { PrimaryButton(stringResource(R.string.settings_clear_search), { onQueryChange("") }, secondary = true, compact = true) } } else null,
-                    ) }
+                    ) } }
             items(state.conversations) { item ->
                 ConversationRow(item = item, onClick = { onOpenChat(item.id) })
             }

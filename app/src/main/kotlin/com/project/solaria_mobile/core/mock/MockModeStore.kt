@@ -36,7 +36,17 @@ class MockModeStore @Inject constructor(private val dataStore: DataStore<Prefere
         mutableImages.value = enabled
     }
 
+    private val mutableEmptyAccount = MutableStateFlow(runBlocking { dataStore.data.first()[MOCK_EMPTY_ACCOUNT] == true })
+
+    fun isEmptyAccount(): Boolean = mutableEmptyAccount.value
+
+    suspend fun setEmptyAccount(enabled: Boolean) {
+        dataStore.edit { it[MOCK_EMPTY_ACCOUNT] = enabled }
+        mutableEmptyAccount.value = enabled
+    }
+
     private companion object {
+        val MOCK_EMPTY_ACCOUNT = booleanPreferencesKey("qa_mock_empty_account")
         val MOCK_MODE = booleanPreferencesKey("qa_mock_mode")
         val MOCK_IMAGES = booleanPreferencesKey("qa_mock_images")
     }

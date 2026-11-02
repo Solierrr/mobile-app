@@ -128,7 +128,8 @@ fun ProjectListScreen(
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(Spacing.xs), verticalAlignment = Alignment.CenterVertically) {
                     SectionHeading(stringResource(R.string.pl_seus_projetos), Modifier.weight(1f), faded = true)
                     RefreshButton(onRefresh, resource?.refreshing == true, stringResource(R.string.pl_atualizar_projetos))
-                    RoundIconButton(if (gridMode) AppIcons.layout_list else AppIcons.layout_grid,
+                    // Sem projetos não há o que reorganizar.
+                    if (projects.isNotEmpty()) RoundIconButton(if (gridMode) AppIcons.layout_list else AppIcons.layout_grid,
                         if (gridMode) stringResource(R.string.pl_mostrar_lista_compacta) else stringResource(R.string.ps_mostrar_grade), onToggleLayout)
                     RoundIconButton(AppIcons.map_pin, stringResource(R.string.ms_mapa_dos_projetos), onOpenMap)
                 }
@@ -161,7 +162,12 @@ fun ProjectListScreen(
         }
         if (layoutFailure) item(span = { GridItemSpan(maxLineSpan) }) { Text(stringResource(R.string.pl_nao_foi_possivel_salvar_a), color = AppTheme.colors.danger) }
         if (resource?.refreshError != null && !offline) item(span = { GridItemSpan(maxLineSpan) }) { ResourceStatus(resource) }
-        if (projects.isEmpty()) item(span = { GridItemSpan(maxLineSpan) }) { StateNotice(stringResource(R.string.pl_nenhum_projeto_ainda), "Crie um projeto para organizar as atividades, os envolvidos e as informações do local.", icon = AppIcons.folder) }
+        if (projects.isEmpty()) item(span = { GridItemSpan(maxLineSpan) }) {
+            // O aviso ocupa o espaço abaixo do cabeçalho e fica no centro dele, em vez de encostar nos botões do topo.
+            Box(Modifier.fillMaxWidth().height((androidx.compose.ui.platform.LocalConfiguration.current.screenHeightDp * 0.5f).dp), contentAlignment = Alignment.Center) {
+                StateNotice(stringResource(R.string.pl_nenhum_projeto_ainda), "Crie um projeto para organizar as atividades, os envolvidos e as informações do local.", icon = AppIcons.folder)
+            }
+        }
         else if (visible.isEmpty()) item(span = { GridItemSpan(maxLineSpan) }) { StateNotice(stringResource(R.string.pl_nenhum_projeto_encontrado), "Ajuste a busca ou o filtro para ver outros projetos.", icon = AppIcons.search) }
         items(visible, key = { it.id }) { project -> ProjectListCard(project, gridMode, onClick = { onOpenProject(project.id) }) }
     }
