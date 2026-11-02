@@ -44,9 +44,9 @@ android {
             buildConfigField("String", "ENVIRONMENT", "\"prod\"")
             manifestPlaceholders["authScheme"] = "solaria"
             buildConfigField("String", "AUTH_REDIRECT_URI", "\"solaria://auth/callback\"")
-            buildConfigField("String", "AUTH_BASE_URL", "\"https://api-auth.solarianetwork.site/\"")
-            buildConfigField("String", "CORE_BASE_URL", "\"https://api-core.solarianetwork.site/\"")
-            buildConfigField("String", "MESSENGER_BASE_URL", "\"https://api-messenger.solarianetwork.site/\"")
+            buildConfigField("String", "AUTH_BASE_URL", "\"https://auth.solarianetwork.site/\"")
+            buildConfigField("String", "CORE_BASE_URL", "\"https://core.solarianetwork.site/\"")
+            buildConfigField("String", "MESSENGER_BASE_URL", "\"https://messenger.solarianetwork.site/\"")
             buildConfigField("String", "GOOGLE_REGISTRY_BASE_URL", "\"\"")
         }
     }
