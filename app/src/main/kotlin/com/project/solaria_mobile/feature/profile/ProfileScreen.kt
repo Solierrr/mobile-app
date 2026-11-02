@@ -151,9 +151,14 @@ fun ProfileScreen(
     if (infoOpen) {
         BottomSheet(onDismiss = { infoOpen = false }, state = sheetState) {
             Column(modifier = Modifier.fillMaxWidth().padding(horizontal = Spacing.screen).padding(top = Spacing.sm, bottom = Spacing.screenBottom), verticalArrangement = Arrangement.spacedBy(Spacing.md)) {
-                Text(profile.name, color = AppTheme.colors.onSurface, style = androidx.compose.material3.MaterialTheme.typography.headlineMedium)
-                Text(stringResource(R.string.pf_perfil_publico), color = AppTheme.colors.onSurfaceMuted, style = androidx.compose.material3.MaterialTheme.typography.bodyMedium)
-                ProfileInfoFields(profile, state.stats, full = true)
+                if (profile.hasInfo(state.stats)) {
+                    Text(profile.name, color = AppTheme.colors.onSurface, style = androidx.compose.material3.MaterialTheme.typography.headlineMedium)
+                    ProfileInfoFields(profile, state.stats, full = true)
+                } else StateNotice(
+                    stringResource(R.string.pf_sem_informacoes),
+                    stringResource(if (self) R.string.pf_sem_informacoes_propria else R.string.pf_sem_informacoes_outra_pessoa),
+                    icon = AppIcons.info,
+                )
             }
         }
     }
@@ -168,6 +173,10 @@ fun ProfileScreen(
         }
     }
 }
+
+/** Se há algo para mostrar na sheet de informações: um dado do perfil ou a quantidade de projetos ou conexões. */
+private fun UserProfile.hasInfo(stats: ProfileStats?): Boolean =
+    occupation.isNotBlank() || affiliation.isNotBlank() || phone.isNotBlank() || email.isNotBlank() || stats?.projects != null || stats?.connections != null
 
 /**
  * As informações do perfil, cada uma só aparece se o valor existir. A página mostra o essencial (profissão, telefone e

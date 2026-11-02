@@ -445,7 +445,9 @@
     <string name="pf_atualizando_conexao">Actualizando conexión…</string>
     <string name="pf_remover_conexao">Quitar conexión</string>
     <string name="pf_adicionar_conexao">Añadir conexión</string>
-    <string name="pf_perfil_publico">Perfil público</string>
+    <string name="pf_sem_informacoes">Aún no hay información</string>
+    <string name="pf_sem_informacoes_outra_pessoa">Esta persona aún no ha compartido información en su perfil.</string>
+    <string name="pf_sem_informacoes_propria">La información que agregues a tu perfil aparecerá aquí.</string>
     <string name="pf_profissao">Profesión</string>
     <string name="pf_vinculo">Vínculo</string>
     <string name="pf_conexoes">Conexiones</string>

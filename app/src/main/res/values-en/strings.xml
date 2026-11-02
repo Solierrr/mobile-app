@@ -445,7 +445,9 @@
     <string name="pf_atualizando_conexao">Updating connection…</string>
     <string name="pf_remover_conexao">Remove connection</string>
     <string name="pf_adicionar_conexao">Add connection</string>
-    <string name="pf_perfil_publico">Public profile</string>
+    <string name="pf_sem_informacoes">No information yet</string>
+    <string name="pf_sem_informacoes_outra_pessoa">This person has not shared any profile information yet.</string>
+    <string name="pf_sem_informacoes_propria">The information you add to your profile will appear here.</string>
     <string name="pf_profissao">Profession</string>
     <string name="pf_vinculo">Affiliation</string>
     <string name="pf_conexoes">Connections</string>
