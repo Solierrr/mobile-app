@@ -3,12 +3,6 @@ package com.project.solaria_mobile.core.designsystem.components
 import android.graphics.BlurMaskFilter
 import android.provider.Settings
 import androidx.compose.animation.core.EaseInOutCubic
-import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.runtime.Composable
@@ -56,22 +50,7 @@ fun MorphingHexagon(
     val morphs = remember {
         shapes.indices.map { Morph(shapes[it], shapes[(it + 1) % shapes.size]) }
     }
-    val animationsEnabled = animationsEnabled()
-    val position = if (animationsEnabled) {
-        val transition = rememberInfiniteTransition(label = "hexagon-morph")
-        val animated by transition.animateFloat(
-            initialValue = 0f,
-            targetValue = morphs.size.toFloat(),
-            animationSpec = infiniteRepeatable(
-                animation = tween(durationMillis = millisPerShape * morphs.size, easing = LinearEasing),
-                repeatMode = RepeatMode.Restart,
-            ),
-            label = "hexagon-position",
-        )
-        animated
-    } else {
-        0f
-    }
+    val position = rememberMorphPosition(morphs.size, millisPerShape, "hexagon-morph")
     val index = position.toInt().coerceIn(0, morphs.size - 1)
     val progress = EaseInOutCubic.transform((position - index).coerceIn(0f, 1f))
 
