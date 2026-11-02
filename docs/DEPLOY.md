@@ -10,9 +10,9 @@ O aplicativo é instalado num aparelho ou emulador, sem deploy deste cliente no 
 
 | Serviço | QA | PROD |
 |---|---|---|
-| Acesso | `https://api-auth-xw6o.onrender.com/` | `https://api-auth.solarianetwork.site/` |
-| Cadastro | `https://api-core-cqfn.onrender.com/` | `https://api-core.solarianetwork.site/` |
-| Mensagens | `https://api-messenger-5g2n.onrender.com/` | `https://api-messenger.solarianetwork.site/` |
+| Acesso | `https://api-auth-xw6o.onrender.com/` | `https://auth.solarianetwork.site/` |
+| Cadastro | `https://api-core-cqfn.onrender.com/` | `https://core.solarianetwork.site/` |
+| Mensagens | `https://api-messenger-5g2n.onrender.com/` | `https://messenger.solarianetwork.site/` |
 | Endereços | `https://google-registry.onrender.com/` | Sem destino configurado |
 
 O QA tem um identificador com o sufixo `.qa`, além de nome e esquema de callback próprios, o que permite instalar as variantes separadamente. Os hosts de produção e o contrato de endereços precisam ser confirmados antes da distribuição. <!-- PENDENTE: 2 -->
