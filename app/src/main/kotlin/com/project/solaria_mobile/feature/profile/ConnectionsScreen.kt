@@ -35,7 +35,10 @@ import com.project.solaria_mobile.core.designsystem.components.RefreshButton
 import com.project.solaria_mobile.core.designsystem.components.ResourceStatus
 import com.project.solaria_mobile.core.designsystem.components.ScreenTitle
 import com.project.solaria_mobile.core.designsystem.components.SearchField
-import com.project.solaria_mobile.core.designsystem.components.SegmentedControl
+import com.project.solaria_mobile.core.designsystem.components.ActionRow
+import com.project.solaria_mobile.core.designsystem.components.BottomSheet
+import com.project.solaria_mobile.core.designsystem.components.LocalSheetDismiss
+import com.project.solaria_mobile.core.designsystem.components.SheetSize
 import com.project.solaria_mobile.core.designsystem.components.StateNotice
 import com.project.solaria_mobile.core.designsystem.icons.AppIcons
 import com.project.solaria_mobile.core.designsystem.theme.AppTheme
@@ -52,20 +55,39 @@ fun ConnectionsRoute(onBack: () -> Unit, onOpenProfile: (String) -> Unit,
     pick: Boolean = false, onPick: (com.project.solaria_mobile.feature.profile.domain.Connection) -> Unit = {}, status: String? = null, statusIsError: Boolean = false) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val query by viewModel.query.collectAsStateWithLifecycle()
-    val discover by viewModel.discover.collectAsStateWithLifecycle()
+    var findOpen by androidx.compose.runtime.saveable.rememberSaveable { androidx.compose.runtime.mutableStateOf(false) }
     DisposableEffect(Unit) { viewModel.load(); onDispose { } }
     val resource = state as? UiState.Content
     Column(Modifier.fillMaxSize().appBackground().padding(horizontal = Spacing.screen).padding(top = Spacing.lg),
         verticalArrangement = Arrangement.spacedBy(Spacing.md)) {
         ScreenTitle(stringResource(if (pick) R.string.cv_iniciar_conversa else R.string.pf_conexoes), onBack, actions = { RefreshButton(viewModel::load, resource?.refreshing == true, stringResource(R.string.cn_atualizar_conexoes)) })
-        if (!pick) SegmentedControl(listOf(stringResource(R.string.ps_minhas_conexoes), stringResource(R.string.cn_encontrar_pessoas)), if (discover) 1 else 0,
-            { viewModel.selectDiscover(it == 1) }, Modifier.fillMaxWidth())
+        if (!pick) ActionRow(stringResource(R.string.cn_encontrar_pessoas), AppIcons.users, { findOpen = true })
         status?.let { androidx.compose.material3.Text(it, color = if (statusIsError) com.project.solaria_mobile.core.designsystem.theme.AppTheme.colors.danger else com.project.solaria_mobile.core.designsystem.theme.AppTheme.colors.onSurfaceMuted, style = androidx.compose.material3.MaterialTheme.typography.bodyMedium) }
         // Sem ninguém na lista e sem texto digitado, a busca não tem o que procurar.
-        if (resource?.data?.connections?.isEmpty() != true || query.isNotBlank()) SearchField(if (discover) stringResource(R.string.cn_busque_pessoas) else stringResource(R.string.cn_busque_nas_suas_conexoes), query, viewModel::onQueryChange)
+        if (resource?.data?.connections?.isEmpty() != true || query.isNotBlank()) SearchField(stringResource(R.string.cn_busque_nas_suas_conexoes), query, viewModel::onQueryChange)
         resource?.let { ResourceStatus(it) }
         UiStateHost(state, viewModel::load, modifier = Modifier.weight(1f), inline = true, loading = { ListSkeleton() }) { content ->
             ConnectionsList(content, onOpenProfile, viewModel::more, { viewModel.onQueryChange("") }, images::bytes, if (pick) onPick else null)
+        }
+        if (findOpen) FindPeopleSheet(onOpenProfile, images) { findOpen = false }
+    }
+}
+
+/** Busca de pessoas fora das conexões; tocar em uma fecha a folha e abre o perfil. */
+@Composable
+private fun FindPeopleSheet(onOpenProfile: (String) -> Unit, images: ImageLoaderViewModel, onDismiss: () -> Unit) {
+    val viewModel: ConnectionsViewModel = hiltViewModel(key = "find-people")
+    LaunchedEffect(Unit) { viewModel.selectDiscover(true) }
+    val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val query by viewModel.query.collectAsStateWithLifecycle()
+    BottomSheet(onDismiss = onDismiss, scrollable = false, size = SheetSize.Expanded) {
+        val dismiss = LocalSheetDismiss.current
+        Column(Modifier.fillMaxSize().padding(horizontal = Spacing.screen), verticalArrangement = Arrangement.spacedBy(Spacing.md)) {
+            Text(stringResource(R.string.cn_encontrar_pessoas), color = AppTheme.colors.onSurface, style = MaterialTheme.typography.titleLarge)
+            SearchField(stringResource(R.string.cn_busque_pessoas), query, viewModel::onQueryChange)
+            UiStateHost(state, viewModel::load, modifier = Modifier.weight(1f), inline = true, loading = { ListSkeleton() }) { content ->
+                ConnectionsList(content, { id -> dismiss(); onOpenProfile(id) }, viewModel::more, { viewModel.onQueryChange("") }, images::bytes)
+            }
         }
     }
 }
