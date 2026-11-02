@@ -278,9 +278,13 @@ private fun LocationCard(location: MessageAttachment.Location) {
                 // Cobre o mapa para o toque abrir o aplicativo de mapas em vez de mexer na câmera.
                 Box(Modifier.matchParentSize().clickable(onClickLabel = open) { openInMaps(context, location) })
             } else {
-                Column(Modifier.matchParentSize(), verticalArrangement = Arrangement.Center, horizontalAlignment = Alignment.CenterHorizontally) {
+                Column(
+                    Modifier.matchParentSize().background(AppTheme.colors.inputFill).padding(Spacing.sm),
+                    verticalArrangement = Arrangement.spacedBy(Spacing.xs, Alignment.CenterVertically),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ) {
                     Icon(painterResource(AppIcons.map_pin), null, Modifier.size(28.dp), tint = AppTheme.colors.action)
-                    Text(stringResource(R.string.ch_mapa_indisponivel), color = AppTheme.colors.onSurfaceMuted, style = MaterialTheme.typography.labelMedium)
+                    Text(stringResource(R.string.ch_mapa_indisponivel), color = AppTheme.colors.onSurfaceMuted, style = MaterialTheme.typography.labelMedium, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
                 }
             }
         }
