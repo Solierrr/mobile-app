@@ -95,6 +95,18 @@ class ProjectSectionsTest {
         assertEquals("Rua 5, 20, Centro, Goiânia, GO, CEP 74000000", info.copyText)
     }
 
+    @Test fun locationExposesLabelledFieldsInOrderAndSkipsBlanks() {
+        val project = ProjectDto(
+            id = "1", name = "Obra",
+            location = ProjectLocationDto(latitude = -23.5505, longitude = -46.6333, city = "São Paulo", state = "SP", neighborhood = "Vila Mariana", street = "Rua 5", number = "20", complement = " "),
+        )
+        assertEquals(
+            listOf("Rua" to "Rua 5", "Número" to "20", "Bairro" to "Vila Mariana", "Cidade" to "São Paulo", "Estado" to "SP"),
+            project.toLocationInfo().fields.map { it.label to it.value },
+        )
+        assertEquals(-23.5505 to -46.6333, project.toLocationInfo().let { it.latitude to it.longitude })
+    }
+
     @Test fun locationWithoutAddressHasNoLines() {
         assertTrue(ProjectDto(id = "1", name = "Obra").toLocationInfo().addressLines.isEmpty())
     }
