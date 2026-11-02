@@ -30,6 +30,7 @@ import com.project.solaria_mobile.core.designsystem.icons.AppIcons
 import com.project.solaria_mobile.core.designsystem.components.ScreenTitle
 import com.project.solaria_mobile.core.designsystem.components.SearchField
 import com.project.solaria_mobile.core.designsystem.components.Avatar
+import com.project.solaria_mobile.core.designsystem.components.userMessage
 import com.project.solaria_mobile.core.designsystem.theme.AppTheme
 import com.project.solaria_mobile.core.designsystem.theme.appBackground
 import com.project.solaria_mobile.core.designsystem.theme.Spacing
@@ -57,18 +58,36 @@ fun ConversationsRoute(
     onNewSession: () -> Unit = {},
     onOpenConnections: () -> Unit = {},
     onStartConversation: () -> Unit = {},
+    onOpenArchived: () -> Unit = {},
+    onOpenCommunities: () -> Unit = {},
+    groups: NewGroupViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
-    // Ao voltar de uma conversa, recarrega para refletir envio, edição, exclusão e arquivamento; a primeira abertura já carrega no ViewModel.
+    val group by groups.state.collectAsStateWithLifecycle()
+    var newGroup by remember { mutableStateOf(false) }
+    // O grupo criado substitui a escolha: abre direto na conversa.
+    androidx.compose.runtime.LaunchedEffect(group) {
+        (group as? NewGroup.Created)?.let { onOpenChat(it.conversationId); groups.consumed() }
+    }
+    // Com o tempo real ligado a lista já reflete envio, edição, exclusão e arquivamento; ao voltar só lê de novo se ele estava fora.
+    // A primeira abertura já carrega no ViewModel.
     var returning by remember { mutableStateOf(false) }
     LifecycleResumeEffect(viewModel) {
-        if (returning) viewModel.load() else returning = true
+        if (returning) viewModel.onResume() else returning = true
         onPauseOrDispose {}
     }
     val title = stringResource(if (assistant) R.string.as_assistente else R.string.pd_conversas)
     UiStateHost(state, viewModel::load, onBack = onBack, header = { ScreenTitle(title, onBack = if (assistant) onBack else null) }, loading = { ListSkeleton(search = true) }) { content ->
-        ConversationsScreen(content, viewModel::onQueryChange, onBack, onOpenChat, state as? UiState.Content, assistant, onNewSession, onOpenConnections, onStartConversation)
+        ConversationsScreen(
+            content, viewModel::onQueryChange, onBack, onOpenChat, state as? UiState.Content, assistant, onNewSession, onOpenConnections, onStartConversation,
+            onNewGroup = { groups.consumed(); newGroup = true }, onOpenArchived = onOpenArchived, onOpenCommunities = onOpenCommunities,
+            groupFailure = (group as? NewGroup.Failed)?.failure,
+        )
     }
+    if (newGroup && !assistant) PeoplePickerSheet(
+        title = stringResource(R.string.gp_novo_grupo), confirmLabel = stringResource(R.string.gp_criar_grupo), exclude = emptySet(),
+        nameLabel = stringResource(R.string.gp_nome_do_grupo), onConfirm = { ids, name -> groups.create(name, ids) }, onDismiss = { newGroup = false },
+    )
 }
 
 @Composable
@@ -82,12 +101,20 @@ fun ConversationsScreen(
     onNewSession: () -> Unit = {},
     onOpenConnections: () -> Unit = {},
     onStartConversation: () -> Unit = {},
+    onNewGroup: () -> Unit = {},
+    onOpenArchived: () -> Unit = {},
+    onOpenCommunities: () -> Unit = {},
+    groupFailure: com.project.solaria_mobile.core.common.ApiResult.Failure? = null,
 ) {
     Column(
         modifier = Modifier.fillMaxSize().appBackground().padding(horizontal = Spacing.screen).padding(top = Spacing.lg),
         verticalArrangement = Arrangement.spacedBy(Spacing.md),
     ) {
-        ScreenTitle(stringResource(if (assistant) R.string.as_assistente else R.string.pd_conversas), onBack = if (assistant) onBack else null)
+        ScreenTitle(
+            stringResource(if (assistant) R.string.as_assistente else R.string.pd_conversas), onBack = if (assistant) onBack else null,
+            actions = if (assistant) null else { { ConversationsMenu(onNewGroup, onOpenArchived, onOpenCommunities) } },
+        )
+        groupFailure?.let { Text(it.userMessage(), color = AppTheme.colors.danger, style = androidx.compose.material3.MaterialTheme.typography.bodyMedium) }
         if (assistant) com.project.solaria_mobile.core.designsystem.components.ActionRow(stringResource(R.string.as_nova_sessao), AppIcons.sparkles, onNewSession)
         else Row(Modifier.fillMaxWidth().height(androidx.compose.foundation.layout.IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(Spacing.md)) {
             // Não há botão para começar uma conversa nova: os dois atalhos ficam no topo da lista.
@@ -104,21 +131,35 @@ fun ConversationsScreen(
                         icon = if (assistant) AppIcons.sparkles else AppIcons.messages_square,
                         actions = if (state.query.isNotBlank()) { { PrimaryButton(stringResource(R.string.settings_clear_search), { onQueryChange("") }, secondary = true, compact = true) } } else null,
                     ) } }
-            items(state.conversations) { item ->
-                ConversationRow(item = item, onClick = { onOpenChat(item.id) })
+            items(state.conversations, key = { it.id }) { item ->
+                ConversationRow(item = item, online = item.id in state.online, typing = item.id in state.typing, onClick = { onOpenChat(item.id) })
             }
         }
     }
 }
 
+/** Novo grupo, conversas arquivadas e comunidades dos projetos: o que a lista abre além das conversas em si. */
 @Composable
-private fun ConversationRow(item: Conversation, onClick: () -> Unit) {
+private fun ConversationsMenu(onNewGroup: () -> Unit, onOpenArchived: () -> Unit, onOpenCommunities: () -> Unit) {
+    var open by remember { mutableStateOf(false) }
+    androidx.compose.foundation.layout.Box {
+        com.project.solaria_mobile.core.designsystem.components.RoundIconButton(AppIcons.ellipsis, stringResource(R.string.cv_mais_opcoes), { open = true })
+        com.project.solaria_mobile.core.designsystem.components.AppMenu(expanded = open, onDismissRequest = { open = false }) {
+            com.project.solaria_mobile.core.designsystem.components.AppMenuItem(stringResource(R.string.gp_novo_grupo), { open = false; onNewGroup() }, icon = AppIcons.users)
+            com.project.solaria_mobile.core.designsystem.components.AppMenuItem(stringResource(R.string.ar_arquivadas), { open = false; onOpenArchived() }, icon = AppIcons.folder)
+            com.project.solaria_mobile.core.designsystem.components.AppMenuItem(stringResource(R.string.cm_comunidades), { open = false; onOpenCommunities() }, icon = AppIcons.messages_square)
+        }
+    }
+}
+
+@Composable
+private fun ConversationRow(item: Conversation, online: Boolean, typing: Boolean, onClick: () -> Unit) {
     ListRow(
         title = item.name.ifBlank { stringResource(R.string.as_sessao) },
         supporting = if (item.geo) stringResource(R.string.geo_assistente) else null,
-        subtitle = item.preview,
+        subtitle = if (typing) stringResource(R.string.ch_digitando) else item.preview,
         onClick = onClick,
-        leading = { Avatar(item.initials, color = item.tone.toColor(), textColor = item.tone.toContentColor(), placeholderIcon = if (item.geo) AppIcons.globe else if (item.assistant) AppIcons.sparkles_filled else if (item.group) AppIcons.group_silhouette else AppIcons.user_silhouette) },
+        leading = { Avatar(item.initials, online = online, color = item.tone.toColor(), textColor = item.tone.toContentColor(), placeholderIcon = if (item.geo) AppIcons.globe else if (item.assistant) AppIcons.sparkles_filled else if (item.group) AppIcons.group_silhouette else AppIcons.user_silhouette) },
         trailing = {
             Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(Spacing.xxs)) {
                 Text(item.time, color = if (item.unread > 0) AppTheme.colors.brandStrong else AppTheme.colors.onSurfaceMuted, style = androidx.compose.material3.MaterialTheme.typography.labelMedium)

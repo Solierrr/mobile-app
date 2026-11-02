@@ -64,6 +64,8 @@ sealed interface ApiResult<out T> {
     data class Failure(
         val kind: ErrorKind,
         val invalidFields: Set<String> = emptySet(),
+        /** `errorCode` do ProblemDetail do servidor (`SUCCESSOR_REQUIRED`, `MEDIA_EXPIRED`...), quando vem; separa casos que o status não distingue. */
+        val errorCode: String? = null,
     ) : ApiResult<Nothing>
 }
 

@@ -4,6 +4,8 @@ import com.project.solaria_mobile.R
 
 object AppIcons {
     val x = R.drawable.solaria_ic_x
+    val star = R.drawable.solaria_ic_star
+    val star_filled = R.drawable.solaria_ic_star_filled
     val layout_grid = R.drawable.solaria_ic_layout_grid
     val layout_list = R.drawable.solaria_ic_layout_list
     val refresh = R.drawable.solaria_ic_refresh

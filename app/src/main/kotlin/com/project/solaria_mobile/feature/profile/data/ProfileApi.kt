@@ -26,6 +26,9 @@ data class UserDto(
 )
 
 @Serializable
+data class UserSummaryDto(val username: String? = null, val avatar: String? = null)
+
+@Serializable
 data class SelfPersonDto(val name: String? = null, val phone: String? = null)
 
 @Serializable
@@ -81,6 +84,10 @@ interface ProfileApi {
 
     @GET("api/users/me")
     suspend fun me(): SelfProfileDto
+
+    /** Nome de exibição e foto de uma conta pelo `authId`, o identificador que o messenger usa para as pessoas. */
+    @GET("api/users/auth/{authId}/summary")
+    suspend fun summary(@Path("authId") authId: String): UserSummaryDto
 
     @GET("api/connections")
     suspend fun connections(): List<UserDto>

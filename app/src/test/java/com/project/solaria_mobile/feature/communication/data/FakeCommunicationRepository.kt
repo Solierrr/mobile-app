@@ -17,7 +17,7 @@ import javax.inject.Singleton
 @Singleton
 class FakeCommunicationRepository @Inject constructor() : CommunicationRepository, com.project.solaria_mobile.feature.communication.domain.ServiceCallRepository {
     private val baseConversations = listOf(
-        Conversation("c1", "RD", "Ricardo Dostoiévski", "O Will Smith, aquela lá do holiud", "17:40", AvatarTone.ORANGE),
+        Conversation("c1", "RD", "Ricardo Dostoiévski", "O Will Smith, aquela lá do holiud", "17:40", AvatarTone.ORANGE, participants = setOf("ana")),
         Conversation("c2", "AM", "Alexandre de Moraes", "Tu vai apagar agora aquela mensagem?", "16:32", AvatarTone.BLUE),
         Conversation("c3", "BB", "Bruce Banner", "Cara, minha mão deu até hoje slk", "16:20", AvatarTone.GREEN),
         Conversation("c4", "AS", "Anthony Stark", "mas o thanos é um filho da mãe", "Há 20 dias", AvatarTone.ORANGE),
@@ -64,4 +64,10 @@ class FakeCommunicationRepository @Inject constructor() : CommunicationRepositor
         ChatMessage("Consegui sim. Vou enviar os detalhes ainda hoje.", true, "10:42"),
         ChatMessage("Perfeito, obrigado!", false, "10:45"),
     )
+}
+
+/** Gateway de mídia dos testes que não envolvem arquivo: aceita o envio e não guarda nada. */
+internal object NoMediaGateway : MediaGateway {
+    override suspend fun upload(target: MediaUploadTarget, uri: String, mimeType: String, sizeBytes: Long) = true
+    override suspend fun save(mediaId: String, name: String?, body: okhttp3.ResponseBody): String? = null
 }

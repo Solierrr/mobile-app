@@ -13,6 +13,7 @@ import com.project.solaria_mobile.core.mock.MockModeStore
 import com.project.solaria_mobile.core.offline.OfflineReader
 import com.project.solaria_mobile.feature.communication.domain.CommunityGroup
 import com.project.solaria_mobile.feature.communication.domain.CommunityPerson
+import com.project.solaria_mobile.feature.communication.domain.CommunitySummary
 import com.project.solaria_mobile.feature.communication.domain.GroupCreated
 import com.project.solaria_mobile.feature.communication.domain.ProjectCommunity
 import com.project.solaria_mobile.feature.communication.domain.ProjectCommunityRepository
@@ -53,11 +54,16 @@ class RemoteProjectCommunityRepository @Inject constructor(
             val me = credentials.accessToken()?.let(::accessTokenSubject)
             val groups = api.groups(community.id).map { group ->
                 CommunityGroup(group.id, group.title?.takeIf(String::isNotBlank) ?: "Conversa do projeto", group.participantIds.size,
-                    group.status == "ACTIVE", me != null && me in group.participantIds)
+                    community.status == "ACTIVE", me != null && me in group.participantIds, group.managerUserId, group.participantIds.toList())
             }
             val role = community.members.firstOrNull { it.userId == me }?.role
             ProjectCommunity(community.id, projectId, community.status == "ACTIVE" && mutable, false, community.members.size, groups,
-                role in setOf("OWNER", "ADMIN"), people.map { it.copy(joined = community.members.any { member -> member.userId == it.authId }, self = it.authId == me) })
+                role in setOf("OWNER", "ADMIN"),
+                people.map { person ->
+                    val member = community.members.firstOrNull { it.userId == person.authId }
+                    person.copy(joined = member != null, self = person.authId == me, role = member?.role)
+                },
+                role, community.status == "ARCHIVED")
         }
     }
 
@@ -85,6 +91,38 @@ class RemoteProjectCommunityRepository @Inject constructor(
         executor.execute { api.addMember(communityId, CommunityMembersRequest(setOf(authId))); Unit }
     }
 
+    override suspend fun setArchived(communityId: String, archived: Boolean): ApiResult<Unit> = online {
+        executor.execute { api.updateStatus(communityId, CommunityStatusRequest(if (archived) "ARCHIVED" else "ACTIVE")); Unit }
+    }
+
+    override suspend fun setAdmin(communityId: String, authId: String, admin: Boolean): ApiResult<Unit> = online {
+        executor.execute { api.addMember(communityId, CommunityMembersRequest(setOf(authId), if (admin) "ADMIN" else "MEMBER")); Unit }
+    }
+
+    override suspend fun removeMember(communityId: String, authId: String, successors: Map<String, String>): ApiResult<Unit> = online {
+        val body = CommunityRemovalRequest(successors.map { (conversationId, successor) -> CommunitySuccessorDto(conversationId, successor) })
+        var result: ApiResult<Unit> = executor.execute { api.removeMember(communityId, authId, body) }
+        // Uma falha no meio da cascata não desfaz nada: repetir o mesmo pedido continua de onde parou.
+        var attempts = 1
+        while (result is ApiResult.Failure && result.errorCode == "REMOVAL_INCOMPLETE" && attempts < REMOVAL_ATTEMPTS) {
+            result = executor.execute { api.removeMember(communityId, authId, body) }
+            attempts++
+        }
+        result
+    }
+
+    override suspend fun mine(): ApiResult<List<CommunitySummary>> = online {
+        val me = credentials.accessToken()?.let(::accessTokenSubject)
+        when (val result = executor.execute { api.mine() }) {
+            is ApiResult.Failure -> result
+            // O nome do projeto vem do api-core; se ele não responde, a comunidade aparece mesmo assim.
+            is ApiResult.Success -> ApiResult.Success(result.data.map { community ->
+                val name = runCatching { projects.project(community.projectId).name }.getOrNull().orEmpty()
+                CommunitySummary(community.id, community.projectId, name, community.status == "ARCHIVED", community.members.size, community.members.firstOrNull { it.userId == me }?.role)
+            })
+        }
+    }
+
     private suspend fun <T> online(block: suspend () -> ApiResult<T>): ApiResult<T> =
         if (mock.isEnabled() || network.isOnline.first()) executor.execute(block).let { result ->
             when (result) {
@@ -93,6 +131,8 @@ class RemoteProjectCommunityRepository @Inject constructor(
             }
         } else ApiResult.Failure(ErrorKind.CONNECTIVITY)
 }
+
+private const val REMOVAL_ATTEMPTS = 3
 
 @Module
 @InstallIn(SingletonComponent::class)

@@ -13,6 +13,10 @@ sealed interface AppDestination {
     @Serializable data object Assistant : AppDestination
     @Serializable data object NewConversation : AppDestination
     @Serializable data class Chat(val id: String) : AppDestination
+    @Serializable data class GroupDetails(val id: String) : AppDestination
+    @Serializable data object ArchivedChats : AppDestination
+    @Serializable data object Communities : AppDestination
+    @Serializable data object MyRatings : AppDestination
     @Serializable data object Calls : AppDestination
     @Serializable data class Call(val id: String) : AppDestination
     @Serializable data object Schedule : AppDestination

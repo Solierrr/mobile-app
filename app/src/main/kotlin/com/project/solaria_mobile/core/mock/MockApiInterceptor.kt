@@ -66,6 +66,21 @@ import com.project.solaria_mobile.feature.communication.data.CommunityCreateRequ
 import com.project.solaria_mobile.feature.communication.data.CommunityGroupRequest
 import com.project.solaria_mobile.feature.communication.data.CommunityMembersRequest
 import com.project.solaria_mobile.feature.communication.data.GroupCreationDto
+import com.project.solaria_mobile.feature.communication.data.CommunityRemovalRequest
+import com.project.solaria_mobile.feature.communication.data.CommunityStatusRequest
+import com.project.solaria_mobile.feature.communication.data.GroupConversationRequest
+import com.project.solaria_mobile.feature.communication.data.MediaUploadDto
+import com.project.solaria_mobile.feature.communication.data.MediaUploadRequest
+import com.project.solaria_mobile.feature.communication.data.MediaUploadTargetDto
+import com.project.solaria_mobile.feature.communication.data.NpsRequest
+import com.project.solaria_mobile.feature.communication.data.ParticipantsRequest
+import com.project.solaria_mobile.feature.communication.data.RejectedGroupParticipantDto
+import com.project.solaria_mobile.feature.communication.data.TransferManagerRequest
+import com.project.solaria_mobile.feature.profile.data.UserSummaryDto
+import com.project.solaria_mobile.feature.rating.data.RatingDto
+import com.project.solaria_mobile.feature.rating.data.RatingRequest
+import com.project.solaria_mobile.feature.rating.data.RatingStatusRequest
+import com.project.solaria_mobile.feature.rating.data.RatingUpdateRequest
 import com.project.solaria_mobile.feature.communication.data.ServiceCallDto
 import com.project.solaria_mobile.feature.communication.data.ServiceScheduleRequest
 
@@ -129,9 +144,19 @@ class MockApiInterceptor @Inject constructor(
                 val body = decode<CommunityGroupRequest>(request.body?.let(::bodyText).orEmpty())
                 data.createCommunityGroup(segments[2], body, actor)?.let { success(GroupCreationDto.serializer(), it) } ?: respond(chain, 422, "{}")
             }
+            segments == listOf("messaging", "communities", "me") && method == "GET" ->
+                success(ListSerializer(CommunityDto.serializer()), data.communitiesOf().map { data.communityForActor(it, actor) })
+            segments.size == 3 && segments.take(2) == listOf("messaging", "communities") && method == "PATCH" -> {
+                val body = decode<CommunityStatusRequest>(request.body?.let(::bodyText).orEmpty())
+                data.setCommunityStatus(segments[2], body.status)?.let { success(CommunityDto.serializer(), data.communityForActor(it, actor)) } ?: notFound()
+            }
+            segments.size == 5 && segments.take(2) == listOf("messaging", "communities") && segments[3] == "members" && method == "DELETE" -> {
+                val body = request.body?.let(::bodyText).orEmpty().takeIf { it.isNotBlank() }?.let { decode<CommunityRemovalRequest>(it) } ?: CommunityRemovalRequest()
+                data.removeCommunityMember(segments[2], segments[4].let { if (it == actor) MockChatSeed.SELF else it }, body).let { (code, text) -> respond(chain, code, text) }
+            }
             segments.size == 4 && segments.take(2) == listOf("messaging", "communities") && segments[3] == "members" && method == "POST" -> {
                 val body = decode<CommunityMembersRequest>(request.body?.let(::bodyText).orEmpty())
-                data.addCommunityMembers(segments[2], body.userIds)?.let { success(CommunityDto.serializer(), data.communityForActor(it, actor)) } ?: notFound()
+                data.addCommunityMembers(segments[2], body.userIds.map { if (it == actor) MockChatSeed.SELF else it }.toSet(), body.role)?.let { success(CommunityDto.serializer(), data.communityForActor(it, actor)) } ?: notFound()
             }
             segments.size == 4 && segments.take(3) == listOf("api", "shifts", "technician") && method == "GET" ->
                 success(ListSerializer(com.project.solaria_mobile.feature.discovery.data.ShiftDto.serializer()), data.shifts())
@@ -299,13 +324,56 @@ class MockApiInterceptor @Inject constructor(
             }
             segments.size == 3 && segments.take(2) == listOf("messaging", "messages") && method == "DELETE" ->
                 data.mutateMessage(segments[2], request.header("Authorization").orEmpty(), null).let { (code, body) -> respond(chain, code, body) }
+            segments == listOf("messaging", "conversations", "me") && request.url.queryParameter("archived") == "true" ->
+                success(ListSerializer(ConversationDto.serializer()), data.archivedConversationList().map { data.forActor(it, actor) })
+            segments == listOf("messaging", "conversations", "group") && method == "POST" -> {
+                val body = decode<GroupConversationRequest>(request.body?.let(::bodyText).orEmpty())
+                val created = data.createGroup(body, actor)
+                respond(chain, 201, json.encodeToString(GroupCreationDto.serializer(), created.copy(conversation = data.forActor(created.conversation, actor))))
+            }
+            segments.size == 4 && segments.take(2) == listOf("messaging", "conversations") && segments[3] == "participants" && method == "POST" -> {
+                val body = decode<ParticipantsRequest>(request.body?.let(::bodyText).orEmpty())
+                data.addParticipants(segments[2], body.userIds, actor)?.let { success(ConversationDto.serializer(), data.forActor(it, actor)) } ?: respond(chain, 403, "{\"errorCode\":\"UNAUTHORIZED_ACCESS\"}")
+            }
+            segments.size == 4 && segments.take(2) == listOf("messaging", "conversations") && segments[3] == "manager" && method == "PUT" -> {
+                val body = decode<TransferManagerRequest>(request.body?.let(::bodyText).orEmpty())
+                if (data.transferManager(segments[2], body.successorUserId, actor)) respond(chain, 200, "{}") else respond(chain, 403, "{\"errorCode\":\"UNAUTHORIZED_ACCESS\"}")
+            }
+            segments.size == 5 && segments.take(2) == listOf("messaging", "conversations") && segments[3] == "participants" && method == "DELETE" ->
+                data.removeParticipant(segments[2], segments[4], request.url.queryParameter("successorUserId"), actor).let { (code, text) -> respond(chain, code, text) }
+            segments == listOf("messaging", "media") && method == "POST" -> {
+                val body = decode<MediaUploadRequest>(request.body?.let(::bodyText).orEmpty())
+                success(MediaUploadDto.serializer(), data.mediaUpload(body))
+            }
+            segments.size == 4 && segments.take(2) == listOf("messaging", "media") && segments[3] == "content" && method == "GET" ->
+                data.mediaType(segments[2])?.let { respondBytes(chain, data.mediaBytes(it), if (it == "IMAGE") "image/png" else "application/octet-stream") } ?: respond(chain, 410, "{\"errorCode\":\"MEDIA_EXPIRED\"}")
+            segments == listOf("messaging", "nps") && method == "POST" -> {
+                val body = decode<NpsRequest>(request.body?.let(::bodyText).orEmpty())
+                if (data.answerNps(body.conversationId)) respond(chain, 201, "{}") else respond(chain, 409, "{\"errorCode\":\"DUPLICATE_RESOURCE\"}")
+            }
+            segments == listOf("messaging", "ratings") && method == "POST" -> {
+                val body = decode<RatingRequest>(request.body?.let(::bodyText).orEmpty())
+                if (body.evaluatedId == actor) respond(chain, 422, "{\"errorCode\":\"BUSINESS_RULE_VIOLATION\"}") else respond(chain, 201, json.encodeToString(RatingDto.serializer(), data.createRating(body, actor)))
+            }
+            segments.size == 4 && segments.take(3) == listOf("messaging", "ratings", "evaluated") -> success(ListSerializer(RatingDto.serializer()), data.ratingsOf(evaluated = segments[3]))
+            segments.size == 4 && segments.take(3) == listOf("messaging", "ratings", "evaluator") -> success(ListSerializer(RatingDto.serializer()), data.ratingsOf(evaluator = segments[3]))
+            segments.size == 3 && segments.take(2) == listOf("messaging", "ratings") && method == "PATCH" -> {
+                val body = decode<RatingUpdateRequest>(request.body?.let(::bodyText).orEmpty())
+                data.updateRating(segments[2]) { it.copy(rating = body.rating ?: it.rating, comment = body.comment ?: it.comment) }?.let { success(RatingDto.serializer(), it) } ?: notFound()
+            }
+            segments.size == 4 && segments.take(2) == listOf("messaging", "ratings") && segments[3] == "status" && method == "PATCH" -> {
+                val body = decode<RatingStatusRequest>(request.body?.let(::bodyText).orEmpty())
+                data.updateRating(segments[2]) { it.copy(status = body.status) }?.let { success(RatingDto.serializer(), it) } ?: notFound()
+            }
+            segments.size == 5 && segments.take(3) == listOf("api", "users", "auth") && segments[4] == "summary" ->
+                success(UserSummaryDto.serializer(), UserSummaryDto(MockChatSeed.names[segments[3]] ?: "Pessoa de demonstração"))
             segments == listOf("messaging", "conversations", "direct") && method == "POST" -> {
                 val direct = decode<com.project.solaria_mobile.feature.communication.data.DirectConversationRequest>(request.body?.let(::bodyText).orEmpty())
                 respond(chain, 201, json.encodeToString(ConversationDto.serializer(), data.directConversation(direct.recipientId)))
             }
-            segments == listOf("messaging", "conversations", "me") -> success(ListSerializer(ConversationDto.serializer()), data.conversations())
+            segments == listOf("messaging", "conversations", "me") -> success(ListSerializer(ConversationDto.serializer()), data.conversations().map { data.forActor(it, actor) })
             segments.size == 3 && segments.take(2) == listOf("messaging", "conversations") ->
-                data.conversation(segments[2])?.let { success(ConversationDto.serializer(), it) } ?: notFound()
+                data.conversation(segments[2])?.let { success(ConversationDto.serializer(), data.forActor(it, actor)) } ?: notFound()
             segments.size == 4 && segments.take(3) == listOf("messaging", "messages", "conversation") -> success(ListSerializer(MessageDto.serializer()), data.messages(
                 segments[3],
                 before = request.url.queryParameter("beforeSequence")?.toIntOrNull(),
@@ -440,6 +508,8 @@ class MockApiData internal constructor(private val profileStore: MockProfileStor
     }.toMutableMap()
     /** Quem quiser reagir a uma mensagem enviada pela pessoa (o cliente de tempo real falso, para simular respostas). */
     @Volatile var messageListener: ((MessageDto) -> Unit)? = null
+    /** Avisado com o id da conversa quando algo nela muda para a conta (mensagem, leitura, estado), como o `CONVERSATION_UPDATED` do messenger. */
+    @Volatile var conversationListener: ((String) -> Unit)? = null
     private var nextProject = 4
     private var nextMessage = 1000
     private val selfId = "qa-mock-user"
@@ -525,17 +595,39 @@ class MockApiData internal constructor(private val profileStore: MockProfileStor
     }
 
     @Synchronized fun communityGroups(id: String, actor: String) = communityGroupStore[id]?.map {
-        it.copy(participantIds = it.participantIds.map { member -> if (member == selfId) actor else member }.toSet())
+        it.copy(participantIds = it.participantIds.map { member -> if (member == selfId) actor else member }.toSet(), managerUserId = it.managerUserId?.let { manager -> if (manager == selfId) actor else manager })
     }.orEmpty()
 
     fun communityForActor(community: CommunityDto, actor: String) = community.copy(members = community.members.map {
         if (it.userId == selfId) it.copy(userId = actor) else it
     })
 
-    @Synchronized fun addCommunityMembers(id: String, users: Set<String>): CommunityDto? {
+    /** Quem já é integrante só muda de papel (nunca para dono); quem não é entra com o papel pedido. */
+    @Synchronized fun addCommunityMembers(id: String, users: Set<String>, role: String = "MEMBER"): CommunityDto? {
         val existing = communityStore[id] ?: return null
-        val added = users.filter { candidate -> existing.members.none { it.userId == candidate } }.map { CommunityMemberDto(it, "MEMBER") }
-        return existing.copy(members = existing.members + added).also { communityStore[id] = it }
+        val granted = if (role == "ADMIN") "ADMIN" else "MEMBER"
+        val updated = existing.members.map { if (it.userId in users && it.role != "OWNER") it.copy(role = granted) else it }
+        val added = users.filter { candidate -> existing.members.none { it.userId == candidate } }.map { CommunityMemberDto(it, granted) }
+        return existing.copy(members = updated + added).also { communityStore[id] = it }
+    }
+
+    @Synchronized fun communitiesOf(): List<CommunityDto> = communityStore.values.toList()
+
+    @Synchronized fun setCommunityStatus(id: String, status: String): CommunityDto? =
+        communityStore[id]?.copy(status = status)?.also { communityStore[id] = it }
+
+    /** Tira o integrante da comunidade; 409 se ele gere um subgrupo com gente e nenhum sucessor foi indicado. */
+    @Synchronized fun removeCommunityMember(id: String, userId: String, removal: CommunityRemovalRequest): Pair<Int, String> {
+        val community = communityStore[id] ?: return 404 to "{}"
+        val groups = communityGroupStore[id].orEmpty()
+        val needing = groups.filter { it.managerUserId == userId && it.participantIds.any { member -> member != userId } }
+        if (needing.any { group -> removal.successors.none { it.conversationId == group.id } }) return 409 to "{\"errorCode\":\"SUCCESSOR_REQUIRED\"}"
+        communityStore[id] = community.copy(members = community.members.filterNot { it.userId == userId })
+        communityGroupStore[id] = groups.map { group ->
+            val successor = removal.successors.firstOrNull { it.conversationId == group.id }?.successorUserId
+            group.copy(participantIds = group.participantIds - userId, managerUserId = if (group.managerUserId == userId) successor else group.managerUserId)
+        }.toMutableList()
+        return 204 to ""
     }
 
     @Synchronized fun createCommunityGroup(id: String, request: CommunityGroupRequest, actor: String): GroupCreationDto? {
@@ -546,7 +638,7 @@ class MockApiData internal constructor(private val profileStore: MockProfileStor
             else (request.participantIds.map { if (it == actor) selfId else it }.toSet() + selfId).intersect(community.members.map { it.userId }.toSet())
         if (participants.size < 2) return null
         val groupId = "qa-group-${java.util.UUID.randomUUID()}"
-        val group = CommunityGroupDto(groupId, title.trim(), participants, "ACTIVE")
+        val group = CommunityGroupDto(groupId, title.trim(), participants, selfId)
         communityGroupStore.getOrPut(id) { mutableListOf() }.add(group)
         val conversation = ConversationDto(groupId, "GROUP", title.trim(), OffsetDateTime.now().toString())
         conversationList.add(conversation)
@@ -800,6 +892,10 @@ class MockApiData internal constructor(private val profileStore: MockProfileStor
         MessagePreviewDto(message.id, message.senderId, if (message.deleted) "" else listOfNotNull(label, message.content.takeIf { it.isNotBlank() }).joinToString(": "), message.deleted)
     }
 
+    /** A conversa como a lista a mostra agora, com a última interação na hora da última mensagem; nulo se foi arquivada. */
+    @Synchronized fun liveConversation(id: String): ConversationDto? =
+        conversations().firstOrNull { it.id == id }?.let { it.copy(lastInteractionAt = conversationMessages[id]?.lastOrNull()?.timestamp ?: it.lastInteractionAt) }
+
     /** Quem está online, como o retrato de presença que o messenger manda ao assinar a conversa. */
     fun presence(conversationId: String): Map<String, Boolean> = MockChatSeed.presence[conversationId].orEmpty()
 
@@ -813,6 +909,105 @@ class MockApiData internal constructor(private val profileStore: MockProfileStor
     }
 
     fun conversationIds(): List<String> = conversationList.map { it.id }
+
+    private var nextGroup = 1
+    private var nextMedia = 1
+    private val mediaStore = mutableMapOf<String, String>()
+    private val npsAnswered = mutableSetOf<String>()
+    private val ratingStore = mutableListOf<RatingDto>()
+    private var nextRating = 1
+
+    /** A conta de demonstração aparece com o identificador do token da sessão, como nas comunidades. */
+    fun forActor(conversation: ConversationDto, actor: String): ConversationDto = conversation.copy(
+        participantIds = conversation.participantIds.map { if (it == selfId) actor else it },
+        managerUserId = conversation.managerUserId?.let { if (it == selfId) actor else it },
+    )
+
+    @Synchronized fun archivedConversationList(): List<ConversationDto> =
+        if (emptyAccount.value) emptyList() else conversationList.filter { it.id in archivedConversations }.map { it.copy(archived = true, unreadCount = 0, lastMessage = lastMessage(it.id)) }
+
+    @Synchronized fun createGroup(request: GroupConversationRequest, actor: String): GroupCreationDto {
+        val participants = (request.participantIds.map { if (it == actor) selfId else it }.toSet() + selfId).toList()
+        val conversation = ConversationDto("qa-group-${nextGroup++}", "GROUP", request.title.trim(), OffsetDateTime.now().toString(), participantIds = participants, managerUserId = selfId)
+        conversationList.add(conversation)
+        conversationMessages[conversation.id] = mutableListOf()
+        conversationListener?.invoke(conversation.id)
+        return GroupCreationDto(conversation)
+    }
+
+    /** Só o gestor adiciona; quem já está no grupo conta como recusado, como o servidor. */
+    @Synchronized fun addParticipants(id: String, users: Set<String>, actor: String): ConversationDto? {
+        val index = conversationList.indexOfFirst { it.id == id }
+        val conversation = conversationList.getOrNull(index)?.takeIf { it.managerUserId == selfId } ?: return null
+        val incoming = users.map { if (it == actor) selfId else it }
+        val fresh = incoming.filterNot { it in conversation.participantIds }
+        val updated = conversation.copy(participantIds = conversation.participantIds + fresh)
+        conversationList[index] = updated
+        conversationListener?.invoke(id)
+        return updated.copy(rejectedParticipants = (incoming - fresh.toSet()).map { RejectedGroupParticipantDto(it, "ALREADY_PARTICIPANT") })
+    }
+
+    @Synchronized fun transferManager(id: String, successor: String, actor: String): Boolean {
+        val index = conversationList.indexOfFirst { it.id == id }
+        val conversation = conversationList.getOrNull(index)?.takeIf { it.managerUserId == selfId } ?: return false
+        val target = if (successor == actor) selfId else successor
+        if (target !in conversation.participantIds) return false
+        conversationList[index] = conversation.copy(managerUserId = target)
+        conversationListener?.invoke(id)
+        return true
+    }
+
+    /** Sair é remover a própria conta; o gestor que sai com gente no grupo precisa indicar o sucessor. */
+    @Synchronized fun removeParticipant(id: String, userId: String, successor: String?, actor: String): Pair<Int, String> {
+        val index = conversationList.indexOfFirst { it.id == id }
+        val conversation = conversationList.getOrNull(index) ?: return 404 to "{}"
+        val target = if (userId == actor) selfId else userId
+        if (target !in conversation.participantIds) return 404 to "{}"
+        val others = conversation.participantIds - target
+        if (target != selfId && conversation.managerUserId != selfId) return 403 to "{\"errorCode\":\"UNAUTHORIZED_ACCESS\"}"
+        val manager = conversation.managerUserId
+        var nextManager = manager
+        if (target == manager && others.isNotEmpty()) {
+            if (successor == null) return 409 to "{\"errorCode\":\"SUCCESSOR_REQUIRED\"}"
+            val chosen = if (successor == actor) selfId else successor
+            if (chosen !in others) return 409 to "{\"errorCode\":\"SUCCESSOR_INELIGIBLE\"}"
+            nextManager = chosen
+        }
+        if (target == selfId) {
+            conversationList.removeAt(index)
+            conversationMessages.remove(id)
+        } else conversationList[index] = conversation.copy(participantIds = others, managerUserId = nextManager)
+        conversationListener?.invoke(id)
+        return 204 to ""
+    }
+
+    @Synchronized fun mediaUpload(request: MediaUploadRequest): MediaUploadDto {
+        val id = "qa-media-${nextMedia++}"
+        mediaStore[id] = request.type
+        return MediaUploadDto(id, MediaUploadTargetDto("mock://upload/$id", "PUT", emptyMap()), maxBytes = request.sizeBytes)
+    }
+
+    @Synchronized fun mediaType(id: String): String? = mediaStore[id]
+
+    /** Uma imagem de 1 pixel para as fotos; os demais tipos baixam um texto qualquer. */
+    fun mediaBytes(type: String): ByteArray =
+        if (type == "IMAGE") java.util.Base64.getDecoder().decode("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==")
+        else "arquivo de demonstração".toByteArray()
+
+    /** Uma nota por sessão: a segunda volta 409, como o servidor. */
+    @Synchronized fun answerNps(conversationId: String): Boolean = npsAnswered.add(conversationId)
+
+    @Synchronized fun createRating(request: RatingRequest, actor: String): RatingDto =
+        RatingDto("qa-rating-${nextRating++}", actor, request.evaluatedId, request.typeRate, request.comment, request.rating, "ACTIVE", OffsetDateTime.now().toString()).also { ratingStore.add(it) }
+
+    @Synchronized fun ratingsOf(evaluated: String? = null, evaluator: String? = null): List<RatingDto> =
+        ratingStore.filter { (evaluated == null || it.evaluatedId == evaluated) && (evaluator == null || it.evaluatorId == evaluator) }
+
+    @Synchronized fun updateRating(id: String, change: (RatingDto) -> RatingDto): RatingDto? {
+        val index = ratingStore.indexOfFirst { it.id == id }
+        if (index < 0) return null
+        return change(ratingStore[index]).also { ratingStore[index] = it }
+    }
 
     private var nextAssistantSession = 1
     private var nextDirect = 1
@@ -863,6 +1058,7 @@ class MockApiData internal constructor(private val profileStore: MockProfileStor
         patch.muted?.let { if (it) mutedConversations += id else mutedConversations -= id }
         patch.archived?.let { if (it) archivedConversations += id else archivedConversations -= id }
         patch.lastReadSequence?.let { lastRead[id] = maxOf(lastRead[id] ?: 0, it) }
+        conversationListener?.invoke(id)
         return ConversationStateDto(id, id in mutedConversations, id in archivedConversations)
     }
 
@@ -877,6 +1073,7 @@ class MockApiData internal constructor(private val profileStore: MockProfileStor
             if (content != null && current.deleted) return 422 to "{}"
             val updated = if (content == null) current.copy(content = "", deleted = true) else current.copy(content = content, edited = true)
             messages[index] = updated
+            conversationListener?.invoke(updated.conversationId)
             return 200 to ApiJson.instance.encodeToString(MessageDto.serializer(), updated)
         }
         return 404 to "{}"
@@ -897,6 +1094,7 @@ class MockApiData internal constructor(private val profileStore: MockProfileStor
         list.add(message)
         lastRead[request.conversationId] = message.sequence
         messageListener?.invoke(message)
+        conversationListener?.invoke(message.conversationId)
         return message
     }
 

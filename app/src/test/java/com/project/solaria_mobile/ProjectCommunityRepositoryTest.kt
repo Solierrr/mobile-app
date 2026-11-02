@@ -18,6 +18,10 @@ import com.project.solaria_mobile.feature.communication.data.CommunityCreateRequ
 import com.project.solaria_mobile.feature.communication.data.CommunityDto
 import com.project.solaria_mobile.feature.communication.data.CommunityGroupDto
 import com.project.solaria_mobile.feature.communication.data.CommunityMemberDto
+import com.project.solaria_mobile.feature.communication.data.CommunityMembersRequest
+import com.project.solaria_mobile.feature.communication.data.CommunityRemovalRequest
+import com.project.solaria_mobile.feature.communication.data.CommunityStatusRequest
+import com.project.solaria_mobile.feature.communication.data.CommunitySuccessorDto
 import com.project.solaria_mobile.feature.communication.data.RemoteProjectCommunityRepository
 import com.project.solaria_mobile.feature.project.data.ProjectApi
 import com.project.solaria_mobile.feature.project.data.ProjectDto
@@ -94,13 +98,23 @@ class ProjectCommunityRepositoryTest {
         val f = Fixture()
         coEvery { f.api.community("p1") } returns CommunityDto("community", "p1", listOf(CommunityMemberDto("auth-me", "OWNER")), "ACTIVE")
         coEvery { f.api.groups("community") } returns listOf(
-            CommunityGroupDto("visible", "Geral", setOf("auth-me", "auth-ana"), "ACTIVE"),
-            CommunityGroupDto("other", "Outro grupo", setOf("auth-ana"), "ACTIVE"),
+            CommunityGroupDto("visible", "Geral", setOf("auth-me", "auth-ana")),
+            CommunityGroupDto("other", "Outro grupo", setOf("auth-ana")),
         )
         val community = (f.repository.read("p1").result as ApiResult.Success).data
         assertTrue(community.canManage)
         assertTrue(community.groups.first().canOpen)
         assertFalse(community.groups.last().canOpen)
+    }
+
+    @Test fun groupIsActiveOnlyWhileTheCommunityIs() = runTest {
+        val f = Fixture()
+        coEvery { f.api.groups("community") } returns listOf(CommunityGroupDto("g", "Geral", setOf("auth-me")))
+        for ((status, active) in listOf("ACTIVE" to true, "ARCHIVED" to false)) {
+            coEvery { f.api.community("p1") } returns CommunityDto("community", "p1", listOf(CommunityMemberDto("auth-me", "OWNER")), status)
+            val community = (f.repository.read("p1").result as ApiResult.Success).data
+            assertEquals(active, community.groups.single().active)
+        }
     }
 
     @Test fun creatingCommunityUsesAuthIdsFromAuthorizedCoreRoster() = runTest {
@@ -124,5 +138,64 @@ class ProjectCommunityRepositoryTest {
         f.networkState.value = false
         assertEquals(ApiResult.Failure(ErrorKind.CONNECTIVITY), f.repository.createGroup("community", "Geral"))
         coVerify(exactly = 0) { f.api.createGroup(any(), any()) }
+    }
+
+    @Test fun readExposesRolesTheArchivedStateAndWhoManagesEachGroup() = runTest {
+        val f = Fixture()
+        coEvery { f.api.community("p1") } returns CommunityDto("community", "p1", listOf(CommunityMemberDto("auth-me", "OWNER"), CommunityMemberDto("auth-ana", "ADMIN")), "ARCHIVED")
+        coEvery { f.api.groups("community") } returns listOf(CommunityGroupDto("g", "Geral", setOf("auth-me", "auth-ana"), "auth-ana"))
+        val community = (f.repository.read("p1").result as ApiResult.Success).data
+        assertTrue(community.archived)
+        assertEquals("OWNER", community.myRole)
+        assertEquals(listOf("OWNER", "ADMIN"), community.people.map { it.role })
+        assertEquals("auth-ana", community.groups.single().managerId)
+        assertEquals(setOf("auth-me", "auth-ana"), community.groups.single().participantIds.toSet())
+    }
+
+    @Test fun archivingAndGrantingRolesSendTheServerPayloads() = runTest {
+        val f = Fixture()
+        coEvery { f.api.updateStatus(any(), any()) } returns CommunityDto("community", "p1", status = "ARCHIVED")
+        coEvery { f.api.addMember(any(), any()) } returns CommunityDto("community", "p1", status = "ACTIVE")
+        assertEquals(ApiResult.Success(Unit), f.repository.setArchived("community", true))
+        assertEquals(ApiResult.Success(Unit), f.repository.setAdmin("community", "auth-ana", true))
+        assertEquals(ApiResult.Success(Unit), f.repository.setAdmin("community", "auth-ana", false))
+        coVerify { f.api.updateStatus("community", CommunityStatusRequest("ARCHIVED")) }
+        coVerify { f.api.addMember("community", CommunityMembersRequest(setOf("auth-ana"), "ADMIN")) }
+        coVerify { f.api.addMember("community", CommunityMembersRequest(setOf("auth-ana"), "MEMBER")) }
+    }
+
+    private fun incomplete() = HttpException(Response.error<Any>(503, """{"errorCode":"REMOVAL_INCOMPLETE"}""".toResponseBody()))
+
+    @Test fun removalRepeatsTheSameRequestWhileTheServerSaysItIsIncomplete() = runTest {
+        val f = Fixture()
+        var calls = 0
+        coEvery { f.api.removeMember("community", "auth-ana", any()) } answers { if (++calls < 3) throw incomplete() }
+        val result = f.repository.removeMember("community", "auth-ana", mapOf("g" to "auth-me"))
+        assertEquals(ApiResult.Success(Unit), result)
+        assertEquals(3, calls)
+        coVerify(exactly = 3) { f.api.removeMember("community", "auth-ana", CommunityRemovalRequest(listOf(CommunitySuccessorDto("g", "auth-me")))) }
+    }
+
+    @Test fun removalGivesUpAfterThreeAttemptsKeepingTheErrorCode() = runTest {
+        val f = Fixture()
+        // Uma exceção nova a cada chamada: o corpo do erro só pode ser lido uma vez.
+        coEvery { f.api.removeMember(any(), any(), any()) } answers { throw incomplete() }
+        val failure = f.repository.removeMember("community", "auth-ana") as ApiResult.Failure
+        assertEquals("REMOVAL_INCOMPLETE", failure.errorCode)
+        coVerify(exactly = 3) { f.api.removeMember(any(), any(), any()) }
+    }
+
+    @Test fun myCommunitiesJoinTheProjectNamesAndSurviveACoreFailure() = runTest {
+        val f = Fixture()
+        coEvery { f.api.mine() } returns listOf(
+            CommunityDto("c1", "p1", listOf(CommunityMemberDto("auth-me", "ADMIN")), "ACTIVE"),
+            CommunityDto("c2", "p2", listOf(CommunityMemberDto("auth-me", "MEMBER"), CommunityMemberDto("x", "OWNER")), "ARCHIVED"),
+        )
+        coEvery { f.projects.project("p2") } throws java.io.IOException("sem rede")
+        val list = (f.repository.mine() as ApiResult.Success).data
+        assertEquals(listOf("Projeto", ""), list.map { it.projectName })
+        assertEquals(listOf("ADMIN", "MEMBER"), list.map { it.myRole })
+        assertEquals(listOf(false, true), list.map { it.archived })
+        assertEquals(listOf(1, 2), list.map { it.members })
     }
 }

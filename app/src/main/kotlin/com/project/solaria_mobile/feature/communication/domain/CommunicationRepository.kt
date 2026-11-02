@@ -27,6 +27,29 @@ interface CommunicationRepository {
     suspend fun editMessage(id: String, text: String): ApiResult<ChatMessage> = ApiResult.Failure(ErrorKind.NOT_SUPPORTED)
     suspend fun deleteMessage(id: String): ApiResult<ChatMessage> = ApiResult.Failure(ErrorKind.NOT_SUPPORTED)
 
+    /** Conversas que esta conta arquivou; desarquivar é `conversationState(id, archived = false)`. */
+    suspend fun archivedConversations(): ApiResult<List<Conversation>> = ApiResult.Failure(ErrorKind.NOT_SUPPORTED)
+
+    /** Grupo avulso, fora de qualquer comunidade; [GroupCreated.rejectedParticipants] conta os convidados recusados. */
+    suspend fun createGroup(title: String, participantIds: Set<String>): ApiResult<GroupCreated> = ApiResult.Failure(ErrorKind.NOT_SUPPORTED)
+
+    /** Devolve quantos convidados o servidor recusou. */
+    suspend fun addParticipants(id: String, userIds: Set<String>): ApiResult<Int> = ApiResult.Failure(ErrorKind.NOT_SUPPORTED)
+
+    /** Remove [userId] ou, se for a própria conta, sai do grupo. O gestor que sai com outros no grupo indica [successorId]. */
+    suspend fun removeParticipant(id: String, userId: String, successorId: String? = null): ApiResult<Unit> = ApiResult.Failure(ErrorKind.NOT_SUPPORTED)
+
+    suspend fun transferManager(id: String, successorId: String): ApiResult<Unit> = ApiResult.Failure(ErrorKind.NOT_SUPPORTED)
+
+    /** Nome de exibição por `authId` das pessoas que o api-core soube resolver; quem falhar fica de fora. */
+    suspend fun participantNames(authIds: Collection<String>): Map<String, String> = emptyMap()
+
+    /** Nota de 0 a 10 do assistente. 409 `DUPLICATE_RESOURCE` quer dizer que já foi respondida. */
+    suspend fun submitNps(conversationId: String, score: Int): ApiResult<Unit> = ApiResult.Failure(ErrorKind.NOT_SUPPORTED)
+
+    /** Baixa a mídia do servidor para o aparelho e devolve o URI do arquivo; `MEDIA_EXPIRED` quando passou dos 7 dias. */
+    suspend fun downloadMedia(mediaId: String, name: String?): ApiResult<String> = ApiResult.Failure(ErrorKind.NOT_SUPPORTED)
+
     /** Sem valores, só lê o estado atual. `lastReadSequence` marca como lido até essa mensagem. */
     suspend fun conversationState(id: String, muted: Boolean? = null, archived: Boolean? = null, lastReadSequence: Int? = null): ApiResult<ConversationState> =
         ApiResult.Failure(ErrorKind.NOT_SUPPORTED)

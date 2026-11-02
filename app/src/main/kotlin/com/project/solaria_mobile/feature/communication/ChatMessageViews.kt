@@ -171,6 +171,15 @@ private fun MessageMeta(time: String) {
     Text(time, Modifier.padding(top = 3.dp), color = AppTheme.colors.onSurfaceMuted, style = MaterialTheme.typography.labelMedium)
 }
 
+/** O que a bolha precisa para baixar mídia, sem passar parâmetros por cada camada da lista. */
+class MediaUi(
+    val loading: Set<String> = emptySet(),
+    val unavailable: Set<String> = emptySet(),
+    val onDownload: (mediaId: String, name: String?, expiresAt: java.time.Instant?) -> Unit = { _, _, _ -> },
+)
+
+val LocalMediaUi = androidx.compose.runtime.staticCompositionLocalOf { MediaUi() }
+
 /** O anexo, quando há, acima do texto da mensagem. */
 @Composable
 private fun MessageContent(message: ChatMessage, sender: String? = null, mine: Boolean = false) {
@@ -181,7 +190,7 @@ private fun MessageContent(message: ChatMessage, sender: String? = null, mine: B
     Column(Modifier.padding(start = Spacing.sm, end = Spacing.sm, bottom = Spacing.sm, top = if (sender != null) SENDER_TOP_PADDING else Spacing.sm)) {
         if (sender != null) Text(sender, Modifier.padding(horizontal = Spacing.xs).padding(bottom = if (attachment != null) SENDER_GAP_ATTACHMENT else SENDER_GAP), color = AppTheme.colors.onSurfaceMuted, style = MaterialTheme.typography.labelLarge)
         when (attachment) {
-            is MessageAttachment.Image -> ChatImage(attachment.url)
+            is MessageAttachment.Image -> ChatImage(attachment)
             is MessageAttachment.File -> FileCard(attachment)
             is MessageAttachment.Location -> LocationCard(attachment)
             null -> Unit
@@ -218,7 +227,13 @@ fun MessageText(text: String, modifier: Modifier = Modifier, mine: Boolean = fal
 
 /** Foto enviada: carrega pelo mesmo cache das outras imagens do app; arquivos locais (fotos recém-enviadas) são lidos do aparelho. */
 @Composable
-private fun ChatImage(url: String, loader: ImageLoaderViewModel = hiltViewModel()) {
+private fun ChatImage(image: MessageAttachment.Image, loader: ImageLoaderViewModel = hiltViewModel()) {
+    val url = image.url
+    // Ainda só no servidor: o espaço da foto mostra o andamento, o aviso de indisponível ou o convite a baixar.
+    if (url.isBlank()) {
+        MediaPlaceholder(image.mediaId, null, image.expiresAt, Modifier.size(MEDIA_WIDTH, MEDIA_HEIGHT))
+        return
+    }
     RemoteImage(
         key = url,
         load = { key -> if (key.startsWith("file:")) withContext(Dispatchers.IO) { runCatching { File(Uri.parse(key).path.orEmpty()).readBytes() }.getOrNull() } else loader.bytes(key) },
@@ -228,16 +243,41 @@ private fun ChatImage(url: String, loader: ImageLoaderViewModel = hiltViewModel(
     )
 }
 
+/** Mídia que ainda não está no aparelho: baixa ao tocar (as fotos baixam sozinhas), ou diz que o servidor não a guarda mais. */
+@Composable
+private fun MediaPlaceholder(mediaId: String?, name: String?, expiresAt: java.time.Instant?, modifier: Modifier) {
+    val media = LocalMediaUi.current
+    val unavailable = mediaId == null || mediaId in media.unavailable
+    val loading = mediaId != null && mediaId in media.loading
+    Box(
+        modifier.clip(RoundedCornerShape(Radius.medium)).background(AppTheme.colors.surface)
+            .clickable(enabled = !unavailable && !loading) { mediaId?.let { media.onDownload(it, name, expiresAt) } },
+        contentAlignment = Alignment.Center,
+    ) {
+        if (loading) com.project.solaria_mobile.core.designsystem.components.InlineLoader()
+        else Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
+            Icon(painterResource(if (unavailable) AppIcons.shield_alert else AppIcons.download), null, Modifier.size(28.dp), tint = AppTheme.colors.onSurfaceMuted)
+            Text(stringResource(if (unavailable) R.string.ch_midia_indisponivel else R.string.ch_toque_para_baixar), color = AppTheme.colors.onSurfaceMuted, style = MaterialTheme.typography.labelMedium)
+        }
+    }
+}
+
 @Composable
 private fun FileCard(file: MessageAttachment.File) {
     val context = LocalContext.current
+    val media = LocalMediaUi.current
     val size = android.text.format.Formatter.formatShortFileSize(context, file.sizeBytes)
     val description = stringResource(R.string.ch_arquivo_desc, file.name, size)
+    val remoteOnly = file.url.isBlank()
+    val unavailable = file.mediaId == null || file.mediaId in media.unavailable
+    val loading = file.mediaId != null && file.mediaId in media.loading
     Row(
         Modifier.width(MEDIA_WIDTH)
             .clip(RoundedCornerShape(Radius.medium))
             .background(AppTheme.colors.surface)
-            .clickable { openDocument(context, file) }
+            .clickable(enabled = !(remoteOnly && (unavailable || loading))) {
+                if (remoteOnly) file.mediaId?.let { media.onDownload(it, file.name, file.expiresAt) } else openDocument(context, file)
+            }
             .padding(Spacing.sm)
             .semantics { contentDescription = description },
         verticalAlignment = Alignment.CenterVertically,
@@ -246,15 +286,27 @@ private fun FileCard(file: MessageAttachment.File) {
         Icon(painterResource(AppIcons.folder), null, Modifier.size(28.dp), tint = AppTheme.colors.action)
         Column(Modifier.weight(1f)) {
             Text(file.name, color = AppTheme.colors.onSurface, style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Text(size, color = AppTheme.colors.onSurfaceMuted, style = MaterialTheme.typography.labelMedium)
+            Text(
+                when {
+                    !remoteOnly -> size
+                    unavailable -> stringResource(R.string.ch_midia_indisponivel)
+                    loading -> stringResource(R.string.ch_baixando)
+                    else -> stringResource(R.string.ch_toque_para_baixar_tamanho, size)
+                },
+                color = AppTheme.colors.onSurfaceMuted, style = MaterialTheme.typography.labelMedium,
+            )
         }
     }
 }
 
 private fun openDocument(context: android.content.Context, file: MessageAttachment.File) {
     if (!file.url.startsWith("content:") && !file.url.startsWith("file:")) return
+    // O arquivo baixado fica na pasta do app: outro aplicativo só o abre por um URI do FileProvider, nunca por `file://`.
+    val uri = Uri.parse(file.url).let { parsed ->
+        if (parsed.scheme == "file") androidx.core.content.FileProvider.getUriForFile(context, "${context.packageName}.files", File(parsed.path.orEmpty())) else parsed
+    }
     runCatching {
-        context.startActivity(Intent(Intent.ACTION_VIEW).setDataAndType(Uri.parse(file.url), file.mimeType.ifBlank { "*/*" }).addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+        context.startActivity(Intent(Intent.ACTION_VIEW).setDataAndType(uri, file.mimeType.ifBlank { "*/*" }).addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
     }
 }
 

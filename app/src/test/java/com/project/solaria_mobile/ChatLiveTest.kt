@@ -12,6 +12,7 @@ import com.project.solaria_mobile.feature.communication.data.ChatEvent
 import com.project.solaria_mobile.feature.communication.data.ChatRealtime
 import com.project.solaria_mobile.feature.communication.data.FakeCommunicationRepository
 import com.project.solaria_mobile.feature.communication.data.MessageDto
+import com.project.solaria_mobile.feature.communication.data.PresenceState
 import com.project.solaria_mobile.feature.communication.data.parseChatEvent
 import com.project.solaria_mobile.feature.communication.data.toConversation
 import com.project.solaria_mobile.feature.communication.data.testOutbox
@@ -21,6 +22,7 @@ import java.time.ZoneOffset
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runCurrent
@@ -102,15 +104,32 @@ class ChatEventParsingTest {
         assertTrue(parseChatEvent(envelope("MESSAGE_DELETED", body)) is ChatEvent.MessageChanged)
     }
 
-    @Test fun parsesTypingAndPresence() {
-        assertEquals(ChatEvent.Typing("u1", true), parseChatEvent(envelope("TYPING_STARTED", """{"userId":"u1"}""")))
-        assertEquals(ChatEvent.Typing("u1", false), parseChatEvent(envelope("TYPING_STOPPED", """{"userId":"u1"}""")))
-        assertEquals(ChatEvent.Presence("u2", true), parseChatEvent(envelope("USER_ONLINE", """{"userId":"u2","presenceEpoch":1,"presenceVersion":4}""")))
-        assertEquals(ChatEvent.Presence("u2", false), parseChatEvent(envelope("USER_OFFLINE", """{"userId":"u2"}""")))
+    // Presença e retrato não pertencem a uma conversa: o servidor manda `conversationId` nulo.
+    private fun bare(type: String, payload: String) = """{"type":"$type","conversationId":null,"eventId":"e1","serverTimestamp":"2026-10-20T09:00:00Z","payload":$payload}"""
+
+    @Test fun parsesTypingWithItsConversation() {
+        assertEquals(ChatEvent.Typing("c1", "u1", true), parseChatEvent(envelope("TYPING_STARTED", """{"userId":"u1"}""")))
+        assertEquals(ChatEvent.Typing("c1", "u1", false), parseChatEvent(envelope("TYPING_STOPPED", """{"userId":"u1"}""")))
+        // Sem a conversa não há onde mostrar o aviso.
+        assertNull(parseChatEvent(bare("TYPING_STARTED", """{"userId":"u1"}""")))
+    }
+
+    @Test fun parsesPresenceWithItsEpochAndVersion() {
+        assertEquals(ChatEvent.Presence("u2", true, "e1", 4), parseChatEvent(bare("USER_ONLINE", """{"userId":"u2","presenceEpoch":"e1","presenceVersion":4}""")))
+        assertEquals(ChatEvent.Presence("u2", false), parseChatEvent(bare("USER_OFFLINE", """{"userId":"u2"}""")))
         assertEquals(
-            ChatEvent.PresenceSnapshot(mapOf("u1" to true, "u2" to false)),
-            parseChatEvent(envelope("PRESENCE_SNAPSHOT", """{"subscriptionId":"s","presenceEpoch":1,"presenceVersion":2,"users":{"u1":true,"u2":false}}""")),
+            ChatEvent.PresenceSnapshot(mapOf("u1" to true, "u2" to false), "e1", 2),
+            parseChatEvent(bare("PRESENCE_SNAPSHOT", """{"subscriptionId":null,"presenceEpoch":"e1","presenceVersion":2,"users":{"u1":true,"u2":false}}""")),
         )
+    }
+
+    @Test fun parsesConversationUpdatesAsTheListProjection() {
+        val event = parseChatEvent(envelope("CONVERSATION_UPDATED", """{"id":"c1","syncEpoch":"x","syncVersion":9,"conversationType":"GROUP","participantIds":["u1","u2"],"lastInteractionAt":"2026-11-02T10:00:00Z","unreadCount":3,"muted":false,"archived":false,"lastMessage":{"id":"m1","senderId":"u1","content":"oi","deleted":false}}"""))
+        val conversation = (event as ChatEvent.ConversationUpdated).conversation
+        assertEquals("c1", conversation.id)
+        assertEquals(3L, conversation.unreadCount)
+        assertEquals(listOf("u1", "u2"), conversation.participantIds)
+        assertEquals("oi", conversation.lastMessage?.content)
     }
 
     @Test fun removedConversationComesFromThePayloadId() {
@@ -118,7 +137,7 @@ class ChatEventParsingTest {
     }
 
     @Test fun ignoresUnknownTypesAndMalformedBodies() {
-        assertNull(parseChatEvent(envelope("CONVERSATION_UPDATED", """{"id":"c1"}""")))
+        assertNull(parseChatEvent(envelope("CONVERSATION_RENAMED", """{"id":"c1"}""")))
         assertNull(parseChatEvent("não é json"))
         assertNull(parseChatEvent(envelope("MESSAGE_CREATED", "null")))
     }
@@ -129,9 +148,12 @@ class ChatRealtimeViewModelTest {
     @get:Rule val mainDispatcher = MainDispatcherRule()
 
     private class FakeRealtime : ChatRealtime {
-        val events = MutableSharedFlow<ChatEvent>(extraBufferCapacity = 16)
+        override val events = MutableSharedFlow<ChatEvent>(extraBufferCapacity = 16)
+        val presenceState = MutableStateFlow(PresenceState())
+        val typingState = MutableStateFlow<Map<String, Set<String>>>(emptyMap())
         override val connected: Flow<Boolean> = flowOf(true)
-        override fun conversationEvents(conversationId: String): Flow<ChatEvent> = events
+        override val presence: Flow<PresenceState> = presenceState
+        override val typingByConversation: Flow<Map<String, Set<String>>> = typingState
         override suspend fun typing(conversationId: String, started: Boolean) = Unit
     }
 
@@ -140,24 +162,66 @@ class ChatRealtimeViewModelTest {
         return ChatViewModel(SavedStateHandle(mapOf("id" to "c1")), repository, testOutbox(repository), realtime, ChatCapabilities { false })
     }
 
-    @Test fun showsTypingAndPresenceFromTheServer() = runTest {
+    @Test fun showsTypingAndPresenceFromTheGlobalState() = runTest {
         val realtime = FakeRealtime()
         val viewModel = viewModel(realtime)
         viewModel.uiState.test {
             advanceUntilIdle()
-            realtime.events.emit(ChatEvent.PresenceSnapshot(mapOf("ana" to true)))
-            realtime.events.emit(ChatEvent.Typing("ana", true))
-            // Só processa o que já está pronto: o aviso expira sozinho depois de 8 s de tempo virtual.
+            realtime.presenceState.value = PresenceState(known = true, online = setOf("ana"))
+            realtime.typingState.value = mapOf("c1" to setOf("ana"))
             runCurrent()
             val typing = (expectMostRecentItem() as UiState.Content).data
             assertEquals(1, typing.typingCount)
             assertEquals(true, typing.online)
-            realtime.events.emit(ChatEvent.Typing("ana", false))
-            realtime.events.emit(ChatEvent.Presence("ana", false))
+            realtime.typingState.value = emptyMap()
+            realtime.presenceState.value = PresenceState(known = true, online = emptySet())
             advanceUntilIdle()
             val idle = (expectMostRecentItem() as UiState.Content).data
             assertEquals(0, idle.typingCount)
             assertEquals(false, idle.online)
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test fun unknownPresenceIsNotShownAsOffline() = runTest {
+        val viewModel = viewModel(FakeRealtime())
+        viewModel.uiState.test {
+            advanceUntilIdle()
+            assertNull((expectMostRecentItem() as UiState.Content).data.online)
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test fun ignoresTypingAndMessagesOfOtherConversations() = runTest {
+        val realtime = FakeRealtime()
+        val viewModel = viewModel(realtime)
+        viewModel.uiState.test {
+            advanceUntilIdle()
+            val before = (expectMostRecentItem() as UiState.Content).data.messages.size
+            realtime.typingState.value = mapOf("c2" to setOf("ana"))
+            realtime.events.emit(ChatEvent.MessageCreated(MessageDto("other-1", "c2", "ana", "outra conversa", "2026-10-20T09:00:00Z", 9)))
+            advanceUntilIdle()
+            // Nada muda para esta conversa, então o estado não emite de novo: lê o valor atual.
+            val state = (viewModel.uiState.value as UiState.Content).data
+            assertEquals(0, state.typingCount)
+            assertEquals(before, state.messages.size)
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test fun appliesRecoveredMessagesOnceAndTheirLaterEdits() = runTest {
+        val realtime = FakeRealtime()
+        val viewModel = viewModel(realtime)
+        viewModel.uiState.test {
+            advanceUntilIdle()
+            val before = (expectMostRecentItem() as UiState.Content).data.messages.size
+            val recovered = MessageDto("lost-1", "c1", "ana", "perdida", "2026-10-20T09:00:00Z", 60)
+            realtime.events.emit(ChatEvent.MessageRecovered(recovered))
+            realtime.events.emit(ChatEvent.MessageRecovered(recovered.copy(content = "perdida, editada", edited = true)))
+            advanceUntilIdle()
+            val messages = (expectMostRecentItem() as UiState.Content).data.messages
+            assertEquals(before + 1, messages.size)
+            assertEquals("perdida, editada", messages.single { it.id == "lost-1" }.text)
             cancelAndIgnoreRemainingEvents()
         }
     }

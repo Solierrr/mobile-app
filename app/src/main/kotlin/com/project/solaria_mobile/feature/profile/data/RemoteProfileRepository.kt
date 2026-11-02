@@ -134,6 +134,7 @@ internal fun SelfProfileDto.toProfile(): UserProfile {
         companyId = companyMemberships.firstOrNull { !it.companyId.isNullOrBlank() }?.companyId,
         technicianId = technician?.id?.takeIf { it.isNotBlank() },
         independent = activeAffiliations.any { it.type == "INDEPENDENT" },
+        authId = authId,
     )
 }
 
@@ -159,7 +160,7 @@ private fun SelfProfileDto.affiliationLabel(hasProfession: Boolean): String {
 
 internal fun UserDto.toProfile(): UserProfile = UserProfile(
     id = id, initials = initialsOf(displayName()), name = displayName(), handle = handle(),
-    state = "", occupation = "", phone = "", avatarUrl = avatar, bannerUrl = banner, connected = connected,
+    state = "", occupation = "", phone = "", avatarUrl = avatar, bannerUrl = banner, connected = connected, authId = authId,
 )
 
 internal fun UserDto.toConnection(): Connection = Connection(

@@ -8,8 +8,10 @@ import com.project.solaria_mobile.core.network.realtime.StompConnector
 import com.project.solaria_mobile.core.network.realtime.StompRealtimeClient
 import com.project.solaria_mobile.feature.communication.data.ChatCapabilities
 import com.project.solaria_mobile.feature.communication.data.ChatRealtime
-import com.project.solaria_mobile.feature.communication.data.MockModeChatCapabilities
+import com.project.solaria_mobile.feature.communication.data.MessageRecovery
+import com.project.solaria_mobile.feature.communication.data.AppChatCapabilities
 import com.project.solaria_mobile.feature.communication.data.SwitchingChatRealtime
+import com.project.solaria_mobile.feature.communication.data.UpdatesMessageRecovery
 import dagger.Binds
 import dagger.Module
 import dagger.Provides
@@ -40,7 +42,10 @@ abstract class RealtimeModule {
     abstract fun bindChatRealtime(impl: SwitchingChatRealtime): ChatRealtime
 
     @Binds
-    abstract fun bindChatCapabilities(impl: MockModeChatCapabilities): ChatCapabilities
+    abstract fun bindMessageRecovery(impl: UpdatesMessageRecovery): MessageRecovery
+
+    @Binds
+    abstract fun bindChatCapabilities(impl: AppChatCapabilities): ChatCapabilities
 
     companion object {
         /** Escopo do processo para a conexão em tempo real, que sobrevive às telas. */

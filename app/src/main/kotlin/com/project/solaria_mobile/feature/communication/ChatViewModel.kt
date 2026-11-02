@@ -17,10 +17,15 @@ import com.project.solaria_mobile.feature.communication.domain.MessageAttachment
 import com.project.solaria_mobile.feature.communication.data.ChatCapabilities
 import com.project.solaria_mobile.feature.communication.data.ChatEvent
 import com.project.solaria_mobile.feature.communication.data.ChatRealtime
+import com.project.solaria_mobile.feature.communication.data.MessageDto
 import com.project.solaria_mobile.feature.communication.data.NoChatRealtime
 import com.project.solaria_mobile.feature.communication.data.PAGE_SIZE
+import com.project.solaria_mobile.feature.communication.data.PresenceState
+import com.project.solaria_mobile.feature.communication.data.conversationId
 import com.project.solaria_mobile.feature.communication.data.toMessage
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.delay
 import com.project.solaria_mobile.presentation.navigation.routeId
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -30,6 +35,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import com.project.solaria_mobile.feature.communication.data.MessageOutbox
 import com.project.solaria_mobile.feature.communication.data.PendingState
@@ -60,6 +66,8 @@ data class ChatUiState(
     /** Nulo enquanto o estado pessoal não foi lido; o menu só oferece silenciar quando ele é conhecido. */
     val muted: Boolean? = null,
     val archived: Boolean = false,
+    /** A pessoa deixou de participar da conversa (evento `CONVERSATION_REMOVED`); a tela deve sair dela. */
+    val removed: Boolean = false,
     /** Há histórico mais antigo no servidor para carregar ao rolar para cima. */
     val hasMore: Boolean = false,
     val loadingOlder: Boolean = false,
@@ -75,9 +83,29 @@ data class ChatUiState(
     val attachmentsEnabled: Boolean = false,
     /** O assistente está elaborando a resposta de uma mensagem enviada nesta sessão. */
     val assistantThinking: Boolean = false,
+    /** Mídia que está baixando e mídia que o servidor não entrega mais (passou dos 7 dias), por `mediaId`. */
+    val mediaLoading: Set<String> = emptySet(),
+    val mediaUnavailable: Set<String> = emptySet(),
+    /** Um anexo está subindo para o servidor. */
+    val uploading: Boolean = false,
+    /** Sessão do assistente que já teve resposta e ainda não foi avaliada: ao sair, pede a nota (NPS). */
+    val npsPending: Boolean = false,
 )
 
 internal const val MAX_MESSAGE_LENGTH = 8_000
+
+/** Sessões do assistente já avaliadas neste processo; a de uma execução anterior o servidor recusa com 409 e entra aqui também. */
+internal val NpsAnswers: MutableSet<String> = java.util.concurrent.ConcurrentHashMap.newKeySet()
+
+/** Quantas das últimas mensagens baixam a foto sozinhas ao abrir a conversa. */
+private const val AUTO_DOWNLOAD_WINDOW = 20
+
+/** Mostra o arquivo que já está no aparelho no lugar do `mediaId` que só o servidor conhece. */
+private fun ChatMessage.withLocalMedia(files: Map<String, String>): ChatMessage = when (val a = attachment) {
+    is MessageAttachment.Image -> a.mediaId?.let(files::get)?.takeIf { a.url.isBlank() }?.let { copy(attachment = a.copy(url = it)) } ?: this
+    is MessageAttachment.File -> a.mediaId?.let(files::get)?.takeIf { a.url.isBlank() }?.let { copy(attachment = a.copy(url = it)) } ?: this
+    else -> this
+}
 
 private data class ChatContent(
     val conversation: Conversation,
@@ -86,13 +114,20 @@ private data class ChatContent(
     val firstUnreadSequence: Int? = null,
 )
 
-private data class LivePresence(val typing: Set<String> = emptySet(), val online: Map<String, Boolean> = emptyMap(), val loadingOlder: Boolean = false, val thinking: Boolean = false)
+/** Mídia da conversa: o arquivo já no aparelho por `mediaId`, o que está baixando e o que o servidor não entrega mais. */
+private data class MediaProgress(val files: Map<String, String> = emptyMap(), val loading: Set<String> = emptySet(), val unavailable: Set<String> = emptySet())
+
+private data class LivePresence(
+    val typing: Set<String> = emptySet(), val presence: PresenceState = PresenceState(), val loadingOlder: Boolean = false, val thinking: Boolean = false,
+    val media: MediaProgress = MediaProgress(), val uploading: Boolean = false,
+)
 
 private data class ChatControls(
     val editingId: String?,
     val action: ChatAction?,
     val muted: Boolean?,
     val archived: Boolean,
+    val removed: Boolean = false,
 )
 
 @HiltViewModel
@@ -134,26 +169,36 @@ class ChatViewModel @Inject constructor(
     private val composer = combine(draft, sendFailure, draftLimitExceeded) { text, failure, exceeded -> Triple(text, failure, exceeded) }
     private val live = MutableStateFlow(LivePresence())
     private val myId = repository.currentUserId()
-    private val typingTimeouts = mutableMapOf<String, Job>()
 
     private val allOutgoing = combine(outgoing, assistantPending) { queued, assistant -> queued + assistant }
 
     val uiState: StateFlow<UiState<ChatUiState>> = combine(content, composer, allOutgoing, controls, live) { loaded, (text, failure, exceeded), queued, control, presence ->
         when (loaded) {
             is UiState.Content -> {
-                val names = loaded.data.messages.mapNotNull { message -> message.senderId?.let { id -> id to message.senderName } }.toMap()
-                val others = presence.online.filterKeys { it != myId }
+                // O servidor só manda o `senderId`; o nome vem dos participantes da conversa, e o da própria mensagem (modo de demonstração) tem prioridade.
+                val known = loaded.data.conversation.participantNames
+                val messages = loaded.data.messages.map { message ->
+                    val name = message.senderId?.let(known::get)
+                    val named = if (message.mine || !message.senderName.isNullOrBlank() || name == null) message else message.copy(senderName = name)
+                    named.withLocalMedia(presence.media.files)
+                }
+                val names = known + messages.mapNotNull { message -> message.senderId?.let { id -> message.senderName?.takeIf(String::isNotBlank)?.let { id to it } } }
+                // Participantes da conversa menos a própria conta, cruzados com a presença global dos contatos.
+                val others = loaded.data.conversation.participants.filterNot { it == myId?.lowercase() }
+                val onlineOthers = others.filter { it in presence.presence.online }
                 UiState.Content(
                     ChatUiState(
-                        loaded.data.conversation, text, loaded.data.messages, failure, exceeded, queued,
-                        control.editingId, control.action, control.muted, control.archived,
+                        loaded.data.conversation, text, messages, failure, exceeded, queued,
+                        control.editingId, control.action, control.muted, control.archived, control.removed,
                         hasMore = loaded.data.hasMore, loadingOlder = presence.loadingOlder, firstUnreadSequence = loaded.data.firstUnreadSequence,
-                        typingNames = presence.typing.mapNotNull { names[it]?.takeIf(String::isNotBlank) },
+                        typingNames = presence.typing.mapNotNull { names[it] },
                         typingCount = presence.typing.size,
-                        online = if (loaded.data.conversation.group || others.isEmpty()) null else others.values.any { it },
-                        onlineCount = others.values.count { it },
+                        online = if (!presence.presence.known || loaded.data.conversation.group || others.isEmpty()) null else onlineOthers.isNotEmpty(),
+                        onlineCount = onlineOthers.size,
                         attachmentsEnabled = capabilities.attachments() && !loaded.data.conversation.assistant,
                         assistantThinking = presence.thinking,
+                        mediaLoading = presence.media.loading, mediaUnavailable = presence.media.unavailable, uploading = presence.uploading,
+                        npsPending = loaded.data.conversation.assistant && remoteId != null && messages.any { !it.mine } && remote() !in NpsAnswers,
                     ),
                 )
             }
@@ -165,19 +210,27 @@ class ChatViewModel @Inject constructor(
 
     init {
         load()
+        // Foto recebida baixa sozinha (as mais recentes); documento, áudio e vídeo esperam o toque.
+        viewModelScope.launch {
+            content.collect { state ->
+                (state as? UiState.Content)?.data?.messages.orEmpty().takeLast(AUTO_DOWNLOAD_WINDOW).forEach { message ->
+                    val image = message.attachment as? MessageAttachment.Image
+                    if (image != null && image.url.isBlank() && image.mediaId != null) download(image.mediaId, null, image.expiresAt)
+                }
+            }
+        }
         viewModelScope.launch {
             outbox.delivered.filter { it.conversationId == conversationId }.collect { delivered ->
                 val message = delivered.message
                 if (message == null) refreshMessages() else appendMessage(message)
             }
         }
-        if (!newSession) viewModelScope.launch { realtime.conversationEvents(conversationId).collect(::onEvent) }
-        viewModelScope.launch {
-            // Quem estava fora do ar recupera o que perdeu assim que a conexão volta.
-            var wasDown = false
-            realtime.connected.collect { connected ->
-                if (!connected) wasDown = true else if (wasDown) { wasDown = false; catchUp() }
-            }
+        if (!newSession) {
+            // Um canal só traz as conversas todas; aqui ficam os eventos desta, e a presença e o "digitando" vêm do estado global.
+            // O que passou com a conexão fora chega como `MessageRecovered`, recuperado pelo próprio tempo real; `Resynced` vale para todas.
+            viewModelScope.launch { realtime.events.filter { it.conversationId() == conversationId || it is ChatEvent.Resynced }.collect(::onEvent) }
+            viewModelScope.launch { realtime.presence.collect { state -> live.update { it.copy(presence = state) } } }
+            viewModelScope.launch { realtime.typingByConversation.collect { all -> live.update { it.copy(typing = all[conversationId].orEmpty()) } } }
         }
     }
 
@@ -257,13 +310,61 @@ class ChatViewModel @Inject constructor(
         }
     }
 
-    /** Envia uma foto, um documento ou uma localização; só o modo de demonstração aceita, enquanto o messenger não tem contrato para isso. */
+    /** Envia uma foto, um documento ou uma localização: o arquivo sobe para o bucket e a mensagem cita o `mediaId`. */
     fun sendAttachment(attachment: MessageAttachment) {
         sendFailure.value = null
+        live.update { it.copy(uploading = true) }
         viewModelScope.launch {
             when (val result = repository.sendAttachment(remote(), attachment)) {
-                is ApiResult.Success -> appendMessage(result.data)
+                is ApiResult.Success -> {
+                    // Quem enviou já tem o arquivo: o eco do servidor, que só traz o `mediaId`, não precisa baixá-lo de volta.
+                    val sent = result.data.attachment
+                    val local = (sent as? MessageAttachment.Image)?.let { it.mediaId to it.url } ?: (sent as? MessageAttachment.File)?.let { it.mediaId to it.url }
+                    if (local?.first != null && local.second.isNotBlank()) live.update { it.copy(media = it.media.copy(files = it.media.files + (local.first!! to local.second))) }
+                    appendMessage(result.data)
+                }
                 is ApiResult.Failure -> sendFailure.value = result.kind
+            }
+            live.update { it.copy(uploading = false) }
+        }
+    }
+
+    /**
+     * Manda a nota da sessão do assistente. Segue mesmo que a tela já tenha saído (por isso `NonCancellable`): quem avalia ao sair
+     * fecha o chat logo em seguida. 409 `DUPLICATE_RESOURCE` quer dizer que já tinha respondido; qualquer outro erro deixa perguntar de novo.
+     */
+    fun submitNps(score: Int) {
+        val id = remote()
+        viewModelScope.launch {
+            withContext(NonCancellable) {
+                val result = repository.submitNps(id, score)
+                if (result is ApiResult.Success || (result is ApiResult.Failure && result.errorCode == "DUPLICATE_RESOURCE")) NpsAnswers += id
+            }
+        }
+    }
+
+    /**
+     * Baixa uma mídia recebida para o aparelho, uma vez. Passou do prazo (7 dias no servidor) ou o servidor não a entrega mais:
+     * fica como indisponível e não tenta de novo. Qualquer outra falha deixa tentar com um toque.
+     */
+    fun download(mediaId: String, name: String?, expiresAt: java.time.Instant? = null) {
+        val progress = live.value.media
+        if (mediaId in progress.files || mediaId in progress.loading || mediaId in progress.unavailable) return
+        if (expiresAt != null && expiresAt.isBefore(java.time.Instant.now())) {
+            live.update { it.copy(media = it.media.copy(unavailable = it.media.unavailable + mediaId)) }
+            return
+        }
+        live.update { it.copy(media = it.media.copy(loading = it.media.loading + mediaId)) }
+        viewModelScope.launch {
+            val result = repository.downloadMedia(mediaId, name)
+            live.update { state ->
+                val media = state.media.copy(loading = state.media.loading - mediaId)
+                state.copy(media = when {
+                    result is ApiResult.Success -> media.copy(files = media.files + (mediaId to result.data))
+                    result is ApiResult.Failure && (result.errorCode == "MEDIA_EXPIRED" || result.kind == ErrorKind.NOT_FOUND || result.kind == ErrorKind.FORBIDDEN) ->
+                        media.copy(unavailable = media.unavailable + mediaId)
+                    else -> media
+                })
             }
         }
     }
@@ -275,10 +376,12 @@ class ChatViewModel @Inject constructor(
         when (event) {
             // Numa sessão do assistente a resposta vem no retorno do turno; o evento só duplicaria a mensagem.
             is ChatEvent.MessageCreated, is ChatEvent.MessageChanged -> if (!isAssistant()) onMessageEvent(event)
-            is ChatEvent.Typing -> onTyping(event.userId, event.started)
-            is ChatEvent.Presence -> live.value = live.value.copy(online = live.value.online + (event.userId to event.online))
-            is ChatEvent.PresenceSnapshot -> live.value = live.value.copy(online = event.users)
-            is ChatEvent.ConversationRemoved -> controls.value = controls.value.copy(archived = true)
+            is ChatEvent.MessageRecovered -> if (!isAssistant()) onRecovered(event.message)
+            // O servidor perdeu a contagem de versões: o que está na tela pode estar velho, então lê o histórico de novo.
+            is ChatEvent.Resynced -> if (!isAssistant()) refreshMessages()
+            is ChatEvent.ConversationRemoved -> controls.value = controls.value.copy(removed = true)
+            // Presença e "digitando" chegam pelo estado global do tempo real, não por este fluxo.
+            else -> Unit
         }
     }
 
@@ -286,31 +389,48 @@ class ChatViewModel @Inject constructor(
         when (event) {
             is ChatEvent.MessageCreated -> {
                 val message = event.message.toMessage(myId)
+                val lastKnown = currentMessages().maxOfOrNull { it.sequence } ?: 0
                 appendMessage(message)
-                if (!message.mine && message.sequence > 0) viewModelScope.launch { repository.conversationState(remote(), lastReadSequence = message.sequence) }
+                // Entre instâncias uma inserção pode ficar para trás: ela aparece como um pulo na sequência, e aí busca o que falta.
+                if (hasSequenceGap(lastKnown, message.sequence)) catchUp(lastKnown)
+                markRead(message)
             }
             is ChatEvent.MessageChanged -> replaceOrAppend(event.message.toMessage(myId))
             else -> Unit
         }
     }
 
-    private fun onTyping(userId: String, started: Boolean) {
-        if (userId == myId) return
-        typingTimeouts.remove(userId)?.cancel()
-        live.value = live.value.copy(typing = if (started) live.value.typing + userId else live.value.typing - userId)
-        if (started) typingTimeouts[userId] = viewModelScope.launch {
-            // Sem renovação, o aviso some sozinho, mesmo que o "parou de digitar" se perca.
-            delay(TYPING_EXPIRE_MILLIS)
-            live.value = live.value.copy(typing = live.value.typing - userId)
+    private fun onRecovered(dto: MessageDto) {
+        val message = dto.toMessage(myId)
+        replaceOrAppend(message)
+        markRead(message)
+    }
+
+    /** Busca o que foi publicado depois de [after], quando uma mensagem ao vivo chegou com a sequência pulada. */
+    private fun catchUp(after: Int) {
+        viewModelScope.launch {
+            val missed = repository.messagesSince(remote(), after) as? ApiResult.Success ?: return@launch
+            missed.data.forEach(::replaceOrAppend)
         }
     }
 
-    /** Busca o que foi publicado depois da última mensagem conhecida, depois de uma queda da conexão. */
-    private fun catchUp() {
-        val last = currentMessages().maxOfOrNull { it.sequence } ?: return
-        viewModelScope.launch {
-            val missed = repository.messagesSince(remote(), last) as? ApiResult.Success ?: return@launch
-            missed.data.forEach(::replaceOrAppend)
+    private fun markRead(message: ChatMessage) {
+        if (!message.mine && message.sequence > 0) scheduleRead(message.sequence)
+    }
+
+    private var readJob: Job? = null
+    private var pendingRead = 0
+
+    /**
+     * Junta uma rajada de mensagens numa leitura só: espera um instante sem novidade e marca como lida a maior sequência vista. Se a
+     * tela fechar nesse instante, a marcação se perde e a lista mostra a mensagem como não lida até a próxima abertura.
+     */
+    private fun scheduleRead(sequence: Int) {
+        pendingRead = maxOf(pendingRead, sequence)
+        readJob?.cancel()
+        readJob = viewModelScope.launch {
+            delay(READ_DEBOUNCE_MILLIS)
+            repository.conversationState(remote(), lastReadSequence = pendingRead)
         }
     }
 
@@ -491,7 +611,7 @@ class ChatViewModel @Inject constructor(
 
 private const val TYPING_RENEW_MILLIS = 3_000L
 private const val TYPING_IDLE_MILLIS = 4_000L
-private const val TYPING_EXPIRE_MILLIS = 8_000L
+private const val READ_DEBOUNCE_MILLIS = 500L
 
 /** Texto curto para o resultado de uma ação da conversa. */
 internal fun ChatAction.message(resources: android.content.res.Resources): String = when (this) {

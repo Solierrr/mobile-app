@@ -8,6 +8,9 @@ import com.project.solaria_mobile.core.common.ErrorKind
 import com.project.solaria_mobile.core.common.UiState
 import com.project.solaria_mobile.core.common.canRetainContent
 import com.project.solaria_mobile.feature.communication.domain.ProjectCommunity
+import com.project.solaria_mobile.feature.communication.domain.canChangeAdmin
+import com.project.solaria_mobile.feature.communication.domain.canRemove
+import com.project.solaria_mobile.feature.communication.domain.groupsNeedingSuccessor
 import com.project.solaria_mobile.feature.communication.domain.ProjectCommunityRepository
 import com.project.solaria_mobile.presentation.navigation.routeId
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -20,7 +23,7 @@ import kotlinx.coroutines.launch
 /** Aviso de grupo criado; [rejected] convites não foram admitidos pelo servidor. */
 data class GroupNotice(val rejected: Int)
 
-data class CommunityContent(val community: ProjectCommunity, val busy: Boolean = false, val error: ErrorKind? = null, val notice: GroupNotice? = null)
+data class CommunityContent(val community: ProjectCommunity, val busy: Boolean = false, val error: ErrorKind? = null, val notice: GroupNotice? = null, val errorCode: String? = null)
 
 @HiltViewModel
 class ProjectCommunityViewModel @Inject constructor(
@@ -67,6 +70,28 @@ class ProjectCommunityViewModel @Inject constructor(
         repository.addMember(id, authId)
     }
 
+    fun setArchived(archived: Boolean) = operation { community ->
+        val id = community.id ?: return@operation ApiResult.Failure(ErrorKind.NOT_FOUND)
+        if (!community.canManage || community.archived == archived) return@operation ApiResult.Failure(ErrorKind.FORBIDDEN)
+        repository.setArchived(id, archived)
+    }
+
+    fun setAdmin(authId: String, admin: Boolean) = operation { community ->
+        val id = community.id ?: return@operation ApiResult.Failure(ErrorKind.NOT_FOUND)
+        val person = community.people.firstOrNull { it.authId == authId }
+        if (community.archived || person == null || !community.canChangeAdmin(person) || (person.role == "ADMIN") == admin) return@operation ApiResult.Failure(ErrorKind.FORBIDDEN)
+        repository.setAdmin(id, authId, admin)
+    }
+
+    /** [successors] indica, por subgrupo que a pessoa gere, quem assume; falta de um deles é pedido inválido antes de ir ao servidor. */
+    fun removeMember(authId: String, successors: Map<String, String> = emptyMap()) = operation { community ->
+        val id = community.id ?: return@operation ApiResult.Failure(ErrorKind.NOT_FOUND)
+        val person = community.people.firstOrNull { it.authId == authId }
+        if (person == null || !community.canRemove(person)) return@operation ApiResult.Failure(ErrorKind.FORBIDDEN)
+        if (community.groupsNeedingSuccessor(authId).any { it.id !in successors }) return@operation ApiResult.Failure(ErrorKind.VALIDATION)
+        repository.removeMember(id, authId, successors)
+    }
+
     fun createGroup(title: String, participants: Set<String>? = null) = operation { community ->
         val id = community.id ?: return@operation ApiResult.Failure(ErrorKind.NOT_FOUND)
         if (!community.active || community.members < 2) return@operation ApiResult.Failure(ErrorKind.FORBIDDEN)
@@ -82,12 +107,12 @@ class ProjectCommunityViewModel @Inject constructor(
     private fun operation(call: suspend (ProjectCommunity) -> ApiResult<*>) {
         val current = mutable.value as? UiState.Content ?: return
         if (current.refreshing || current.data.busy) return
-        mutable.value = current.copy(data = current.data.copy(busy = true, error = null, notice = null))
+        mutable.value = current.copy(data = current.data.copy(busy = true, error = null, errorCode = null, notice = null))
         viewModelScope.launch {
             val result = call(current.data.community)
             val latest = mutable.value as? UiState.Content ?: return@launch
             mutable.value = latest.copy(data = latest.data.copy(busy = false,
-                error = (result as? ApiResult.Failure)?.kind,
+                error = (result as? ApiResult.Failure)?.kind, errorCode = (result as? ApiResult.Failure)?.errorCode,
                 notice = (result as? ApiResult.Success)?.data as? GroupNotice))
             if (result is ApiResult.Success || (result is ApiResult.Failure && result.kind == ErrorKind.CONFLICT)) load()
         }
