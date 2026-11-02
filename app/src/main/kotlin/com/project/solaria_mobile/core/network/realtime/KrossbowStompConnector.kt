@@ -1,6 +1,6 @@
 package com.project.solaria_mobile.core.network.realtime
 
-import com.project.solaria_mobile.core.auth.accessTokenUserId
+import com.project.solaria_mobile.core.auth.accessTokenSubject
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.flow
@@ -10,7 +10,7 @@ import org.hildan.krossbow.stomp.StompErrorFrameReceived
 import org.hildan.krossbow.stomp.StompSession
 import org.hildan.krossbow.stomp.config.HeartBeat
 import org.hildan.krossbow.stomp.frame.FrameBody
-import org.hildan.krossbow.stomp.headers.StompSendHeaders
+import org.hildan.krossbow.stomp.sendText
 import org.hildan.krossbow.stomp.subscribeText
 import org.hildan.krossbow.websocket.okhttp.OkHttpWebSocketClient
 import javax.inject.Inject
@@ -29,7 +29,6 @@ import kotlin.time.Duration.Companion.seconds
  * - `/ws` (local) | `/messaging/ws` (local com kong | QA | prod)
  * - jwt vai no header `Authorization` do frame `CONNECT`
  * - heartbeat de 10 s (Kong derruba conexão ociosa em 60 s)
- * - eventos privados em `/topic/users.{userId}.{acks|errors|events}`, com o `sub` do jwt
  * - servidor confere expiração do token apenas quando chega um frame
  *
  *
@@ -54,7 +53,7 @@ class KrossbowStompConnector @Inject constructor(
             // Um frame ERROR durante o CONNECT só acontece por recusa de autenticação
             throw authFailureOf(e)?.let { StompAuthException(it, e) } ?: e
         }
-        return KrossbowStompLink(session, accessTokenUserId(token).orEmpty())
+        return KrossbowStompLink(session, accessTokenSubject(token))
     }
 
     private companion object {
@@ -64,30 +63,35 @@ class KrossbowStompConnector @Inject constructor(
 
 private class KrossbowStompLink(
     private val session: StompSession,
-    private val userId: String,
+    private val userId: String?,
 ) : StompLink {
 
     override fun subscribe(destination: String): Flow<String> =
         flow { emitAll(session.subscribeText(destination)) }
 
     override suspend fun send(destination: String, body: String) {
-        // O messenger lê o corpo como JSON, então o frame SEND declara o tipo em vez de depender do padrão do servidor
-        session.send(StompSendHeaders(destination) { contentType = "application/json" }, FrameBody.Text(body))
+        session.sendText(destination, body)
     }
 
     override suspend fun close() {
         session.disconnect()
     }
 
-    override suspend fun awaitLoss(): AuthFailure? =
-        try {
-            session.subscribeText("/topic/users.$userId.errors").collect { }
+    /**
+     * Fica na fila de erros da própria conta (`/topic/users.{id}.errors`, a única que o messenger permite assinar para isso)
+     * até a sessão cair. Sem identificador no token não há fila para assinar.
+     */
+    override suspend fun awaitLoss(): AuthFailure? {
+        val destination = userId?.let { "/topic/users.$it.errors" } ?: return AuthFailure.TOKEN_REJECTED
+        return try {
+            session.subscribeText(destination).collect { }
             null
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
             authFailureOf(e)
         }
+    }
 }
 
 internal fun authFailureOf(error: Throwable): AuthFailure? {

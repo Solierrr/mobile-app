@@ -10,6 +10,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 @Singleton
 class DataStoreTokenStore @Inject constructor(
@@ -18,6 +20,7 @@ class DataStoreTokenStore @Inject constructor(
 ) : TokenStore {
     private val mutableTokens = MutableStateFlow<AuthTokens?>(null)
     private var loaded = false
+    private val sessionMutex = Mutex()
 
     override val tokens: StateFlow<AuthTokens?>
         get() {
@@ -31,23 +34,35 @@ class DataStoreTokenStore @Inject constructor(
     }
 
     override suspend fun saveTokens(tokens: AuthTokens) {
-        dataStore.edit {
-            it[ACCESS] = cipher.encrypt(tokens.accessToken)
-            it[REFRESH] = cipher.encrypt(tokens.refreshToken)
-            tokens.accessTokenExpiresAt?.let { expiresAt -> it[EXPIRES_AT] = expiresAt } ?: it.remove(EXPIRES_AT)
-        }
-        loaded = true
-        mutableTokens.value = tokens
+        sessionMutex.withLock { writeTokens(tokens) }
     }
 
     override suspend fun clearTokens() {
+        sessionMutex.withLock { writeTokens(null) }
+    }
+
+    override suspend fun replaceTokensIfCurrent(expected: AuthTokens, replacement: AuthTokens?): Boolean =
+        sessionMutex.withLock {
+            loadTokens()
+            if (mutableTokens.value != expected) return@withLock false
+            writeTokens(replacement)
+            true
+        }
+
+    private suspend fun writeTokens(tokens: AuthTokens?) {
         dataStore.edit {
-            it.remove(ACCESS)
-            it.remove(REFRESH)
-            it.remove(EXPIRES_AT)
+            if (tokens == null) {
+                it.remove(ACCESS)
+                it.remove(REFRESH)
+                it.remove(EXPIRES_AT)
+            } else {
+                it[ACCESS] = cipher.encrypt(tokens.accessToken)
+                it[REFRESH] = cipher.encrypt(tokens.refreshToken)
+                tokens.accessTokenExpiresAt?.let { expiresAt -> it[EXPIRES_AT] = expiresAt } ?: it.remove(EXPIRES_AT)
+            }
         }
         loaded = true
-        mutableTokens.value = null
+        mutableTokens.value = tokens
     }
 
     override suspend fun savePendingLogin(pending: PendingLogin) {
@@ -68,10 +83,13 @@ class DataStoreTokenStore @Inject constructor(
         return if (state != null && verifier != null) PendingLogin(state, verifier) else null
     }
 
-    @Synchronized
     private fun ensureLoaded() {
+        runBlocking { sessionMutex.withLock { loadTokens() } }
+    }
+
+    private suspend fun loadTokens() {
         if (loaded) return
-        val preferences = runBlocking { dataStore.data.first() }
+        val preferences = dataStore.data.first()
         val access = preferences[ACCESS]?.let(cipher::decrypt)
         val refresh = preferences[REFRESH]?.let(cipher::decrypt)
         mutableTokens.value = if (access != null && refresh != null) AuthTokens(access, refresh, preferences[EXPIRES_AT]) else null
