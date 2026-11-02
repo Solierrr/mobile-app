@@ -88,7 +88,7 @@ fun ConversationsScreen(
         verticalArrangement = Arrangement.spacedBy(Spacing.md),
     ) {
         ScreenTitle(stringResource(if (assistant) R.string.as_assistente else R.string.pd_conversas), onBack = if (assistant) onBack else null)
-        if (assistant) PrimaryButton(stringResource(R.string.as_nova_sessao), onNewSession)
+        if (assistant) com.project.solaria_mobile.core.designsystem.components.ActionRow(stringResource(R.string.as_nova_sessao), AppIcons.sparkles, onNewSession)
         else Row(Modifier.fillMaxWidth().height(androidx.compose.foundation.layout.IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(Spacing.md)) {
             // Não há botão para começar uma conversa nova: os dois atalhos ficam no topo da lista.
             com.project.solaria_mobile.core.designsystem.components.ActionTile(stringResource(R.string.ps_minhas_conexoes), AppIcons.users, onOpenConnections, Modifier.weight(1f).fillMaxHeight())
