@@ -65,16 +65,17 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 /**
- * Fundos prontos do início. O degradê vai do topo à base e um brilho suave no canto dá volume; [darkContent] diz se o
- * texto por cima deve ser escuro (fundos claros) ou branco (fundos escuros).
+ * Fundos prontos do início. O degradê vai do topo à base e dois brilhos suaves (um no canto superior direito, outro na
+ * base à esquerda, na cor [glow]) dão volume sem pesar; [darkContent] diz se o texto por cima deve ser escuro (fundos
+ * claros) ou branco (fundos escuros).
  */
-enum class BannerPreset(val id: String, @StringRes val label: Int, val top: Color, val bottom: Color, val darkContent: Boolean) {
-    SUN("sun", R.string.hm_fundo_sol, Color(0xFFFFC9A3), Color(0xFFFF9B52), true),
-    SKY("sky", R.string.hm_fundo_ceu, Color(0xFFD7E8F8), Color(0xFF8FBFE8), true),
-    LEAF("leaf", R.string.hm_fundo_folha, Color(0xFFDCEECF), Color(0xFF9CC98A), true),
-    SAND("sand", R.string.hm_fundo_areia, Color(0xFFF6EBDA), Color(0xFFE3CFB0), true),
-    SUNSET("sunset", R.string.hm_fundo_entardecer, Color(0xFFFF8236), Color(0xFF9A3412), false),
-    NIGHT("night", R.string.hm_fundo_noite, Color(0xFF3B4252), Color(0xFF1E232B), false);
+enum class BannerPreset(val id: String, @StringRes val label: Int, val top: Color, val bottom: Color, val glow: Color, val darkContent: Boolean) {
+    SUN("sun", R.string.hm_fundo_sol, Color(0xFFFFF1E6), Color(0xFFFFCFA8), Color(0xFFFF9B52), true),
+    SKY("sky", R.string.hm_fundo_ceu, Color(0xFFEAF3FC), Color(0xFFBDD9F2), Color(0xFF7FB5E8), true),
+    LEAF("leaf", R.string.hm_fundo_folha, Color(0xFFEAF5E4), Color(0xFFBEDDB0), Color(0xFF8CC97A), true),
+    SAND("sand", R.string.hm_fundo_areia, Color(0xFFFAF5EE), Color(0xFFEADFCB), Color(0xFFE0B97E), true),
+    SUNSET("sunset", R.string.hm_fundo_entardecer, Color(0xFFF97316), Color(0xFF7C2D12), Color(0xFFFFB27A), false),
+    NIGHT("night", R.string.hm_fundo_noite, Color(0xFF334155), Color(0xFF0F172A), Color(0xFF6B8AB8), false);
 
     companion object {
         fun fromId(id: String?): BannerPreset = entries.firstOrNull { it.id == id } ?: SUN
@@ -144,14 +145,21 @@ fun HomeBanner.contentColor(): Color = when (this) {
     is HomeBanner.Custom -> AppTheme.colors.onAccent
 }
 
-/** Degradê do fundo com um brilho no canto superior direito. */
+/** Degradê do fundo com um brilho no canto superior direito e outro, mais fraco, na base à esquerda. */
 private fun Modifier.presetBackground(preset: BannerPreset): Modifier = drawBehind {
     drawRect(Brush.verticalGradient(listOf(preset.top, preset.bottom)))
     drawRect(
         Brush.radialGradient(
-            listOf(Color.White.copy(alpha = 0.32f), Color.Transparent),
-            center = Offset(size.width * 0.88f, size.height * 0.12f),
-            radius = size.width * 0.7f,
+            listOf(preset.glow.copy(alpha = 0.55f), Color.Transparent),
+            center = Offset(size.width * 0.9f, size.height * 0.05f),
+            radius = size.width * 0.75f,
+        ),
+    )
+    drawRect(
+        Brush.radialGradient(
+            listOf(preset.glow.copy(alpha = 0.3f), Color.Transparent),
+            center = Offset(size.width * 0.05f, size.height * 0.95f),
+            radius = size.width * 0.6f,
         ),
     )
 }
