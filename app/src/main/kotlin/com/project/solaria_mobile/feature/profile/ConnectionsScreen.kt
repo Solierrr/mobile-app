@@ -61,7 +61,8 @@ fun ConnectionsRoute(onBack: () -> Unit, onOpenProfile: (String) -> Unit,
         if (!pick) SegmentedControl(listOf(stringResource(R.string.ps_minhas_conexoes), stringResource(R.string.cn_encontrar_pessoas)), if (discover) 1 else 0,
             { viewModel.selectDiscover(it == 1) }, Modifier.fillMaxWidth())
         status?.let { androidx.compose.material3.Text(it, color = if (statusIsError) com.project.solaria_mobile.core.designsystem.theme.AppTheme.colors.danger else com.project.solaria_mobile.core.designsystem.theme.AppTheme.colors.onSurfaceMuted, style = androidx.compose.material3.MaterialTheme.typography.bodyMedium) }
-        SearchField(if (discover) stringResource(R.string.cn_busque_pessoas) else stringResource(R.string.cn_busque_nas_suas_conexoes), query, viewModel::onQueryChange)
+        // Sem ninguém na lista e sem texto digitado, a busca não tem o que procurar.
+        if (resource?.data?.connections?.isEmpty() != true || query.isNotBlank()) SearchField(if (discover) stringResource(R.string.cn_busque_pessoas) else stringResource(R.string.cn_busque_nas_suas_conexoes), query, viewModel::onQueryChange)
         resource?.let { ResourceStatus(it) }
         UiStateHost(state, viewModel::load, modifier = Modifier.weight(1f), inline = true, loading = { ListSkeleton() }) { content ->
             ConnectionsList(content, onOpenProfile, viewModel::more, { viewModel.onQueryChange("") }, images::bytes, if (pick) onPick else null)
@@ -86,11 +87,11 @@ private fun ConnectionsList(state: ConnectionsUiState, onOpenProfile: (String) -
     }
     LazyColumn(Modifier.fillMaxSize(), state = listState, verticalArrangement = Arrangement.spacedBy(Spacing.xxs), contentPadding = PaddingValues(bottom = Spacing.screenBottom)) {
         if (state.connections.isEmpty()) item {
-            StateNotice(if (state.discover) stringResource(R.string.cn_nenhuma_pessoa_encontrada) else stringResource(R.string.cn_nenhuma_conexao_encontrada),
+            androidx.compose.foundation.layout.Box(Modifier.fillParentMaxHeight(0.8f).fillMaxWidth(), contentAlignment = androidx.compose.ui.Alignment.Center) { StateNotice(if (state.discover) stringResource(R.string.cn_nenhuma_pessoa_encontrada) else stringResource(R.string.cn_nenhuma_conexao_encontrada),
                 if (state.query.isNotBlank()) stringResource(R.string.cn_tente_outro_nome_ou_limpe)
                 else if (state.discover) stringResource(R.string.cn_nao_encontramos_pessoas_disponiveis_para)
                 else stringResource(R.string.cn_use_encontrar_pessoas_para_adicionar), icon = AppIcons.users,
-                actions = if (state.query.isNotBlank()) { { PrimaryButton(stringResource(R.string.settings_clear_search), onClear, secondary = true, compact = true) } } else null)
+                actions = if (state.query.isNotBlank()) { { PrimaryButton(stringResource(R.string.settings_clear_search), onClear, secondary = true, compact = true) } } else null) }
         }
         items(state.connections, key = { it.id }) { user -> ConnectionRow(user, { if (onPick != null) onPick(user) else onOpenProfile(user.id) }, loadImage) }
         if (state.loadingMore) item { InlineLoader() }

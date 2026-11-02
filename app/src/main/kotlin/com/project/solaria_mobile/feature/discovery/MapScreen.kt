@@ -179,12 +179,12 @@ private fun MapScreen(state: MapUiState, resource: UiState.Content<*>?, saved: S
                 }
                 // Enquanto o mapa carrega, só o fundo do mapa: painel e controles continuam no lugar, sem cartões genéricos por cima.
                 if (!loaded && !timedOut) Box(Modifier.fillMaxSize().background(AppTheme.colors.mapPlaceholder))
-                if (!loaded && timedOut) Box(Modifier.padding(top = Sizing.mapControlsTop, bottom = visibleSheet)) {
+                if (!loaded && timedOut) Box(Modifier.fillMaxSize().padding(top = Sizing.mapControlsTop, bottom = visibleSheet), contentAlignment = Alignment.Center) {
                     StateNotice(stringResource(R.string.ms_o_mapa_demorou_para_carregar), "Confira a conexão e tente novamente.", actions = {
                         PrimaryButton(stringResource(R.string.common_try_again), { mapVersion++ }, secondary = true, compact = true)
                     })
                 }
-            } else Box(Modifier.padding(top = Sizing.mapControlsTop, bottom = visibleSheet)) {
+            } else Box(Modifier.fillMaxSize().padding(top = Sizing.mapControlsTop, bottom = visibleSheet), contentAlignment = Alignment.Center) {
                 StateNotice(stringResource(R.string.ms_mapa_ainda_nao_configurado), "Os endereços continuam disponíveis no painel.", icon = AppIcons.map_pin)
             }
             Row(Modifier.align(Alignment.TopCenter).fillMaxWidth().padding(horizontal = Spacing.md, vertical = Spacing.sm),
