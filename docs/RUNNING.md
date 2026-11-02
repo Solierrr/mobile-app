@@ -1,84 +1,48 @@
-# Rodando o Projeto Localmente
-
-Este repositório é Kotlin + Jetpack Compose (Android), buildado com Gradle Kotlin DSL. Diferente dos serviços de backend da organização, não há `Dockerfile` nem deploy em cluster — o app roda direto em um emulador ou dispositivo físico e pode ser operado pelo terminal com o `Makefile`, sem depender do Android Studio. Antes de iniciar, verifique a seção de impedimentos abaixo.
-
-<p>
-  <a href="https://github.com/syvixor/skills-icons">
-    <img src="https://skills.syvixor.com/api/icons?i=kotlin,android,androidstudio,jetpackcompose,github" height="48" alt="Rodando o Projeto — Jetpack Compose">
-  </a>
+<p align="center">
+  <img src="../assets/readme/banners/jetpack-compose.png" alt="Jetpack Compose" width="100%">
 </p>
 
-## Possíveis Impedimentos
+# Execução local
 
-- **Android SDK Command-line Tools**, com `adb`, `emulator`, Platform-Tools e o SDK Platform 37 disponíveis no `PATH`. O Android Studio é opcional.
-- **JDK 21**, o CI (`ci.yml`) usa `temurin` 21 via `actions/setup-java`; use a mesma versão localmente para evitar builds divergentes do pipeline.
-- **AGP 9.3.1 e Kotlin 2.2.10**, versões fixadas em `gradle/libs.versions.toml` — o `compileSdk`/`targetSdk` está em 37 e o `minSdk` em 29, então o SDK Platform 37 precisa estar instalado pelo `sdkmanager`.
-- **Emulador ou dispositivo físico configurado**, um AVD (Android Virtual Device) precisa estar criado pelo `avdmanager`, ou um dispositivo físico com depuração USB habilitada.
-- **Secrets locais**, o projeto ainda não define nenhuma chave de API no código-fonte, mas se a integração com as APIs da organização for adicionada, endpoints e credenciais devem ser criados manualmente em `local.properties` (não versionado) — sem isso, o app builda mas falha ao tentar se conectar em dependências externas.
+Usar JDK 21, como no CI, Android SDK com plataforma 37, build tools compatíveis e emulador ou aparelho com API 29 ou superior. O catálogo declara AGP 9.3.3, Kotlin 2.4.20 e Compose BOM 2026.09.00. O wrapper fixa Gradle 9.7.1. A compatibilidade de bytecode Java 11 é distinta do JDK de build.
 
-## Instalação do Projeto
+O guia comum está em [Kotlin e Compose](https://github.com/Solierrr/docs-warehouse/blob/main/readme/running/KOTLIN_JETPACK_COMPOSE.md). Neste aplicativo, URLs vêm do flavor Gradle, sem leitura automática de `.env` ou `local.properties` para os destinos.
 
-### Iniciando o repositório com o Github
+## Preparar e instalar
 
-<p>
-  <a href="https://github.com/syvixor/skills-icons">
-    <img src="https://skills.syvixor.com/api/icons?i=github,androidstudio" height="48" alt="Frameworks">
-  </a>
-</p>
-
-Clone o repositório e entre no diretório do projeto. O Gradle wrapper baixa as dependências necessárias no primeiro comando.
-
-```Comandos para clonar o repositório
-git clone https://github.com/Solierrr/mobile-app.git
-cd ./mobile-app
-```
-
-### Instalando dependências e rodando o projeto localmente
-
-<p>
-  <a href="https://github.com/syvixor/skills-icons">
-    <img src="https://skills.syvixor.com/api/icons?i=gradle" height="48" alt="Frameworks">
-  </a>
-</p>
-
-Use o `Makefile` para verificar o ambiente, listar ou iniciar um emulador e executar o app. Se houver mais de um dispositivo conectado, informe o serial com `DEVICE` (por exemplo, `make run DEVICE=emulator-5554`).
-
-## Ambientes (flavors)
-
-O app tem dois flavors, escolhidos com `FLAVOR` (padrão `qa`):
-
-- `qa`: pacote `com.project.solaria_mobile.qa`, nome Solaria QA, APIs dos serviços do Render e o google-registry do Render. Como o Render gratuito dorme sem tráfego, a primeira chamada pode levar cerca de 30 segundos.
-- `prod`: pacote `com.project.solaria_mobile`, nome Solaria, APIs em `solarianetwork.site`, sem google-registry.
-
-Exemplos: `make run`, `make run FLAVOR=prod` e `make build FLAVOR=prod`. As URLs ficam em `BuildConfig` (`AUTH_BASE_URL`, `CORE_BASE_URL`, `MESSENGER_BASE_URL`, `GOOGLE_REGISTRY_BASE_URL`) e são definidas por flavor em `app/build.gradle.kts`. Não há flavor local: ninguém executa o backend para o mobile.
+Executar no checkout do aplicativo. No Windows, usar Git Bash para make ou `gradlew.bat` nas tarefas diretas.
 
 ```bash
 make doctor
-make avds
-make emulator AVD=nome_do_avd
-
-# Em outro terminal, depois que o emulador iniciar:
-make run
+make install
+make devices
+make dev FLAVOR=qa
 ```
 
-Use `make help` para ver todos os comandos. A criação inicial de um AVD pode ser feita com o `avdmanager`, também incluído nas Android SDK Command-line Tools.
+O `make dev` constrói, instala o APK debug e abre a Activity, com a variável `DEVICE` selecionando o aparelho. O `make avds` lista os emuladores e o `make emulator AVD=nome` inicia um AVD, e o Android Studio também permite escolher a variante.
 
-### Testes e lint
+`make vault` exporta `/service-urls`, mas o build não usa esse arquivo para trocar `BuildConfig`. Não colocar chaves de serviço no aplicativo. Obter `google-services.json` pelo procedimento autorizado e manter fora do versionamento. O plugin correspondente só é aplicado quando um dos arquivos previstos existe.
 
-<p>
-  <a href="https://github.com/syvixor/skills-icons">
-    <img src="https://skills.syvixor.com/api/icons?i=kotlin,gradle" height="48" alt="Testes">
-  </a>
-</p>
+## Build e testes
 
-O pipeline de CI roda dois workflows separados em toda Pull Request: testes unitários (`ci.yml`) e lint (`quality.yml`) via `ktlint`. Rode os dois localmente antes de abrir a PR para evitar falhas no CI.
+Os alvos usam QA por padrão.
 
 ```bash
-make ci
+make build FLAVOR=qa
+make build FLAVOR=prod
+make test
+make lint FLAVOR=qa
+./gradlew connectedQaDebugAndroidTest
 ```
 
-## Login e diagnóstico (QA)
+O `make test` roda `testQaDebugUnitTest` e `testProdDebugUnitTest`, e o lint usa o ktlint e o Android lint, enquanto a instrumentação exige um dispositivo. O app não tem alvo OpenAPI nem servidor local.
 
-O app não tem tela de login: sem sessão, ele abre o login do web em Custom Tabs e volta pelo deeplink `solaria-qa://auth/callback` (qa) ou `solaria://auth/callback` (prod). O `api-auth` precisa de `MOBILE_REDIRECT_URIS` com esse endereço e de `MOBILE_WEB_AUTHORIZE_URL` apontando para a página `/pt-BR/auth/mobile` do web.
+Testes JVM cobrem autenticação, fila, sincronização, presença, leitura, projetos e perfil. O smoke de navegação fica em `app/src/androidTest/`.
 
-No flavor `qa`, Configurações → Desenvolvimento → Diagnóstico mostra o ambiente, as URLs, o FID da instalação (copie e cadastre na página Dispositivos QA do web-sandbox) e o teste do google-registry. O FID só aparece com o `google-services.json` do app `.qa` em `app/src/qa/` (fora do git).
+## Conferir uma sessão
+
+Abrir QA, autorizar no navegador e aguardar o callback. Conferir projetos, perfil e conversas com dados sintéticos autorizados. Para conferir a fila, preparar mensagem sem rede, restaurar a conexão e acompanhar a confirmação.
+
+O QA pode precisar acordar o servidor antes do uso, e uma falha de callback exige conferir a variante, o redirect e o state. O endereço compilado não muda quando a variável é trocada no servidor, e as URLs de produção e de geocodificação ainda precisam ser confirmadas. <!-- PENDENTE: 2 -->
+
+Fontes em [Makefile](https://github.com/Solierrr/mobile-app/blob/main/Makefile), [CI](https://github.com/Solierrr/mobile-app/blob/main/.github/workflows/ci.yml), [versões](https://github.com/Solierrr/mobile-app/blob/main/gradle/libs.versions.toml) e [wrapper](https://github.com/Solierrr/mobile-app/blob/main/gradle/wrapper/gradle-wrapper.properties).

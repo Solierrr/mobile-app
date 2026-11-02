@@ -3,7 +3,6 @@
 
 [versions]
 mapsCompose = "9.0.1"
-room = "2.7.1"
 agp = "9.3.3"
 coreKtx = "1.19.0"
 coreSplashscreen = "1.0.1"
@@ -44,6 +43,9 @@ kotlinxCoroutinesTest = "1.11.0"
 
 # Sessao local
 datastorePreferences = "1.2.1"
+
+# Banco SQLite local (fila de mensagens sem conexão)
+room = "2.8.5"
 
 # Custom Tabs para o login no web
 browser = "1.9.0"
@@ -120,6 +122,8 @@ androidx-browser = { group = "androidx.browser", name = "browser", version.ref =
 
 # Sessao local
 androidx-datastore-preferences = { group = "androidx.datastore", name = "datastore-preferences", version.ref = "datastorePreferences" }
+
+# Banco local
 
 # Testes
 mockk = { group = "io.mockk", name = "mockk", version.ref = "mockk" }
