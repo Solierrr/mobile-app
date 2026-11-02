@@ -37,8 +37,10 @@ import androidx.compose.ui.text.style.TextOverflow
 import com.project.solaria_mobile.core.designsystem.icons.AppIcons
 import com.project.solaria_mobile.core.designsystem.components.ActionRow
 import com.project.solaria_mobile.core.designsystem.components.AvatarPalette
-import com.project.solaria_mobile.core.designsystem.components.ExpressiveShapes
 import com.project.solaria_mobile.core.designsystem.theme.Sizing
+import com.project.solaria_mobile.core.designsystem.components.MissingImage
+import com.project.solaria_mobile.core.designsystem.components.MorphingShapeHost
+import com.project.solaria_mobile.core.designsystem.components.StateNotice
 import com.project.solaria_mobile.core.designsystem.components.RemoteImage
 import com.project.solaria_mobile.core.designsystem.components.RoundIconButton
 import com.project.solaria_mobile.core.images.ImageLoaderViewModel
@@ -125,7 +127,9 @@ fun ProfileScreen(
             verticalArrangement = Arrangement.spacedBy(Spacing.md),
         ) {
             Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm), verticalAlignment = Alignment.CenterVertically) {
-                Avatar(profile.initials, size = Sizing.avatarLarge, color = AvatarPalette(if (self) 0 else 1), imageUrl = profile.avatarUrl, loadImage = loadImage, shape = if (self) ExpressiveShapes.cookie else ExpressiveShapes.clover)
+                MorphingShapeHost { shape ->
+                    Avatar(profile.initials, size = Sizing.avatarLarge, color = AvatarPalette(if (self) 0 else 1), imageUrl = profile.avatarUrl, loadImage = loadImage, shape = shape)
+                }
                 Column(modifier = Modifier.weight(1f)) {
                     Text(profile.name, color = AppTheme.colors.onSurface, style = androidx.compose.material3.MaterialTheme.typography.headlineMedium, maxLines = 2, overflow = TextOverflow.Ellipsis)
                     if (profile.handle.isNotBlank()) {
