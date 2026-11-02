@@ -101,18 +101,22 @@ fun ProfileScreen(
     val editSheetState = rememberSheetState()
 
     Column(modifier = Modifier.fillMaxSize().background(AppTheme.colors.surface).verticalScroll(rememberScrollState())) {
+        var bannerFailed by remember { mutableStateOf(false) }
+        val noBanner = profile.bannerUrl == null || loadImage == null || bannerFailed
+        // Sem imagem, o botão padrão tem a mesma cor do fundo e some; por isso fica sólido.
+        val bannerButton = if (noBanner) AppTheme.colors.surface else AppTheme.colors.inputFill
         Box(modifier = Modifier.fillMaxWidth().height(Sizing.profileBannerHeight).background(AppTheme.colors.inputFill)) {
             if (profile.bannerUrl != null && loadImage != null) {
-                RemoteImage(profile.bannerUrl, loadImage, null, Modifier.fillMaxSize())
-            }
+                RemoteImage(profile.bannerUrl, loadImage, null, Modifier.fillMaxSize(), onMissing = { bannerFailed = it })
+            } else MissingImage(Modifier.fillMaxSize(), AppTheme.colors.inputFill)
             Row(
                 modifier = Modifier.fillMaxWidth().padding(horizontal = Spacing.screen).padding(top = Spacing.lg),
                 horizontalArrangement = Arrangement.SpaceBetween,
             ) {
-                RoundIconButton(AppIcons.chevron_left, stringResource(R.string.common_back), onBack)
+                RoundIconButton(AppIcons.chevron_left, stringResource(R.string.common_back), onBack, background = bannerButton)
                 Row(horizontalArrangement = Arrangement.spacedBy(Spacing.xs)) {
-                    if (self) RoundIconButton(AppIcons.pencil, stringResource(R.string.pf_editar_perfil), { onEditOpen(); editOpen = true })
-                    RoundIconButton(AppIcons.info, stringResource(R.string.pf_ver_informacoes), onClick = { infoOpen = true })
+                    if (self) RoundIconButton(AppIcons.pencil, stringResource(R.string.pf_editar_perfil), { onEditOpen(); editOpen = true }, background = bannerButton)
+                    RoundIconButton(AppIcons.info, stringResource(R.string.pf_ver_informacoes), onClick = { infoOpen = true }, background = bannerButton)
                 }
             }
         }
