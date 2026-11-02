@@ -10,7 +10,7 @@ import androidx.compose.ui.res.stringResource
 import com.project.solaria_mobile.feature.project.domain.ProjectInviteLink
 import com.project.solaria_mobile.feature.project.domain.InviteLinkValidity
 import com.project.solaria_mobile.feature.project.domain.INVITE_LINK_ROLES
-import com.project.solaria_mobile.core.designsystem.components.SegmentedControl
+import com.project.solaria_mobile.core.designsystem.components.BottomSheet
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.navigationBarsPadding
@@ -616,6 +616,27 @@ private fun InviteForm(viewModel: ProjectSectionsViewModel, onSent: () -> Unit) 
     }, enabled = action != ProjectAction.Working && email.isNotBlank())
 }
 
+/** O que o convite por link deixa escolher, cada opção num bottom sheet. */
+private enum class LinkOption { ROLE, VALIDITY }
+
+/** Escolha de uma opção entre várias, num bottom sheet: a atual fica marcada e tocar em outra seleciona e fecha. */
+@Composable
+private fun OptionSheet(title: String, options: List<String>, selected: Int, @androidx.annotation.DrawableRes icon: Int, onSelect: (Int) -> Unit, onDismiss: () -> Unit) {
+    BottomSheet(onDismiss = onDismiss) {
+        val dismiss = LocalSheetDismiss.current
+        Column(
+            Modifier.fillMaxWidth().padding(horizontal = Spacing.screen).padding(top = Spacing.sm, bottom = Spacing.screenBottom),
+            verticalArrangement = Arrangement.spacedBy(Spacing.sm),
+        ) {
+            Text(title, color = AppTheme.colors.onSurface, style = MaterialTheme.typography.titleLarge)
+            options.forEachIndexed { index, label ->
+                ActionRow(label, if (index == selected) AppIcons.check else icon, { onSelect(index); dismiss() },
+                    trailing = if (index == selected) stringResource(R.string.journey_preset_selected) else null, compact = true)
+            }
+        }
+    }
+}
+
 /**
  * Convite por link: papel e validade, criação e, só logo depois dela, o endereço para copiar ou compartilhar. A lista
  * abaixo mostra os links ativos sem o endereço (o servidor não o guarda) e permite cancelar.
@@ -630,6 +651,7 @@ private fun InviteLinkSheet(viewModel: ProjectSectionsViewModel) {
     androidx.compose.runtime.DisposableEffect(Unit) { onDispose { viewModel.clearCreatedLink() } }
     var role by rememberSaveable { mutableStateOf(0) }
     var validity by rememberSaveable { mutableStateOf(1) }
+    var picking by rememberSaveable { mutableStateOf<LinkOption?>(null) }
     var copied by remember(created?.id) { mutableStateOf(false) }
     var revoking by remember { mutableStateOf<ProjectInviteLink?>(null) }
     val validities = InviteLinkValidity.entries
@@ -639,10 +661,15 @@ private fun InviteLinkSheet(viewModel: ProjectSectionsViewModel) {
         stringResource(R.string.ps_quem_tiver_o_link_entra),
         color = AppTheme.colors.onSurfaceMuted, style = MaterialTheme.typography.bodyMedium,
     )
-    Text(stringResource(R.string.ps_papel_no_projeto), color = AppTheme.colors.onSurface, style = MaterialTheme.typography.titleSmall)
-    SegmentedControl(INVITE_LINK_ROLES.map { it.label }, role, { role = it; viewModel.clearTeamAction() })
-    Text(stringResource(R.string.ps_validade), color = AppTheme.colors.onSurface, style = MaterialTheme.typography.titleSmall)
-    SegmentedControl(validities.map { it.label }, validity, { validity = it; viewModel.clearTeamAction() })
+    ActionRow(stringResource(R.string.ps_papel_no_projeto), AppIcons.users, { picking = LinkOption.ROLE }, trailing = localizedRole(INVITE_LINK_ROLES[role].label), compact = true)
+    ActionRow(stringResource(R.string.ps_validade), AppIcons.clock, { picking = LinkOption.VALIDITY }, trailing = validities[validity].label, compact = true)
+    when (picking) {
+        LinkOption.ROLE -> OptionSheet(stringResource(R.string.ps_papel_no_projeto), INVITE_LINK_ROLES.map { localizedRole(it.label) }, role, AppIcons.users,
+            { role = it; viewModel.clearTeamAction() }) { picking = null }
+        LinkOption.VALIDITY -> OptionSheet(stringResource(R.string.ps_validade), validities.map { it.label }, validity, AppIcons.clock,
+            { validity = it; viewModel.clearTeamAction() }) { picking = null }
+        null -> Unit
+    }
     ProjectActionStatus(action, working = stringResource(R.string.ps_criando_o_link))
     PrimaryButton(stringResource(R.string.ps_criar_link), {
         viewModel.clearTeamAction()
