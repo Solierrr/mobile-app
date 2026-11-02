@@ -12,6 +12,7 @@ import com.project.solaria_mobile.feature.communication.domain.ChatMessage
 import com.project.solaria_mobile.feature.communication.domain.CommunicationRepository
 import com.project.solaria_mobile.feature.communication.domain.MessageAttachment
 import com.project.solaria_mobile.feature.communication.domain.Conversation
+import java.util.concurrent.ConcurrentHashMap
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.async
@@ -26,12 +27,21 @@ class RemoteCommunicationRepository @Inject constructor(
     private val api: MessengerApi,
     private val executor: ApiCallExecutor,
     private val credentials: CredentialProvider,
+    private val names: ParticipantNames,
 ) : CommunicationRepository {
+    /** Tipo de mensagem de cada conversa já vista, para o envio não precisar buscar a conversa antes. */
+    private val messageTypes = ConcurrentHashMap<String, String>()
+
     override suspend fun conversations(): ApiResult<List<Conversation>> {
         val me = currentUserId()
         return when (val result = executor.execute { api.conversations() }) {
             is ApiResult.Failure -> result
-            is ApiResult.Success -> ApiResult.Success(withPreviews(result.data, me))
+            is ApiResult.Success -> {
+                result.data.forEach { messageTypes[it.id] = it.messageType() }
+                // Na lista só a conversa direta precisa de nome de pessoa: o título do grupo já vem do servidor.
+                val resolved = names.resolve(result.data.mapNotNull { it.otherParticipant(me) })
+                ApiResult.Success(withPreviews(result.data, me, resolved))
+            }
         }
     }
 
@@ -40,10 +50,10 @@ class RemoteCommunicationRepository @Inject constructor(
      * só a mais recente de cada conversa, com poucas chamadas ao mesmo tempo. `unreadCount` presente indica o contrato novo,
      * em que conversa sem `lastMessage` realmente não tem mensagens.
      */
-    private suspend fun withPreviews(items: List<ConversationDto>, me: String?): List<Conversation> = coroutineScope {
+    private suspend fun withPreviews(items: List<ConversationDto>, me: String?, resolved: Map<String, String>): List<Conversation> = coroutineScope {
         val gate = Semaphore(PREVIEW_CONCURRENCY)
         items.map { dto ->
-            val conversation = dto.toConversation()
+            val conversation = dto.toConversation(me, resolved)
             async {
                 val listed = dto.lastMessage
                 if (listed != null) return@async conversation.copy(preview = previewText(listed.content.orEmpty(), listed.deleted, listed.senderId, me))
@@ -56,8 +66,25 @@ class RemoteCommunicationRepository @Inject constructor(
         }.awaitAll()
     }
 
-    override suspend fun conversation(id: String): ApiResult<Conversation> =
-        executor.execute { api.conversation(id) }.map { it.toConversation() }
+    override suspend fun conversation(id: String): ApiResult<Conversation> {
+        val me = currentUserId()
+        return when (val result = executor.execute { api.conversation(id) }) {
+            is ApiResult.Failure -> result
+            is ApiResult.Success -> {
+                val dto = result.data
+                messageTypes[dto.id] = dto.messageType()
+                ApiResult.Success(dto.toConversation(me, names.resolve(dto.participantIds.filter { it != me })))
+            }
+        }
+    }
+
+    /** O tipo guardado, ou, só quando a conversa ainda não foi vista, o que o servidor informa. */
+    private suspend fun messageType(conversationId: String): ApiResult<String> {
+        messageTypes[conversationId]?.let { return ApiResult.Success(it) }
+        return executor.execute { api.conversation(conversationId) }.map { dto ->
+            dto.messageType().also { messageTypes[conversationId] = it }
+        }
+    }
 
     override suspend fun messages(conversationId: String): ApiResult<List<ChatMessage>> {
         val me = currentUserId()
@@ -83,21 +110,21 @@ class RemoteCommunicationRepository @Inject constructor(
 
     override suspend fun sendAttachment(conversationId: String, attachment: MessageAttachment, caption: String): ApiResult<ChatMessage> {
         val me = currentUserId()
-        val conversation = when (val result = executor.execute { api.conversation(conversationId) }) {
+        val type = when (val result = messageType(conversationId)) {
             is ApiResult.Failure -> return result
             is ApiResult.Success -> result.data
         }
-        val request = SendMessageRequest(conversationId, conversation.messageType(), caption, attachment = attachment.toDto())
+        val request = SendMessageRequest(conversationId, type, caption, attachment = attachment.toDto())
         return executor.execute { api.send(request) }.map { it.toMessage(me) }
     }
 
     override suspend fun sendMessage(conversationId: String, text: String, clientMessageId: String?): ApiResult<ChatMessage> {
         val me = currentUserId()
-        val conversation = when (val result = executor.execute { api.conversation(conversationId) }) {
+        val type = when (val result = messageType(conversationId)) {
             is ApiResult.Failure -> return result
             is ApiResult.Success -> result.data
         }
-        val request = SendMessageRequest(conversationId, conversation.messageType(), text, clientMessageId = clientMessageId)
+        val request = SendMessageRequest(conversationId, type, text, clientMessageId = clientMessageId)
         return executor.execute { api.send(request) }.map { it.toMessage(me) }
     }
 
@@ -138,8 +165,13 @@ private fun ConversationDto.messageType(): String = when (conversationType) {
     else -> "USER_TO_USER"
 }
 
-internal fun ConversationDto.toConversation(): Conversation {
-    val name = title?.takeIf { it.isNotBlank() } ?: if (conversationType == "CHAT_BOT") "" else "Conversa"
+/** Na conversa direta, a outra pessoa: quem participa e não sou eu. */
+internal fun ConversationDto.otherParticipant(me: String?): String? =
+    if (conversationType == "DIRECT") participantIds.firstOrNull { it != me } else null
+
+/** [names] são os nomes já resolvidos por `authId`; sem o nome do outro participante, a conversa direta fica como "Conversa". */
+internal fun ConversationDto.toConversation(me: String? = null, names: Map<String, String> = emptyMap()): Conversation {
+    val name = title?.takeIf { it.isNotBlank() } ?: otherParticipant(me)?.let(names::get) ?: if (conversationType == "CHAT_BOT") "" else "Conversa"
     return Conversation(
         id = id,
         initials = initialsOf(name),
@@ -152,6 +184,7 @@ internal fun ConversationDto.toConversation(): Conversation {
         group = conversationType == "GROUP",
         assistant = conversationType == "CHAT_BOT",
         threadId = (userDetails?.get("threadId") as? kotlinx.serialization.json.JsonPrimitive)?.content,
+        participantNames = names.filterKeys { it in participantIds },
     )
 }
 

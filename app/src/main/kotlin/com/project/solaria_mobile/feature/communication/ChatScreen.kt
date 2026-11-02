@@ -79,7 +79,8 @@ fun ChatRoute(onBack: () -> Unit, viewModel: ChatViewModel = hiltViewModel()) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     UiStateHost(state, viewModel::load, onBack = onBack, header = { ScreenTitle(stringResource(R.string.ch_conversa), onBack) }, loading = { ChatSkeleton() }) { content ->
         // Conversa arquivada sai da lista desta conta; volta para a lista em vez de manter a tela aberta.
-        LaunchedEffect(content.archived) { if (content.archived) onBack() }
+        // Quem perdeu a participação também não tem mais o que fazer aqui.
+        LaunchedEffect(content.archived || content.removed) { if (content.archived || content.removed) onBack() }
         ChatScreen(
             content, viewModel::onDraftChange, viewModel::send, onBack, viewModel::retry, viewModel::discard,
             ChatActions(viewModel::startEdit, viewModel::cancelEdit, viewModel::deleteMessage, viewModel::setMuted, viewModel::archive, viewModel::clearAction),

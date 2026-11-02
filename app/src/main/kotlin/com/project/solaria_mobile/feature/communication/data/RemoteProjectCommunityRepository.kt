@@ -53,7 +53,7 @@ class RemoteProjectCommunityRepository @Inject constructor(
             val me = credentials.accessToken()?.let(::accessTokenSubject)
             val groups = api.groups(community.id).map { group ->
                 CommunityGroup(group.id, group.title?.takeIf(String::isNotBlank) ?: "Conversa do projeto", group.participantIds.size,
-                    group.status == "ACTIVE", me != null && me in group.participantIds)
+                    community.status == "ACTIVE", me != null && me in group.participantIds)
             }
             val role = community.members.firstOrNull { it.userId == me }?.role
             ProjectCommunity(community.id, projectId, community.status == "ACTIVE" && mutable, false, community.members.size, groups,

@@ -10,7 +10,9 @@ data class Conversation(val id: String, val initials: String, val name: String, 
     /** Sessão do assistente geográfico, ligada a um projeto do mapa; o `id` é `geo:<projeto>:<sessão>`. */
     val geo: Boolean = false,
     /** Identificador da sessão no ai-assistant, guardado pela conversa em `userDetails.threadId`. */
-    val threadId: String? = null)
+    val threadId: String? = null,
+    /** Nome de quem participa, por `authId`, quando foi possível resolver; usado nos remetentes de grupo e em "digitando". */
+    val participantNames: Map<String, String> = emptyMap())
 
 /**
  * `clientMessageId` é o identificador que o app gerou ao enviar, devolvido pelo messenger no histórico. Mensagem excluída

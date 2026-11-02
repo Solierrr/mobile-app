@@ -546,7 +546,7 @@ class MockApiData internal constructor(private val profileStore: MockProfileStor
             else (request.participantIds.map { if (it == actor) selfId else it }.toSet() + selfId).intersect(community.members.map { it.userId }.toSet())
         if (participants.size < 2) return null
         val groupId = "qa-group-${java.util.UUID.randomUUID()}"
-        val group = CommunityGroupDto(groupId, title.trim(), participants, "ACTIVE")
+        val group = CommunityGroupDto(groupId, title.trim(), participants)
         communityGroupStore.getOrPut(id) { mutableListOf() }.add(group)
         val conversation = ConversationDto(groupId, "GROUP", title.trim(), OffsetDateTime.now().toString())
         conversationList.add(conversation)

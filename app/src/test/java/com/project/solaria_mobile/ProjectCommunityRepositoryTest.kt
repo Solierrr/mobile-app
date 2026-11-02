@@ -94,13 +94,23 @@ class ProjectCommunityRepositoryTest {
         val f = Fixture()
         coEvery { f.api.community("p1") } returns CommunityDto("community", "p1", listOf(CommunityMemberDto("auth-me", "OWNER")), "ACTIVE")
         coEvery { f.api.groups("community") } returns listOf(
-            CommunityGroupDto("visible", "Geral", setOf("auth-me", "auth-ana"), "ACTIVE"),
-            CommunityGroupDto("other", "Outro grupo", setOf("auth-ana"), "ACTIVE"),
+            CommunityGroupDto("visible", "Geral", setOf("auth-me", "auth-ana")),
+            CommunityGroupDto("other", "Outro grupo", setOf("auth-ana")),
         )
         val community = (f.repository.read("p1").result as ApiResult.Success).data
         assertTrue(community.canManage)
         assertTrue(community.groups.first().canOpen)
         assertFalse(community.groups.last().canOpen)
+    }
+
+    @Test fun groupIsActiveOnlyWhileTheCommunityIs() = runTest {
+        val f = Fixture()
+        coEvery { f.api.groups("community") } returns listOf(CommunityGroupDto("g", "Geral", setOf("auth-me")))
+        for ((status, active) in listOf("ACTIVE" to true, "ARCHIVED" to false)) {
+            coEvery { f.api.community("p1") } returns CommunityDto("community", "p1", listOf(CommunityMemberDto("auth-me", "OWNER")), status)
+            val community = (f.repository.read("p1").result as ApiResult.Success).data
+            assertEquals(active, community.groups.single().active)
+        }
     }
 
     @Test fun creatingCommunityUsesAuthIdsFromAuthorizedCoreRoster() = runTest {

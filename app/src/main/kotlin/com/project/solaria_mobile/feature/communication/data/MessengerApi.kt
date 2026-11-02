@@ -21,6 +21,8 @@ data class ConversationDto(
     val lastMessage: MessagePreviewDto? = null,
     /** Detalhes que quem cria a conversa informa; o ai-assistant guarda aqui o `threadId` da sessão. */
     val userDetails: Map<String, kotlinx.serialization.json.JsonElement>? = null,
+    /** `authId` de quem participa; é a única pista de quem são as pessoas, porque o messenger não manda nomes. */
+    val participantIds: List<String> = emptyList(),
 )
 
 /** Última mensagem que o messenger já manda na lista, com o marcador de excluída. */
@@ -43,7 +45,7 @@ data class MessageDto(
     val clientMessageId: String? = null,
     val edited: Boolean = false,
     val deleted: Boolean = false,
-    /** Só o modo de demonstração preenche estes dois; o messenger real ainda não os envia. */
+    /** Só o modo de demonstração preenche estes dois; o messenger real não envia nome (ele vem de [ParticipantNames]). */
     val senderName: String? = null,
     val attachment: AttachmentDto? = null,
 )

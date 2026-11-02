@@ -8,12 +8,13 @@ import retrofit2.http.Path
 
 @Serializable data class CommunityMemberDto(val userId: String, val role: String)
 @Serializable data class CommunityDto(val id: String, val projectId: String, val members: List<CommunityMemberDto> = emptyList(), val status: String)
-@Serializable data class CommunityGroupDto(val id: String, val title: String? = null, val participantIds: Set<String> = emptySet(), val status: String)
+/** O messenger não manda `status` no subgrupo: ele vale o da comunidade, que é `ACTIVE` ou `ARCHIVED`. */
+@Serializable data class CommunityGroupDto(val id: String, val title: String? = null, val participantIds: Set<String> = emptySet())
 @Serializable data class CommunityCreateRequest(val projectId: String, val memberIds: Set<String> = emptySet())
 @Serializable data class CommunityMembersRequest(val userIds: Set<String>, val role: String = "MEMBER")
 @Serializable data class CommunityGroupRequest(val title: String, val participantIds: Set<String> = emptySet())
 @Serializable data class GroupCreationDto(val conversation: ConversationDto, val rejectedParticipants: List<RejectedGroupParticipantDto> = emptyList())
-@Serializable data class RejectedGroupParticipantDto(val userId: String? = null, val reason: String? = null)
+@Serializable data class RejectedGroupParticipantDto(val userId: String? = null, val reasonCode: String? = null)
 
 interface CommunityApi {
     @GET("messaging/communities/project/{projectId}")

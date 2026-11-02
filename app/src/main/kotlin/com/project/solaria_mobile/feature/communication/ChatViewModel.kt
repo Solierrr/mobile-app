@@ -60,6 +60,8 @@ data class ChatUiState(
     /** Nulo enquanto o estado pessoal não foi lido; o menu só oferece silenciar quando ele é conhecido. */
     val muted: Boolean? = null,
     val archived: Boolean = false,
+    /** A pessoa deixou de participar da conversa (evento `CONVERSATION_REMOVED`); a tela deve sair dela. */
+    val removed: Boolean = false,
     /** Há histórico mais antigo no servidor para carregar ao rolar para cima. */
     val hasMore: Boolean = false,
     val loadingOlder: Boolean = false,
@@ -93,6 +95,7 @@ private data class ChatControls(
     val action: ChatAction?,
     val muted: Boolean?,
     val archived: Boolean,
+    val removed: Boolean = false,
 )
 
 @HiltViewModel
@@ -141,14 +144,20 @@ class ChatViewModel @Inject constructor(
     val uiState: StateFlow<UiState<ChatUiState>> = combine(content, composer, allOutgoing, controls, live) { loaded, (text, failure, exceeded), queued, control, presence ->
         when (loaded) {
             is UiState.Content -> {
-                val names = loaded.data.messages.mapNotNull { message -> message.senderId?.let { id -> id to message.senderName } }.toMap()
+                // O servidor só manda o `senderId`; o nome vem dos participantes da conversa, e o da própria mensagem (modo de demonstração) tem prioridade.
+                val known = loaded.data.conversation.participantNames
+                val messages = loaded.data.messages.map { message ->
+                    val name = message.senderId?.let(known::get)
+                    if (message.mine || !message.senderName.isNullOrBlank() || name == null) message else message.copy(senderName = name)
+                }
+                val names = known + messages.mapNotNull { message -> message.senderId?.let { id -> message.senderName?.takeIf(String::isNotBlank)?.let { id to it } } }
                 val others = presence.online.filterKeys { it != myId }
                 UiState.Content(
                     ChatUiState(
-                        loaded.data.conversation, text, loaded.data.messages, failure, exceeded, queued,
-                        control.editingId, control.action, control.muted, control.archived,
+                        loaded.data.conversation, text, messages, failure, exceeded, queued,
+                        control.editingId, control.action, control.muted, control.archived, control.removed,
                         hasMore = loaded.data.hasMore, loadingOlder = presence.loadingOlder, firstUnreadSequence = loaded.data.firstUnreadSequence,
-                        typingNames = presence.typing.mapNotNull { names[it]?.takeIf(String::isNotBlank) },
+                        typingNames = presence.typing.mapNotNull { names[it] },
                         typingCount = presence.typing.size,
                         online = if (loaded.data.conversation.group || others.isEmpty()) null else others.values.any { it },
                         onlineCount = others.values.count { it },
@@ -278,7 +287,7 @@ class ChatViewModel @Inject constructor(
             is ChatEvent.Typing -> onTyping(event.userId, event.started)
             is ChatEvent.Presence -> live.value = live.value.copy(online = live.value.online + (event.userId to event.online))
             is ChatEvent.PresenceSnapshot -> live.value = live.value.copy(online = event.users)
-            is ChatEvent.ConversationRemoved -> controls.value = controls.value.copy(archived = true)
+            is ChatEvent.ConversationRemoved -> controls.value = controls.value.copy(removed = true)
         }
     }
 

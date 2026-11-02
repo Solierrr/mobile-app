@@ -38,7 +38,7 @@ class ConversationPreviewTest {
         val api = PreviewApi()
         val repository = RemoteCommunicationRepository(api, ApiCallExecutor(ApiErrorParser(Json)), object : CredentialProvider {
             override fun accessToken() = token
-        })
+        }, ParticipantNames { null })
 
         val conversations = (repository.conversations() as ApiResult.Success).data
 
@@ -55,7 +55,7 @@ class ConversationPreviewTest {
         )
         val repository = RemoteCommunicationRepository(api, ApiCallExecutor(ApiErrorParser(Json)), object : CredentialProvider {
             override fun accessToken() = token
-        })
+        }, ParticipantNames { null })
 
         val conversations = (repository.conversations() as ApiResult.Success).data
 
