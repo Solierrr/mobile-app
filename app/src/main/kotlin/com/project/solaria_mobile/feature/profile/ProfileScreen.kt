@@ -155,14 +155,7 @@ fun ProfileScreen(
     if (infoOpen) {
         BottomSheet(onDismiss = { infoOpen = false }, state = sheetState) {
             Column(modifier = Modifier.fillMaxWidth().padding(horizontal = Spacing.screen).padding(top = Spacing.sm, bottom = Spacing.screenBottom), verticalArrangement = Arrangement.spacedBy(Spacing.md)) {
-                if (profile.hasInfo(state.stats)) {
-                    Text(profile.name, color = AppTheme.colors.onSurface, style = androidx.compose.material3.MaterialTheme.typography.headlineMedium)
-                    ProfileInfoFields(profile, state.stats, full = true)
-                } else StateNotice(
-                    stringResource(R.string.pf_sem_informacoes),
-                    stringResource(if (self) R.string.pf_sem_informacoes_propria else R.string.pf_sem_informacoes_outra_pessoa),
-                    icon = AppIcons.info,
-                )
+                ProfileInfoContent(profile, state.stats, self)
             }
         }
     }
@@ -176,6 +169,19 @@ fun ProfileScreen(
             }
         }
     }
+}
+
+/** Conteúdo da sheet de informações: nome e dados, ou só o aviso quando a pessoa não compartilhou nada. */
+@Composable
+private fun ProfileInfoContent(profile: UserProfile, stats: ProfileStats?, self: Boolean) {
+    if (profile.hasInfo(stats)) {
+        Text(profile.name, color = AppTheme.colors.onSurface, style = androidx.compose.material3.MaterialTheme.typography.headlineMedium)
+        ProfileInfoFields(profile, stats, full = true)
+    } else StateNotice(
+        stringResource(R.string.pf_sem_informacoes),
+        stringResource(if (self) R.string.pf_sem_informacoes_propria else R.string.pf_sem_informacoes_outra_pessoa),
+        icon = AppIcons.info,
+    )
 }
 
 /** Se há algo para mostrar na sheet de informações: um dado do perfil ou a quantidade de projetos ou conexões. */
