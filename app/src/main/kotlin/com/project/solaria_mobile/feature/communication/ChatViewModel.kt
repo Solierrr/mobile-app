@@ -24,6 +24,8 @@ import com.project.solaria_mobile.feature.communication.data.PresenceState
 import com.project.solaria_mobile.feature.communication.data.conversationId
 import com.project.solaria_mobile.feature.communication.data.toMessage
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.delay
 import com.project.solaria_mobile.presentation.navigation.routeId
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -81,9 +83,29 @@ data class ChatUiState(
     val attachmentsEnabled: Boolean = false,
     /** O assistente está elaborando a resposta de uma mensagem enviada nesta sessão. */
     val assistantThinking: Boolean = false,
+    /** Mídia que está baixando e mídia que o servidor não entrega mais (passou dos 7 dias), por `mediaId`. */
+    val mediaLoading: Set<String> = emptySet(),
+    val mediaUnavailable: Set<String> = emptySet(),
+    /** Um anexo está subindo para o servidor. */
+    val uploading: Boolean = false,
+    /** Sessão do assistente que já teve resposta e ainda não foi avaliada: ao sair, pede a nota (NPS). */
+    val npsPending: Boolean = false,
 )
 
 internal const val MAX_MESSAGE_LENGTH = 8_000
+
+/** Sessões do assistente já avaliadas neste processo; a de uma execução anterior o servidor recusa com 409 e entra aqui também. */
+internal val NpsAnswers: MutableSet<String> = java.util.concurrent.ConcurrentHashMap.newKeySet()
+
+/** Quantas das últimas mensagens baixam a foto sozinhas ao abrir a conversa. */
+private const val AUTO_DOWNLOAD_WINDOW = 20
+
+/** Mostra o arquivo que já está no aparelho no lugar do `mediaId` que só o servidor conhece. */
+private fun ChatMessage.withLocalMedia(files: Map<String, String>): ChatMessage = when (val a = attachment) {
+    is MessageAttachment.Image -> a.mediaId?.let(files::get)?.takeIf { a.url.isBlank() }?.let { copy(attachment = a.copy(url = it)) } ?: this
+    is MessageAttachment.File -> a.mediaId?.let(files::get)?.takeIf { a.url.isBlank() }?.let { copy(attachment = a.copy(url = it)) } ?: this
+    else -> this
+}
 
 private data class ChatContent(
     val conversation: Conversation,
@@ -92,7 +114,13 @@ private data class ChatContent(
     val firstUnreadSequence: Int? = null,
 )
 
-private data class LivePresence(val typing: Set<String> = emptySet(), val presence: PresenceState = PresenceState(), val loadingOlder: Boolean = false, val thinking: Boolean = false)
+/** Mídia da conversa: o arquivo já no aparelho por `mediaId`, o que está baixando e o que o servidor não entrega mais. */
+private data class MediaProgress(val files: Map<String, String> = emptyMap(), val loading: Set<String> = emptySet(), val unavailable: Set<String> = emptySet())
+
+private data class LivePresence(
+    val typing: Set<String> = emptySet(), val presence: PresenceState = PresenceState(), val loadingOlder: Boolean = false, val thinking: Boolean = false,
+    val media: MediaProgress = MediaProgress(), val uploading: Boolean = false,
+)
 
 private data class ChatControls(
     val editingId: String?,
@@ -151,7 +179,8 @@ class ChatViewModel @Inject constructor(
                 val known = loaded.data.conversation.participantNames
                 val messages = loaded.data.messages.map { message ->
                     val name = message.senderId?.let(known::get)
-                    if (message.mine || !message.senderName.isNullOrBlank() || name == null) message else message.copy(senderName = name)
+                    val named = if (message.mine || !message.senderName.isNullOrBlank() || name == null) message else message.copy(senderName = name)
+                    named.withLocalMedia(presence.media.files)
                 }
                 val names = known + messages.mapNotNull { message -> message.senderId?.let { id -> message.senderName?.takeIf(String::isNotBlank)?.let { id to it } } }
                 // Participantes da conversa menos a própria conta, cruzados com a presença global dos contatos.
@@ -168,6 +197,8 @@ class ChatViewModel @Inject constructor(
                         onlineCount = onlineOthers.size,
                         attachmentsEnabled = capabilities.attachments() && !loaded.data.conversation.assistant,
                         assistantThinking = presence.thinking,
+                        mediaLoading = presence.media.loading, mediaUnavailable = presence.media.unavailable, uploading = presence.uploading,
+                        npsPending = loaded.data.conversation.assistant && remoteId != null && messages.any { !it.mine } && remote() !in NpsAnswers,
                     ),
                 )
             }
@@ -179,6 +210,15 @@ class ChatViewModel @Inject constructor(
 
     init {
         load()
+        // Foto recebida baixa sozinha (as mais recentes); documento, áudio e vídeo esperam o toque.
+        viewModelScope.launch {
+            content.collect { state ->
+                (state as? UiState.Content)?.data?.messages.orEmpty().takeLast(AUTO_DOWNLOAD_WINDOW).forEach { message ->
+                    val image = message.attachment as? MessageAttachment.Image
+                    if (image != null && image.url.isBlank() && image.mediaId != null) download(image.mediaId, null, image.expiresAt)
+                }
+            }
+        }
         viewModelScope.launch {
             outbox.delivered.filter { it.conversationId == conversationId }.collect { delivered ->
                 val message = delivered.message
@@ -270,13 +310,61 @@ class ChatViewModel @Inject constructor(
         }
     }
 
-    /** Envia uma foto, um documento ou uma localização; só o modo de demonstração aceita, enquanto o messenger não tem contrato para isso. */
+    /** Envia uma foto, um documento ou uma localização: o arquivo sobe para o bucket e a mensagem cita o `mediaId`. */
     fun sendAttachment(attachment: MessageAttachment) {
         sendFailure.value = null
+        live.update { it.copy(uploading = true) }
         viewModelScope.launch {
             when (val result = repository.sendAttachment(remote(), attachment)) {
-                is ApiResult.Success -> appendMessage(result.data)
+                is ApiResult.Success -> {
+                    // Quem enviou já tem o arquivo: o eco do servidor, que só traz o `mediaId`, não precisa baixá-lo de volta.
+                    val sent = result.data.attachment
+                    val local = (sent as? MessageAttachment.Image)?.let { it.mediaId to it.url } ?: (sent as? MessageAttachment.File)?.let { it.mediaId to it.url }
+                    if (local?.first != null && local.second.isNotBlank()) live.update { it.copy(media = it.media.copy(files = it.media.files + (local.first!! to local.second))) }
+                    appendMessage(result.data)
+                }
                 is ApiResult.Failure -> sendFailure.value = result.kind
+            }
+            live.update { it.copy(uploading = false) }
+        }
+    }
+
+    /**
+     * Manda a nota da sessão do assistente. Segue mesmo que a tela já tenha saído (por isso `NonCancellable`): quem avalia ao sair
+     * fecha o chat logo em seguida. 409 `DUPLICATE_RESOURCE` quer dizer que já tinha respondido; qualquer outro erro deixa perguntar de novo.
+     */
+    fun submitNps(score: Int) {
+        val id = remote()
+        viewModelScope.launch {
+            withContext(NonCancellable) {
+                val result = repository.submitNps(id, score)
+                if (result is ApiResult.Success || (result is ApiResult.Failure && result.errorCode == "DUPLICATE_RESOURCE")) NpsAnswers += id
+            }
+        }
+    }
+
+    /**
+     * Baixa uma mídia recebida para o aparelho, uma vez. Passou do prazo (7 dias no servidor) ou o servidor não a entrega mais:
+     * fica como indisponível e não tenta de novo. Qualquer outra falha deixa tentar com um toque.
+     */
+    fun download(mediaId: String, name: String?, expiresAt: java.time.Instant? = null) {
+        val progress = live.value.media
+        if (mediaId in progress.files || mediaId in progress.loading || mediaId in progress.unavailable) return
+        if (expiresAt != null && expiresAt.isBefore(java.time.Instant.now())) {
+            live.update { it.copy(media = it.media.copy(unavailable = it.media.unavailable + mediaId)) }
+            return
+        }
+        live.update { it.copy(media = it.media.copy(loading = it.media.loading + mediaId)) }
+        viewModelScope.launch {
+            val result = repository.downloadMedia(mediaId, name)
+            live.update { state ->
+                val media = state.media.copy(loading = state.media.loading - mediaId)
+                state.copy(media = when {
+                    result is ApiResult.Success -> media.copy(files = media.files + (mediaId to result.data))
+                    result is ApiResult.Failure && (result.errorCode == "MEDIA_EXPIRED" || result.kind == ErrorKind.NOT_FOUND || result.kind == ErrorKind.FORBIDDEN) ->
+                        media.copy(unavailable = media.unavailable + mediaId)
+                    else -> media
+                })
             }
         }
     }

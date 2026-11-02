@@ -9,6 +9,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -75,17 +76,24 @@ import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.launch
 
 @Composable
-fun ChatRoute(onBack: () -> Unit, viewModel: ChatViewModel = hiltViewModel()) {
+fun ChatRoute(onBack: () -> Unit, onOpenDetails: (String) -> Unit = {}, viewModel: ChatViewModel = hiltViewModel()) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    var npsOpen by remember { mutableStateOf(false) }
     UiStateHost(state, viewModel::load, onBack = onBack, header = { ScreenTitle(stringResource(R.string.ch_conversa), onBack) }, loading = { ChatSkeleton() }) { content ->
+        // Sair de uma sessão do assistente que já respondeu pede a nota antes; a folha fecha e só então a tela sai.
+        val leave = { if (content.npsPending) npsOpen = true else onBack() }
+        androidx.activity.compose.BackHandler(enabled = content.npsPending && !npsOpen) { leave() }
+        if (npsOpen) NpsSheet(onSubmit = viewModel::submitNps, onDismiss = { npsOpen = false; onBack() })
         // Conversa arquivada sai da lista desta conta; volta para a lista em vez de manter a tela aberta.
         // Quem perdeu a participação também não tem mais o que fazer aqui.
         LaunchedEffect(content.archived || content.removed) { if (content.archived || content.removed) onBack() }
         ChatScreen(
-            content, viewModel::onDraftChange, viewModel::send, onBack, viewModel::retry, viewModel::discard,
+            content, viewModel::onDraftChange, viewModel::send, leave, viewModel::retry, viewModel::discard,
             ChatActions(viewModel::startEdit, viewModel::cancelEdit, viewModel::deleteMessage, viewModel::setMuted, viewModel::archive, viewModel::clearAction),
             onLoadOlder = viewModel::loadOlder,
             onAttachment = viewModel::sendAttachment,
+            onOpenDetails = { onOpenDetails(content.conversation.id) },
+            onDownload = viewModel::download,
         )
     }
 }
@@ -101,6 +109,8 @@ fun ChatScreen(
     actions: ChatActions = ChatActions(),
     onLoadOlder: () -> Unit = {},
     onAttachment: (MessageAttachment) -> Unit = {},
+    onOpenDetails: (() -> Unit)? = null,
+    onDownload: (String, String?, java.time.Instant?) -> Unit = { _, _, _ -> },
 ) {
     val messagesState = rememberLazyListState()
     var menuOpen by remember { mutableStateOf(false) }
@@ -153,6 +163,7 @@ fun ChatScreen(
         false -> stringResource(R.string.ch_offline)
         null -> null
     }
+    androidx.compose.runtime.CompositionLocalProvider(LocalMediaUi provides MediaUi(state.mediaLoading, state.mediaUnavailable, onDownload)) {
     Column(modifier = Modifier.fillMaxSize().background(AppTheme.colors.surface).imePadding()) {
         Row(
             modifier = Modifier.fillMaxWidth().padding(horizontal = Spacing.screen).padding(top = Spacing.md, bottom = Spacing.md),
@@ -161,7 +172,8 @@ fun ChatScreen(
         ) {
             RoundIconButton(AppIcons.chevron_left, stringResource(R.string.common_back), onBack, size = Sizing.compactHeaderControl)
             Avatar(state.conversation.initials, Modifier.semantics { presenceDescription?.let { stateDescription = it } }, size = Sizing.compactHeaderControl, online = state.online == true, color = state.conversation.tone.toColor(), textColor = state.conversation.tone.toContentColor(), placeholderIcon = if (state.conversation.assistant) AppIcons.sparkles_filled else if (state.conversation.group) AppIcons.group_silhouette else AppIcons.user_silhouette)
-            Column(modifier = Modifier.weight(1f)) {
+            // Em grupo, tocar no cabeçalho abre os participantes e a gestão do grupo.
+            Column(modifier = Modifier.weight(1f).then(if (onOpenDetails != null && state.conversation.group) Modifier.clickable(onClick = onOpenDetails) else Modifier)) {
                 Text(state.conversation.name.ifBlank { stringResource(R.string.as_sessao) }, color = AppTheme.colors.onSurface, style = MaterialTheme.typography.titleSmall)
                 ChatStatusLine(state)
             }
@@ -171,6 +183,7 @@ fun ChatScreen(
                     state.muted?.let { muted ->
                         AppMenuItem(if (muted) stringResource(R.string.ch_reativar_notificacoes) else stringResource(R.string.ch_silenciar_conversa), { menuOpen = false; actions.onMute(!muted) }, icon = AppIcons.bell)
                     }
+                    if (onOpenDetails != null && state.conversation.group) AppMenuItem(stringResource(R.string.gp_detalhes), { menuOpen = false; onOpenDetails() }, icon = AppIcons.users)
                     AppMenuItem(stringResource(R.string.ch_arquivar_conversa), { menuOpen = false; confirmArchive = true }, icon = AppIcons.folder)
                 }
             }
@@ -227,6 +240,7 @@ fun ChatScreen(
             Text(failure.userMessage(), Modifier.padding(horizontal = Spacing.screen), color = AppTheme.colors.danger, style = MaterialTheme.typography.bodyMedium)
         }
         if (invalidAttachment) Text(stringResource(R.string.ch_arquivo_invalido), Modifier.padding(horizontal = Spacing.screen), color = AppTheme.colors.danger, style = MaterialTheme.typography.bodyMedium)
+        if (state.uploading) Text(stringResource(R.string.ch_enviando_anexo), Modifier.padding(horizontal = Spacing.screen), color = AppTheme.colors.onSurfaceMuted, style = MaterialTheme.typography.bodyMedium)
         Row(
             modifier = Modifier.fillMaxWidth().padding(horizontal = Spacing.screen).padding(top = Spacing.sm, bottom = Spacing.md),
             horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
@@ -261,6 +275,7 @@ fun ChatScreen(
         }
     }
 
+    }
     if (attachOpen) AttachmentSheet(sources, onLocation = { locationOpen = true }, onDismiss = { attachOpen = false })
     if (locationOpen) LocationShareSheet(
         onDismiss = { locationOpen = false },

@@ -18,6 +18,8 @@ data class UserProfile(
     val technicianId: String? = null,
     /** Profissional autônomo: é quem define jornada de trabalho e integra o Google Agenda. */
     val independent: Boolean = false,
+    /** Identificador de login: é quem o messenger conhece, e por ele se avalia a pessoa. */
+    val authId: String? = null,
 )
 
 /** Números do perfil próprio; ficam nulos quando a consulta falha, e a linha some em vez de mostrar zero falso. */

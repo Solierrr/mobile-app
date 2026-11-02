@@ -53,6 +53,8 @@ import com.project.solaria_mobile.core.designsystem.theme.Sizing
 import com.project.solaria_mobile.core.designsystem.theme.Spacing
 import com.project.solaria_mobile.core.images.readPickedImage
 import com.project.solaria_mobile.core.images.rememberCameraCapture
+import com.project.solaria_mobile.feature.communication.data.mediaKind
+import com.project.solaria_mobile.feature.communication.data.mediaLimit
 import com.project.solaria_mobile.feature.communication.domain.MessageAttachment
 import com.project.solaria_mobile.feature.discovery.currentLocation
 import java.io.File
@@ -60,8 +62,6 @@ import java.util.UUID
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-
-private const val MAX_DOCUMENT_BYTES = 10L * 1024 * 1024
 
 /** Quem abre cada origem de anexo; vem das telas, porque o resultado do seletor precisa sobreviver ao fechamento da folha. */
 class ChatAttachmentSources(val gallery: () -> Unit, val camera: () -> Unit, val document: () -> Unit)
@@ -77,8 +77,8 @@ fun rememberChatAttachmentSources(onAttachment: (MessageAttachment) -> Unit, onI
     fun photo(uri: Uri?) {
         if (uri == null) return
         scope.launch {
-            val url = withContext(Dispatchers.IO) { copyPhoto(context, uri) }
-            if (url == null) onInvalid() else onAttachment(MessageAttachment.Image(url))
+            val image = withContext(Dispatchers.IO) { copyPhoto(context, uri) }
+            if (image == null) onInvalid() else onAttachment(image)
         }
     }
     val gallery = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia(), ::photo)
@@ -99,11 +99,11 @@ fun rememberChatAttachmentSources(onAttachment: (MessageAttachment) -> Unit, onI
     }
 }
 
-private fun copyPhoto(context: Context, uri: Uri): String? {
+private fun copyPhoto(context: Context, uri: Uri): MessageAttachment.Image? {
     val (bytes, type) = readPickedImage(context, uri) ?: return null
     val directory = File(context.cacheDir, "chat-media").apply { mkdirs() }
     val file = File(directory, "${UUID.randomUUID()}.${if (type == "image/png") "png" else "jpg"}")
-    return runCatching { file.writeBytes(bytes); Uri.fromFile(file).toString() }.getOrNull()
+    return runCatching { file.writeBytes(bytes); MessageAttachment.Image(Uri.fromFile(file).toString(), sizeBytes = bytes.size.toLong(), mimeType = type) }.getOrNull()
 }
 
 private fun readDocument(context: Context, uri: Uri): MessageAttachment.File? {
@@ -117,8 +117,11 @@ private fun readDocument(context: Context, uri: Uri): MessageAttachment.File? {
             size = if (cursor.isNull(1)) 0L else cursor.getLong(1)
         }
     }
-    if (size > MAX_DOCUMENT_BYTES) return null
-    return MessageAttachment.File(name ?: uri.lastPathSegment.orEmpty().ifBlank { "arquivo" }, size, resolver.getType(uri).orEmpty(), uri.toString())
+    val mime = resolver.getType(uri).orEmpty()
+    // O servidor confere o tamanho exato do arquivo e o teto de cada tipo; sem tamanho conhecido não há como declarar o envio.
+    val file = MessageAttachment.File(name ?: uri.lastPathSegment.orEmpty().ifBlank { "arquivo" }, size, mime, uri.toString())
+    if (size <= 0 || size > mediaLimit(file.mediaKind())) return null
+    return file
 }
 
 /** Escolha da origem do anexo; a localização abre a própria folha de confirmação. */

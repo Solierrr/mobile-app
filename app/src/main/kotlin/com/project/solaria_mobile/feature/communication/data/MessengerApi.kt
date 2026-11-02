@@ -8,6 +8,8 @@ import retrofit2.http.Path
 import retrofit2.http.Query
 import retrofit2.http.DELETE
 import retrofit2.http.PATCH
+import retrofit2.http.PUT
+import retrofit2.http.Streaming
 
 @Serializable
 data class ConversationDto(
@@ -23,6 +25,10 @@ data class ConversationDto(
     val userDetails: Map<String, kotlinx.serialization.json.JsonElement>? = null,
     /** `authId` de quem participa: cruzado com a presença e usado para buscar os nomes, que o messenger não manda. */
     val participantIds: List<String> = emptyList(),
+    /** Quem gere o grupo: só essa pessoa adiciona, remove e passa a gestão. */
+    val managerUserId: String? = null,
+    /** Convidados que o servidor não admitiu, na resposta de `POST /participants`. */
+    val rejectedParticipants: List<RejectedGroupParticipantDto> = emptyList(),
 )
 
 /** Última mensagem que o messenger já manda na lista, com o marcador de excluída. */
@@ -65,11 +71,20 @@ data class MessageUpdatesDto(
     val messages: List<MessageDto> = emptyList(),
 )
 
-/** Anexo de uma mensagem, `type` em `IMAGE`, `FILE` ou `LOCATION`. Proposta de contrato, ainda sem suporte no servidor. */
+/**
+ * Anexo de uma mensagem, `type` em `IMAGE`, `VIDEO`, `AUDIO`, `FILE` ou `LOCATION`. No envio e no recebimento o arquivo é citado
+ * por [mediaId]; [url] só existe no modo de demonstração. [downloadPath] e [expiresAt] só vêm do servidor (a mídia some em 7 dias).
+ */
 @Serializable
 data class AttachmentDto(
     val type: String,
     val url: String? = null,
+    val mediaId: String? = null,
+    val durationMs: Long? = null,
+    val width: Int? = null,
+    val height: Int? = null,
+    val expiresAt: String? = null,
+    val downloadPath: String? = null,
     val name: String? = null,
     val sizeBytes: Long? = null,
     val mimeType: String? = null,
@@ -77,6 +92,28 @@ data class AttachmentDto(
     val longitude: Double? = null,
     val label: String? = null,
 )
+
+@Serializable
+data class GroupConversationRequest(val title: String, val participantIds: Set<String>)
+
+@Serializable
+data class ParticipantsRequest(val userIds: Set<String>)
+
+@Serializable
+data class TransferManagerRequest(val successorUserId: String)
+
+@Serializable
+data class MediaUploadRequest(val conversationId: String, val type: String, val mimeType: String, val sizeBytes: Long)
+
+@Serializable
+data class MediaUploadDto(val mediaId: String, val upload: MediaUploadTargetDto, val uploadExpiresAt: String? = null, val maxBytes: Long = 0)
+
+@Serializable
+data class MediaUploadTargetDto(val url: String, val method: String = "PUT", val headers: Map<String, String> = emptyMap())
+
+/** `environment` é opcional; o servidor assume o do próprio ambiente. */
+@Serializable
+data class NpsRequest(val conversationId: String, val score: Int)
 
 @Serializable
 data class SendMessageRequest(
@@ -109,6 +146,33 @@ interface MessengerApi {
 
     @POST("messaging/messages")
     suspend fun send(@Body body: SendMessageRequest): MessageDto
+
+    /** Grupo avulso: quem cria vira o gestor. Os convidados que o servidor recusou voltam em `rejectedParticipants`. */
+    @POST("messaging/conversations/group")
+    suspend fun createGroup(@Body body: GroupConversationRequest): GroupCreationDto
+
+    @POST("messaging/conversations/{id}/participants")
+    suspend fun addParticipants(@Path("id") id: String, @Body body: ParticipantsRequest): ConversationDto
+
+    @PUT("messaging/conversations/{id}/manager")
+    suspend fun transferManager(@Path("id") id: String, @Body body: TransferManagerRequest): kotlinx.serialization.json.JsonElement
+
+    /** Remover outra pessoa ou sair; o gestor que sai com outros no grupo precisa de [successorUserId]. */
+    @DELETE("messaging/conversations/{id}/participants/{userId}")
+    suspend fun removeParticipant(@Path("id") id: String, @Path("userId") userId: String, @Query("successorUserId") successorUserId: String? = null)
+
+    /** Pede a permissão de envio de um arquivo; os bytes vão direto para o bucket. */
+    @POST("messaging/media")
+    suspend fun mediaUpload(@Body body: MediaUploadRequest): MediaUploadDto
+
+    /** O servidor responde 302 para um link assinado do bucket e o OkHttp o segue; sem o `Authorization` no outro host. */
+    @Streaming
+    @GET("messaging/media/{mediaId}/content")
+    suspend fun mediaContent(@Path("mediaId") mediaId: String): okhttp3.ResponseBody
+
+    /** Nota de 0 a 10 de uma sessão do assistente; 409 `DUPLICATE_RESOURCE` quando a pessoa já respondeu. */
+    @POST("messaging/nps")
+    suspend fun nps(@Body body: NpsRequest): kotlinx.serialization.json.JsonElement
 
     /** Cria a conversa direta com o destinatário, ou devolve a que já existe com ele. */
     @POST("messaging/conversations/direct")

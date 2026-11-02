@@ -277,12 +277,12 @@ class SwitchingChatRealtime @Inject constructor(
 
 /** O que o chat oferece conforme o ambiente. */
 fun interface ChatCapabilities {
-    /** Foto, documento e localização no compositor; o messenger ainda não tem contrato para isso. */
+    /** Foto, documento e localização no compositor. */
     fun attachments(): Boolean
 }
 
-/** Anexos só aparecem no modo de demonstração. */
+/** O messenger aceita anexos (mídia pelo bucket e localização): o compositor os oferece em qualquer ambiente. */
 @Singleton
-class MockModeChatCapabilities @Inject constructor(private val mockMode: MockModeStore) : ChatCapabilities {
-    override fun attachments(): Boolean = mockMode.isEnabled()
+class AppChatCapabilities @Inject constructor() : ChatCapabilities {
+    override fun attachments(): Boolean = true
 }

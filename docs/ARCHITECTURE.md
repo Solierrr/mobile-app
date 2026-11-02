@@ -46,6 +46,8 @@ Os caminhos são relativos à raiz Kotlin do aplicativo.
 | Cadastro central | HTTPS REST | Bearer JWT |
 | Mensagens e estado de conversa | HTTPS REST | Bearer JWT |
 | Eventos e presença | STOMP sobre WebSocket | Bearer no CONNECT |
+| Mídia do chat | HTTPS PUT/GET direto no bucket, por URL assinada que o messenger concede | URL assinada, sem Bearer (o token não vai ao host do bucket) |
+| Avaliações e NPS | HTTPS REST no serviço de mensagens | Bearer JWT |
 | Geocodificação no QA | HTTPS JSON | Cliente da sessão |
 | Imagens públicas | HTTPS | Cliente sem interceptor de sessão |
 | Identificador de instalação | Firebase Installations | Configuração Firebase da variante |

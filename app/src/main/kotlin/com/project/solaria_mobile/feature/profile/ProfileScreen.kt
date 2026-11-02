@@ -145,9 +145,11 @@ fun ProfileScreen(
                 ActionRow(stringResource(R.string.pf_informacoes_do_perfil), AppIcons.info, { infoOpen = true })
                 ActionRow(stringResource(R.string.pf_privacidade), AppIcons.shield, { onNavigate(AppDestination.Settings) })
                 ActionRow(stringResource(R.string.settings_title), AppIcons.settings, { onNavigate(AppDestination.Settings) })
+                ActionRow(stringResource(R.string.rt_minhas_avaliacoes), AppIcons.star, { onNavigate(AppDestination.MyRatings) })
             } else {
                 ActionRow(stringResource(R.string.pf_informacoes), AppIcons.info, { infoOpen = true })
                 ActionRow(if (state.connecting) stringResource(R.string.pf_atualizando_conexao) else if (state.connected) stringResource(R.string.pf_remover_conexao) else stringResource(R.string.pf_adicionar_conexao), AppIcons.link, { if (!state.connecting) onToggleConnection() })
+                profile.authId?.let { com.project.solaria_mobile.feature.rating.ProfileRatingsSection(it) }
             }
         }
     }

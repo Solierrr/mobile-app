@@ -65,3 +65,9 @@ class FakeCommunicationRepository @Inject constructor() : CommunicationRepositor
         ChatMessage("Perfeito, obrigado!", false, "10:45"),
     )
 }
+
+/** Gateway de mídia dos testes que não envolvem arquivo: aceita o envio e não guarda nada. */
+internal object NoMediaGateway : MediaGateway {
+    override suspend fun upload(target: MediaUploadTarget, uri: String, mimeType: String, sizeBytes: Long) = true
+    override suspend fun save(mediaId: String, name: String?, body: okhttp3.ResponseBody): String? = null
+}

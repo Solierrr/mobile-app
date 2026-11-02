@@ -15,6 +15,8 @@ data class Conversation(val id: String, val initials: String, val name: String, 
     val participants: Set<String> = emptySet(),
     /** Data ISO da última interação, como o servidor a manda; ordena a lista quando chega uma atualização ao vivo. */
     val activityAt: String? = null,
+    /** Gestor do grupo, em minúsculas; só ele adiciona e remove participantes. Nulo em conversa que não é grupo. */
+    val managerId: String? = null,
     /** Nome de quem participa, por `authId`, quando foi possível resolver; usado nos remetentes de grupo e em "digitando". */
     val participantNames: Map<String, String> = emptyMap())
 
@@ -38,12 +40,13 @@ data class ChatMessage(
 )
 
 /**
- * Conteúdo além do texto. O api-messenger ainda não tem contrato para anexos (a proposta está no VersioSpec), então só o
- * modo de demonstração produz estes valores; o servidor real devolve apenas texto.
+ * Conteúdo além do texto. Foto e arquivo viajam pelo bucket (o messenger só cita o `mediaId`); a localização leva as coordenadas.
  */
 sealed interface MessageAttachment {
-    data class Image(val url: String) : MessageAttachment
-    data class File(val name: String, val sizeBytes: Long, val mimeType: String, val url: String) : MessageAttachment
+    /** [url] é o arquivo no aparelho; vazio enquanto só há [mediaId] a baixar. [sizeBytes] e [mimeType] valem para o envio. */
+    data class Image(val url: String, val mediaId: String? = null, val sizeBytes: Long = 0, val mimeType: String = "image/jpeg", val expiresAt: java.time.Instant? = null) : MessageAttachment
+    /** Documento, áudio ou vídeo: o tipo do envio sai do [mimeType]. */
+    data class File(val name: String, val sizeBytes: Long, val mimeType: String, val url: String, val mediaId: String? = null, val expiresAt: java.time.Instant? = null) : MessageAttachment
     data class Location(val latitude: Double, val longitude: Double, val label: String = "") : MessageAttachment
 }
 

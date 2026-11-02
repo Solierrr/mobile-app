@@ -8,6 +8,9 @@ import com.project.solaria_mobile.core.common.UiState
 import com.project.solaria_mobile.feature.communication.ProjectCommunityViewModel
 import com.project.solaria_mobile.feature.communication.domain.CommunityPerson
 import com.project.solaria_mobile.feature.communication.domain.GroupCreated
+import com.project.solaria_mobile.feature.communication.domain.canChangeAdmin
+import com.project.solaria_mobile.feature.communication.domain.canRemove
+import com.project.solaria_mobile.feature.communication.domain.groupsNeedingSuccessor
 import com.project.solaria_mobile.feature.communication.domain.ProjectCommunity
 import com.project.solaria_mobile.feature.communication.domain.ProjectCommunityRepository
 import kotlinx.coroutines.CompletableDeferred
@@ -50,6 +53,13 @@ class ProjectCommunityTest {
             added += authId
             return ApiResult.Success(Unit)
         }
+        val archivedCalls = mutableListOf<Boolean>()
+        val adminCalls = mutableListOf<Pair<String, Boolean>>()
+        val removals = mutableListOf<Pair<String, Map<String, String>>>()
+        override suspend fun setArchived(communityId: String, archived: Boolean): ApiResult<Unit> { archivedCalls += archived; return ApiResult.Success(Unit) }
+        override suspend fun setAdmin(communityId: String, authId: String, admin: Boolean): ApiResult<Unit> { adminCalls += authId to admin; return ApiResult.Success(Unit) }
+        override suspend fun removeMember(communityId: String, authId: String, successors: Map<String, String>): ApiResult<Unit> { removals += authId to successors; return ApiResult.Success(Unit) }
+        override suspend fun mine(): ApiResult<List<com.project.solaria_mobile.feature.communication.domain.CommunitySummary>> = ApiResult.Success(emptyList())
     }
 
     private fun model(repository: FakeCommunity) = ProjectCommunityViewModel(SavedStateHandle(mapOf("id" to "p1")), repository)
@@ -153,5 +163,89 @@ class ProjectCommunityTest {
         model.createGroup("Equipe", setOf("ana"))
         advanceUntilIdle()
         assertEquals(listOf(setOf("ana")), repository.invited)
+    }
+
+    private fun managed(myRole: String) = ProjectCommunity(
+        id = "community", projectId = "p1", members = 4, canManage = myRole != "MEMBER", myRole = myRole,
+        groups = listOf(
+            com.project.solaria_mobile.feature.communication.domain.CommunityGroup("g1", "Geral", 3, true, true, managerId = "ana", participantIds = listOf("ana", "bia", "eu")),
+            com.project.solaria_mobile.feature.communication.domain.CommunityGroup("g2", "Solo", 1, true, true, managerId = "ana", participantIds = listOf("ana")),
+        ),
+        people = listOf(
+            CommunityPerson("eu", "Eu", true, self = true, role = myRole),
+            CommunityPerson("ana", "Ana", true, role = "ADMIN"),
+            CommunityPerson("bia", "Bia", true, role = "MEMBER"),
+            CommunityPerson("dono", "Dono", true, role = "OWNER"),
+        ),
+    )
+
+    @Test fun ownerRemovesAndChangesRolesButNeverTouchesAnotherOwner() {
+        val owner = managed("OWNER")
+        val person = { id: String -> owner.people.first { it.authId == id } }
+        assertTrue(owner.canRemove(person("ana")) && owner.canRemove(person("bia")))
+        assertFalse(owner.canRemove(person("dono")))
+        assertTrue(owner.canChangeAdmin(person("ana")) && owner.canChangeAdmin(person("bia")))
+        assertFalse(owner.canChangeAdmin(person("dono")) || owner.canChangeAdmin(person("eu")))
+    }
+
+    @Test fun administratorOnlyRemovesPlainMembersAndCannotDemoteOtherAdministrators() {
+        val admin = managed("ADMIN")
+        val person = { id: String -> admin.people.first { it.authId == id } }
+        assertTrue(admin.canRemove(person("bia")))
+        assertFalse(admin.canRemove(person("ana")))
+        assertTrue(admin.canChangeAdmin(person("bia")))
+        assertFalse(admin.canChangeAdmin(person("ana")))
+    }
+
+    @Test fun aPlainMemberCanOnlyLeaveByThemselves() {
+        val member = managed("MEMBER")
+        assertTrue(member.canRemove(member.people.first { it.self }))
+        assertFalse(member.canRemove(member.people.first { it.authId == "bia" }))
+        assertFalse(member.canChangeAdmin(member.people.first { it.authId == "bia" }))
+    }
+
+    @Test fun onlyGroupsLeftWithPeopleNeedASuccessor() {
+        assertEquals(listOf("g1"), managed("OWNER").groupsNeedingSuccessor("ANA").map { it.id })
+        assertTrue(managed("OWNER").groupsNeedingSuccessor("bia").isEmpty())
+    }
+
+    @Test fun removingWithoutTheSuccessorOfAManagedGroupNeverReachesTheServer() = runTest {
+        val repository = FakeCommunity().apply { snapshot = managed("OWNER") }
+        val model = model(repository)
+        advanceUntilIdle()
+        model.removeMember("ana")
+        advanceUntilIdle()
+        assertEquals(ErrorKind.VALIDATION, (model.uiState.value as UiState.Content).data.error)
+        assertTrue(repository.removals.isEmpty())
+        model.removeMember("ana", mapOf("g1" to "bia"))
+        advanceUntilIdle()
+        assertEquals(listOf("ana" to mapOf("g1" to "bia")), repository.removals)
+    }
+
+    @Test fun archivingAndRolesAreCheckedBeforeCallingTheServer() = runTest {
+        val repository = FakeCommunity().apply { snapshot = managed("ADMIN") }
+        val model = model(repository)
+        advanceUntilIdle()
+        model.setAdmin("ana", false)
+        advanceUntilIdle()
+        assertEquals(ErrorKind.FORBIDDEN, (model.uiState.value as UiState.Content).data.error)
+        model.setAdmin("bia", true)
+        advanceUntilIdle()
+        model.setArchived(true)
+        advanceUntilIdle()
+        assertEquals(listOf("bia" to true), repository.adminCalls)
+        assertEquals(listOf(true), repository.archivedCalls)
+    }
+
+    @Test fun anArchivedCommunityAcceptsNoRoleChanges() = runTest {
+        val repository = FakeCommunity().apply { snapshot = managed("OWNER").copy(archived = true) }
+        val model = model(repository)
+        advanceUntilIdle()
+        model.setAdmin("bia", true)
+        advanceUntilIdle()
+        assertTrue(repository.adminCalls.isEmpty())
+        model.setArchived(false)
+        advanceUntilIdle()
+        assertEquals(listOf(false), repository.archivedCalls)
     }
 }

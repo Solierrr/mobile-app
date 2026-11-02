@@ -3,6 +3,7 @@ package com.project.solaria_mobile.feature.communication
 import com.project.solaria_mobile.feature.communication.data.ChatEvent
 import com.project.solaria_mobile.feature.communication.data.toListConversation
 import com.project.solaria_mobile.feature.communication.domain.Conversation
+import com.project.solaria_mobile.core.format.initialsOf
 import java.time.OffsetDateTime
 
 /**
@@ -40,3 +41,14 @@ private fun List<Conversation>.applyUpdate(event: ChatEvent.ConversationUpdated,
 
 private fun String?.toInstantOrNull(): java.time.Instant? =
     this?.let { runCatching { OffsetDateTime.parse(it).toInstant() }.getOrNull() }
+
+/** Conversa direta cuja outra pessoa ainda não tem nome: chegou ao vivo, sem passar pela leitura que resolve os nomes. */
+internal fun Conversation.needsName(me: String?): Boolean =
+    !group && !assistant && !geo && participantNames.isEmpty() && participants.any { it != me }
+
+/** A conversa direta com o nome da outra pessoa, quando [names] (por `authId` em minúsculas) a conhece. */
+internal fun Conversation.named(names: Map<String, String>, me: String?): Conversation {
+    val other = participants.firstOrNull { it != me } ?: return this
+    val name = names[other] ?: return this
+    return copy(name = name, initials = initialsOf(name), participantNames = mapOf(other to name))
+}

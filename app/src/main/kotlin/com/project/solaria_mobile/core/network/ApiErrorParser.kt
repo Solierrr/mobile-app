@@ -27,14 +27,16 @@ class ApiErrorParser @Inject constructor(
         return ApiResult.Failure(
             kind = kind,
             invalidFields = if (kind == ErrorKind.VALIDATION) invalidFields(body) else emptySet(),
+            errorCode = payload(body)?.string("errorCode"),
         )
     }
 
+    private fun payload(body: String?): JsonObject? =
+        body?.takeIf { it.isNotBlank() }?.let { runCatching { json.parseToJsonElement(it) }.getOrNull() as? JsonObject }
+
     // Core/Messenger: errors[].field identifica o campo que falhou na validação
     private fun invalidFields(body: String?): Set<String> {
-        val payload = body?.takeIf { it.isNotBlank() }?.let {
-            runCatching { json.parseToJsonElement(it) }.getOrNull() as? JsonObject
-        }
+        val payload = payload(body)
         return (payload?.get("errors") as? JsonArray).orEmpty()
             .mapNotNull { (it as? JsonObject)?.string("field") }
             .toSet()

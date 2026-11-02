@@ -28,6 +28,13 @@ class ConversationPreviewTest {
             }
         }
         override suspend fun updates(since: Long?, limit: Int) = MessageUpdatesDto()
+        override suspend fun createGroup(body: GroupConversationRequest): GroupCreationDto = TODO()
+        override suspend fun addParticipants(id: String, body: ParticipantsRequest): ConversationDto = TODO()
+        override suspend fun transferManager(id: String, body: TransferManagerRequest): kotlinx.serialization.json.JsonElement = TODO()
+        override suspend fun removeParticipant(id: String, userId: String, successorUserId: String?) = TODO()
+        override suspend fun mediaUpload(body: MediaUploadRequest): MediaUploadDto = TODO()
+        override suspend fun mediaContent(mediaId: String): okhttp3.ResponseBody = TODO()
+        override suspend fun nps(body: NpsRequest): kotlinx.serialization.json.JsonElement = TODO()
         override suspend fun direct(body: DirectConversationRequest) = ConversationDto("direct")
         override suspend fun send(body: SendMessageRequest) = MessageDto("m", body.conversationId, content = body.content)
         override suspend fun editMessage(id: String, body: EditMessageRequest) = MessageDto(id, "c1", content = body.content, edited = true)
@@ -39,7 +46,7 @@ class ConversationPreviewTest {
         val api = PreviewApi()
         val repository = RemoteCommunicationRepository(api, ApiCallExecutor(ApiErrorParser(Json)), object : CredentialProvider {
             override fun accessToken() = token
-        }, ParticipantNames { null })
+        }, ParticipantNames { null }, NoMediaGateway)
 
         val conversations = (repository.conversations() as ApiResult.Success).data
 
@@ -56,7 +63,7 @@ class ConversationPreviewTest {
         )
         val repository = RemoteCommunicationRepository(api, ApiCallExecutor(ApiErrorParser(Json)), object : CredentialProvider {
             override fun accessToken() = token
-        }, ParticipantNames { null })
+        }, ParticipantNames { null }, NoMediaGateway)
 
         val conversations = (repository.conversations() as ApiResult.Success).data
 

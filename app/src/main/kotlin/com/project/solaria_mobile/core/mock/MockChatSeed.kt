@@ -77,7 +77,7 @@ internal object MockChatSeed {
 
     fun conversations(now: OffsetDateTime): List<ConversationDto> = listOf(
         ConversationDto(CONVERSATION_ANA, "USER", names.getValue(ANA), now.minusMinutes(25).toString(), participantIds = others(CONVERSATION_ANA)),
-        ConversationDto(CONVERSATION_TEAM, "GROUP", "Equipe de demonstração", now.minusMinutes(50).toString(), participantIds = others(CONVERSATION_TEAM)),
+        ConversationDto(CONVERSATION_TEAM, "GROUP", "Equipe de demonstração", now.minusMinutes(50).toString(), participantIds = listOf(SELF) + others(CONVERSATION_TEAM), managerUserId = SELF),
         ConversationDto(CONVERSATION_RAFAEL, "USER", names.getValue(RAFAEL), now.minusDays(2).toString(), participantIds = others(CONVERSATION_RAFAEL)),
         ConversationDto(CONVERSATION_MARINA, "USER", names.getValue(MARINA), now.minusHours(3).toString(), participantIds = others(CONVERSATION_MARINA)),
         ConversationDto(CONVERSATION_EMPTY, "USER", names.getValue(BEATRIZ), now.minusDays(9).toString(), participantIds = others(CONVERSATION_EMPTY)),

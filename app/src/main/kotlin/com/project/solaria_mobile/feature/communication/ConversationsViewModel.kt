@@ -64,7 +64,10 @@ open class ConversationListViewModel(
             realtime.events.collect { event ->
                 // A contagem de versões do servidor recomeçou: o que a lista mostra pode estar velho, então lê tudo de novo.
                 if (event is ChatEvent.Resynced) load()
-                else source.update { state -> if (state is UiState.Content) state.copy(data = state.data.applyLive(event, myId)) else state }
+                else {
+                    source.update { state -> if (state is UiState.Content) state.copy(data = state.data.applyLive(event, myId)) else state }
+                    if (event is ChatEvent.ConversationUpdated) resolveDirectNames()
+                }
             }
         }
         viewModelScope.launch {
@@ -79,6 +82,19 @@ open class ConversationListViewModel(
 
     fun load() {
         viewModelScope.launch { source.load() { repository.conversations() } }
+    }
+
+    /** Uma conversa direta nova chega ao vivo sem nome (o evento não os traz): busca o da outra pessoa e troca a linha. */
+    private fun resolveDirectNames() {
+        val pending = (source.value as? UiState.Content)?.data.orEmpty().filter { it.needsName(myId) }
+        if (pending.isEmpty()) return
+        viewModelScope.launch {
+            val names = repository.participantNames(pending.flatMap { c -> c.participants.filter { it != myId } }).mapKeys { it.key.lowercase() }
+            if (names.isEmpty()) return@launch
+            source.update { state ->
+                if (state is UiState.Content) state.copy(data = state.data.map { if (it.needsName(myId)) it.named(names, myId) else it }) else state
+            }
+        }
     }
 
     fun onQueryChange(value: String) { query.value = value }

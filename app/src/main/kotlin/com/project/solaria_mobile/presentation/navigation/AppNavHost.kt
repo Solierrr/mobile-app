@@ -173,6 +173,8 @@ fun AppNavHost(
                     onOpenChat = { open(AppDestination.Chat(it)) },
                     onOpenConnections = { open(AppDestination.Connections) },
                     onStartConversation = { open(AppDestination.NewConversation) },
+                    onOpenArchived = { open(AppDestination.ArchivedChats) },
+                    onOpenCommunities = { open(AppDestination.Communities) },
                 )
             }
         }
@@ -201,7 +203,21 @@ fun AppNavHost(
                 )
             }
         }
-        composable<AppDestination.Chat> { ChatRoute(onBack = ::back) }
+        composable<AppDestination.MyRatings> { com.project.solaria_mobile.feature.rating.MyRatingsRoute(onBack = ::back) }
+        composable<AppDestination.Communities> {
+            ProvidePageContainers { com.project.solaria_mobile.feature.communication.CommunitiesRoute(onBack = ::back, onOpenProject = { open(AppDestination.Project(it)) }) }
+        }
+        composable<AppDestination.Chat> { ChatRoute(onBack = ::back, onOpenDetails = { open(AppDestination.GroupDetails(it)) }) }
+        composable<AppDestination.GroupDetails> {
+            com.project.solaria_mobile.feature.communication.GroupDetailsRoute(
+                onBack = ::back,
+                // Quem saiu do grupo volta à lista: a conversa e os detalhes saem da pilha.
+                onLeft = { navController.popBackStack<AppDestination.Chat>(inclusive = true) },
+            )
+        }
+        composable<AppDestination.ArchivedChats> {
+            ProvidePageContainers { com.project.solaria_mobile.feature.communication.ArchivedConversationsRoute(onBack = ::back, onOpenChat = { open(AppDestination.Chat(it)) }) }
+        }
         composable<AppDestination.Calls> { ProvidePageContainers { CallsRoute(onBack = ::back, onOpenCall = { open(AppDestination.Call(it)) }) } }
         composable<AppDestination.Call> { CallDetailsRoute(onBack = ::back, onNavigate = ::open) }
         composable<AppDestination.Schedule> { ProvidePageContainers { ScheduleRoute(onBack = ::back, onOpenSettings = { open(AppDestination.Settings) }, onOpenProject = { open(AppDestination.Project(it)) }) } }

@@ -47,6 +47,11 @@ object ApiModule {
 
     @Provides
     @Singleton
+    fun provideRatingApi(factory: RetrofitFactory): com.project.solaria_mobile.feature.rating.data.RatingApi =
+        factory.create(BuildConfig.MESSENGER_BASE_URL).create(com.project.solaria_mobile.feature.rating.data.RatingApi::class.java)
+
+    @Provides
+    @Singleton
     fun provideAssistantApi(factory: RetrofitFactory): AssistantApi =
         // Cada turno roda vários modelos e pode passar de um minuto; o `/chat` não faz streaming.
         factory.create(BuildConfig.AI_ASSISTANT_BASE_URL, java.time.Duration.ofSeconds(150)).create(AssistantApi::class.java)

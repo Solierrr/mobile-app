@@ -54,7 +54,7 @@ class MessengerContractTest {
             CommunityGroupDto.serializer(),
             """{"id":"g1","title":"Geral","participantIds":["a","b"],"managerUserId":"a","startedAt":"2026-11-01T10:00:00Z","lastInteractionAt":null}""",
         )
-        assertEquals(CommunityGroupDto("g1", "Geral", setOf("a", "b")), group)
+        assertEquals(CommunityGroupDto("g1", "Geral", setOf("a", "b"), "a"), group)
     }
 
     @Test fun rejectedParticipantsCarryTheReasonCode() {
@@ -87,7 +87,7 @@ class MessengerContractTest {
     private val credentials = object : CredentialProvider { override fun accessToken() = token }
     private val executor = ApiCallExecutor(ApiErrorParser(kotlinx.serialization.json.Json))
 
-    private fun repository(api: MessengerApi, names: ParticipantNames) = RemoteCommunicationRepository(api, executor, credentials, names)
+    private fun repository(api: MessengerApi, names: ParticipantNames) = RemoteCommunicationRepository(api, executor, credentials, names, com.project.solaria_mobile.feature.communication.data.NoMediaGateway)
 
     @Test fun directConversationTakesTheNameOfTheOtherParticipant() = runTest {
         val api = mockk<MessengerApi>()
