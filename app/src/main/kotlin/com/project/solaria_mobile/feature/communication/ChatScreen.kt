@@ -39,6 +39,8 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.ClipEntry
 import androidx.compose.ui.platform.LocalClipboard
@@ -145,6 +147,11 @@ fun ChatScreen(
 
     val sources = rememberChatAttachmentSources(onAttachment = onAttachment, onInvalid = { invalidAttachment = true })
     val tooLong = state.draftLimitExceeded || state.draft.trim().length > MAX_MESSAGE_LENGTH
+    val presenceDescription = when (state.online) {
+        true -> stringResource(R.string.ch_online)
+        false -> stringResource(R.string.ch_offline)
+        null -> null
+    }
     Column(modifier = Modifier.fillMaxSize().background(AppTheme.colors.surface).imePadding()) {
         Row(
             modifier = Modifier.fillMaxWidth().padding(horizontal = Spacing.screen).padding(top = Spacing.md, bottom = Spacing.md),
@@ -152,7 +159,7 @@ fun ChatScreen(
             horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
         ) {
             RoundIconButton(AppIcons.chevron_left, stringResource(R.string.common_back), onBack, size = Sizing.compactHeaderControl)
-            Avatar(state.conversation.initials, size = Sizing.compactHeaderControl, color = state.conversation.tone.toColor(), textColor = state.conversation.tone.toContentColor(), placeholderIcon = if (state.conversation.assistant) AppIcons.sparkles_filled else if (state.conversation.group) AppIcons.group_silhouette else AppIcons.user_silhouette)
+            Avatar(state.conversation.initials, Modifier.semantics { presenceDescription?.let { stateDescription = it } }, size = Sizing.compactHeaderControl, online = state.online == true, color = state.conversation.tone.toColor(), textColor = state.conversation.tone.toContentColor(), placeholderIcon = if (state.conversation.assistant) AppIcons.sparkles_filled else if (state.conversation.group) AppIcons.group_silhouette else AppIcons.user_silhouette)
             Column(modifier = Modifier.weight(1f)) {
                 Text(state.conversation.name.ifBlank { stringResource(R.string.as_sessao) }, color = AppTheme.colors.onSurface, style = MaterialTheme.typography.titleSmall)
                 ChatStatusLine(state)
@@ -280,7 +287,7 @@ fun ChatScreen(
     }
 }
 
-/** Sob o nome: quem está digitando, depois online/offline (conversa direta) ou quantos estão online (grupo), e se está silenciada. */
+/** Sob o nome: quem está digitando, depois quantos estão online (grupo), e se está silenciada. Em conversa direta, quem está online aparece na bolinha do avatar. */
 @Composable
 private fun ChatStatusLine(state: ChatUiState) {
     val muted = state.muted == true
@@ -292,16 +299,10 @@ private fun ChatStatusLine(state: ChatUiState) {
         state.typingCount == 1 -> stringResource(R.string.ch_alguem_digitando)
         else -> stringResource(R.string.ch_varios_digitando, state.typingCount)
     }
-    val presenceText = when {
-        state.conversation.group -> if (state.onlineCount > 0) stringResource(R.string.ch_n_online, state.onlineCount) else null
-        state.online == true -> stringResource(R.string.ch_online)
-        state.online == false -> stringResource(R.string.ch_offline)
-        else -> null
-    }
+    val presenceText = if (state.conversation.group && state.onlineCount > 0) stringResource(R.string.ch_n_online, state.onlineCount) else null
     val text = typingText ?: presenceText
     if (text != null) {
-        val highlighted = typingText != null || state.online == true
-        Text(text, color = if (highlighted) AppTheme.colors.brandStrong else AppTheme.colors.onSurfaceMuted, style = MaterialTheme.typography.labelMedium)
+        Text(text, color = if (typingText != null) AppTheme.colors.brandStrong else AppTheme.colors.onSurfaceMuted, style = MaterialTheme.typography.labelMedium)
     }
     if (muted) Text(stringResource(R.string.ch_silenciada), color = AppTheme.colors.onSurfaceMuted, style = MaterialTheme.typography.labelMedium)
 }
