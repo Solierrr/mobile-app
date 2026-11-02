@@ -16,6 +16,7 @@ import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
+import androidx.graphics.shapes.RoundedPolygon
 import com.project.solaria_mobile.R
 
 /**
@@ -27,10 +28,11 @@ fun BrandLoader(
     modifier: Modifier = Modifier,
     rotateShape: Boolean = false,
     millisPerShape: Int = DEFAULT_MORPH_MILLIS,
+    shapes: List<RoundedPolygon> = brandShapes,
 ) {
     BoxWithConstraints(modifier = modifier.aspectRatio(1f), contentAlignment = Alignment.Center) {
         val shapeHeight = maxWidth * BRAND_SHAPE_SCALE
-        MorphingHexagon(Modifier.fillMaxSize(), rotateShape = rotateShape, millisPerShape = millisPerShape)
+        MorphingHexagon(Modifier.fillMaxSize(), rotateShape = rotateShape, millisPerShape = millisPerShape, shapes = shapes)
         // A sombra das mãos usa o desfoque do sistema, que existe a partir do Android 12; antes disso as mãos ficam sem sombra.
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             Image(

@@ -4,8 +4,11 @@ import android.graphics.Point
 import android.view.View
 import android.view.WindowManager
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.EaseOutCubic
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.offset
@@ -26,6 +29,7 @@ import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInWindow
@@ -38,6 +42,7 @@ import androidx.compose.ui.unit.round
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import com.project.solaria_mobile.core.designsystem.components.BrandLoader
+import com.project.solaria_mobile.core.designsystem.components.MorphShapes
 import com.project.solaria_mobile.core.designsystem.components.SPLASH_BRAND_SIZE
 import com.project.solaria_mobile.core.designsystem.components.animationsEnabled
 import kotlin.math.PI
@@ -57,6 +62,8 @@ fun SplashScreen() {
         mutableStateOf(IntOffset(bars?.left ?: 0, bars?.top ?: 0))
     }
     val density = LocalDensity.current
+    val badgeScale = remember { Animatable(if (SplashTiming.played) 1f else 0f) }
+    LaunchedEffect(Unit) { badgeScale.animateTo(1f, tween(BADGE_EXPAND_MILLIS, easing = EaseOutCubic)) }
     Box(
         Modifier.fillMaxSize().onGloballyPositioned {
             origin = it.positionInWindow().round()
@@ -72,8 +79,10 @@ fun SplashScreen() {
             contentAlignment = Alignment.Center,
         ) {
             SplashGrid(animated = animationsEnabled())
-            // A logo é a mesma do Figma; só muda de forma, devagar, sem girar nem pular.
-            BrandLoader(Modifier.size(SPLASH_BRAND_SIZE), millisPerShape = SHAPE_MILLIS)
+            // Um círculo branco separa a logo do laranja do fundo, que tem tom diferente do dela; cresce do centro para fora.
+            Box(Modifier.size(SPLASH_BRAND_SIZE * BADGE_SCALE).graphicsLayer { scaleX = badgeScale.value; scaleY = badgeScale.value }.background(Color.White, CircleShape))
+            // O hexágono da marca fica sempre igual e só gira, como nas telas de carregamento do web.
+            BrandLoader(Modifier.size(SPLASH_BRAND_SIZE), rotateShape = true, millisPerShape = SPIN_MILLIS, shapes = listOf(MorphShapes.hexagon))
         }
     }
 }
@@ -96,7 +105,10 @@ object SplashTiming {
     var played = false
 }
 
-private const val SHAPE_MILLIS = 2200
+/** Uma volta completa da logo, o tamanho do círculo branco em relação a ela e o tempo que ele leva para crescer. */
+private const val SPIN_MILLIS = 6000
+private const val BADGE_SCALE = 1.3f
+private const val BADGE_EXPAND_MILLIS = 700
 
 /** Laranja da marca; é também a cor de fundo da splash nativa (themes.xml). */
 private val BRAND_ORANGE = Color(0xFFFF6500)

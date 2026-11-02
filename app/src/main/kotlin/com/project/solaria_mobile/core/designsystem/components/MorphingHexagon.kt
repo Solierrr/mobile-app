@@ -24,6 +24,7 @@ import androidx.compose.ui.graphics.Matrix
 import androidx.compose.ui.graphics.asComposePath
 import androidx.compose.ui.platform.LocalContext
 import androidx.graphics.shapes.Morph
+import androidx.graphics.shapes.RoundedPolygon
 import androidx.graphics.shapes.toPath
 
 private const val CYCLE_MILLIS_PER_SHAPE = 1400
@@ -31,7 +32,7 @@ private const val CYCLE_MILLIS_PER_SHAPE = 1400
 /** Parte do quadrado da marca que a forma ocupa (a maior dimensão). */
 internal const val BRAND_SHAPE_SCALE = 0.9f
 
-private val shapes = listOf(
+internal val brandShapes = listOf(
     MorphShapes.hexagon,
     MorphShapes.clover,
     MorphShapes.cookie,
@@ -46,8 +47,9 @@ fun MorphingHexagon(
     modifier: Modifier = Modifier,
     rotateShape: Boolean = false,
     millisPerShape: Int = CYCLE_MILLIS_PER_SHAPE,
+    shapes: List<RoundedPolygon> = brandShapes,
 ) {
-    val morphs = remember {
+    val morphs = remember(shapes) {
         shapes.indices.map { Morph(shapes[it], shapes[(it + 1) % shapes.size]) }
     }
     val position = rememberMorphPosition(morphs.size, millisPerShape, "hexagon-morph")
