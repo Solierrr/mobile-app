@@ -31,7 +31,6 @@ A interface usa Kotlin e Jetpack Compose. As chamadas aos serviços de acesso, c
 - [STATUS.md](./docs/STATUS.md), integrações e limitações atuais.
 - [Fluxos](./flows/), login, navegação, projetos e mensagens.
 - [Banco local](./database/), tabelas, índices e ciclo dos dados.
-- [PENDENCIAS.md](./PENDENCIAS.md), confirmações do responsável.
 
 ## Contribuindo
 
