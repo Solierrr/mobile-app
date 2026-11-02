@@ -1,6 +1,9 @@
 package com.project.solaria_mobile.feature.project.domain
 
-enum class NewProjectField { NAME, DESCRIPTION, STATE, CITY, ZIP }
+import com.project.solaria_mobile.feature.address.domain.AddressField
+import com.project.solaria_mobile.feature.address.domain.AddressFields
+
+enum class NewProjectField { NAME, DESCRIPTION, ZIP, STREET, NUMBER, NEIGHBORHOOD, CITY, STATE }
 
 data class NewProjectDraft(
     val name: String = "",
@@ -17,12 +20,40 @@ data class NewProjectDraft(
     val hasLocation: Boolean
         get() = listOf(state, city, neighborhood, zip, street, number, complement).any { it.isNotBlank() }
 
-    fun validate(): Set<NewProjectField> = buildSet {
+    /** O endereço, em campos reutilizáveis por qualquer formulário de endereço. */
+    val address: AddressFields
+        get() = AddressFields(zip, street, number, complement, neighborhood, city, state)
+
+    fun withAddress(address: AddressFields): NewProjectDraft = copy(
+        zip = address.zip, street = address.street, number = address.number, complement = address.complement,
+        neighborhood = address.neighborhood, city = address.city, state = address.state,
+    )
+
+    /** Dados do projeto (passo 1): nome e descrição. */
+    fun validateData(): Set<NewProjectField> = buildSet {
         if (name.trim().length < NAME_MIN || name.trim().length > NAME_MAX) add(NewProjectField.NAME)
         if (description.trim().length > DESCRIPTION_MAX) add(NewProjectField.DESCRIPTION)
-        if (state.isNotBlank() && state.trim().uppercase() !in BRAZILIAN_STATES) add(NewProjectField.STATE)
-        if (city.trim().length > CITY_MAX) add(NewProjectField.CITY)
-        if (zip.isNotBlank() && zipDigits.length != ZIP_LENGTH) add(NewProjectField.ZIP)
+    }
+
+    /** Local (passo 2): obrigatório, só o complemento é opcional. */
+    fun validatePlace(): Set<NewProjectField> = address.validate().mapTo(mutableSetOf()) {
+        when (it) {
+            AddressField.ZIP -> NewProjectField.ZIP
+            AddressField.STREET -> NewProjectField.STREET
+            AddressField.NUMBER -> NewProjectField.NUMBER
+            AddressField.NEIGHBORHOOD -> NewProjectField.NEIGHBORHOOD
+            AddressField.CITY -> NewProjectField.CITY
+            AddressField.STATE -> NewProjectField.STATE
+        }
+    }
+
+    fun validate(): Set<NewProjectField> = validateData() + validatePlace()
+
+    /** Erros de um passo; a revisão (passo 3) confere tudo. */
+    fun validateStep(step: Int): Set<NewProjectField> = when (step) {
+        0 -> validateData()
+        1 -> validatePlace()
+        else -> validate()
     }
 
     companion object {
