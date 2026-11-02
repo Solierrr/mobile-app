@@ -2,27 +2,28 @@
 
 package com.project.solaria_mobile.feature.communication
 
+import com.project.solaria_mobile.R
+import androidx.compose.ui.res.stringResource
 import com.project.solaria_mobile.feature.communication.domain.ServiceCall
+import com.project.solaria_mobile.core.common.ErrorKind
+import com.project.solaria_mobile.core.designsystem.components.BottomSheet
+import com.project.solaria_mobile.core.designsystem.components.StateNotice
+import com.project.solaria_mobile.core.designsystem.components.PrimaryButton
+import com.project.solaria_mobile.core.designsystem.components.presentation
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import com.composables.icons.lucide.R as LucideR
-import com.project.solaria_mobile.core.designsystem.components.ScreenTitle
+import com.project.solaria_mobile.core.designsystem.icons.AppIcons
 import com.project.solaria_mobile.core.designsystem.components.SearchField
 import com.project.solaria_mobile.core.designsystem.components.SectionHeading
 import com.project.solaria_mobile.core.designsystem.theme.Spacing
-import com.project.solaria_mobile.core.designsystem.theme.Radius
-import com.project.solaria_mobile.core.designsystem.theme.AppTheme
 
 @Composable
 fun CallsBottomSheet(
@@ -32,22 +33,29 @@ fun CallsBottomSheet(
     onDismiss: () -> Unit,
     onOpenCall: (String) -> Unit,
     onOpenAll: () -> Unit,
+    failure: ErrorKind? = null,
+    loading: Boolean = false,
 ) {
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-    ModalBottomSheet(
-        onDismissRequest = onDismiss,
-        sheetState = sheetState,
-        containerColor = AppTheme.colors.surface,
-        shape = RoundedCornerShape(topStart = Radius.sheet, topEnd = Radius.sheet),
-        dragHandle = null,
-    ) {
+    BottomSheet(onDismiss = onDismiss) {
         Column(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = Spacing.screen).padding(top = Spacing.xxl, bottom = Spacing.screenBottom),
+            modifier = Modifier.fillMaxWidth().padding(horizontal = Spacing.screen).padding(top = Spacing.sm, bottom = Spacing.screenBottom),
             verticalArrangement = Arrangement.spacedBy(Spacing.md),
         ) {
-            ScreenTitle("Chamados", onBack = onDismiss, trailingIcon = LucideR.drawable.lucide_ic_sliders_horizontal, trailingLabel = "Filtrar", onTrailingClick = {})
-            SearchField("Buscar chamado", query, onQueryChange, trailingIcon = LucideR.drawable.lucide_ic_sliders_horizontal, onTrailingClick = {})
-            SectionHeading("Recentes", faded = true, action = "Ver todos", onAction = onOpenAll)
+            if (loading) com.project.solaria_mobile.core.designsystem.components.ListSkeleton(rows = 3, circle = false)
+            else if (failure != null) {
+                val message = failure.presentation()
+                StateNotice(message.title, message.description, icon = AppIcons.phone,
+                    actions = if (message.canRetry) { { PrimaryButton(stringResource(R.string.cb_ver_todos_os_chamados), onOpenAll, compact = true) } } else null)
+            } else {
+                SearchField(stringResource(R.string.cl_buscar_chamado), query, onQueryChange)
+                SectionHeading(stringResource(R.string.cl_recentes), faded = true, action = stringResource(R.string.hm_ver_todos), navigation = true, onAction = onOpenAll)
+                if (calls.isEmpty()) StateNotice(
+                    if (query.isBlank()) stringResource(R.string.cb_nenhum_chamado_ainda) else stringResource(R.string.cb_nenhum_chamado_encontrado),
+                    if (query.isBlank()) stringResource(R.string.cb_seus_chamados_aparecerao_aqui) else stringResource(R.string.settings_no_results_description),
+                    icon = AppIcons.phone,
+                    actions = if (query.isNotBlank()) { { PrimaryButton(stringResource(R.string.settings_clear_search), { onQueryChange("") }, secondary = true, compact = true) } } else null,
+                )
+            }
             calls.forEach { call ->
                 CallCard(call, onClick = { onOpenCall(call.id) })
             }

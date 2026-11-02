@@ -10,4 +10,5 @@ import com.project.solaria_mobile.feature.communication.domain.CommunicationRepo
 @InstallIn(SingletonComponent::class)
 abstract class CommunicationRepositoryModule {
     @Binds abstract fun bindRepository(repository: RemoteCommunicationRepository): CommunicationRepository
+    @Binds abstract fun bindAssistant(repository: RemoteAssistantRepository): com.project.solaria_mobile.feature.communication.domain.AssistantRepository
 }

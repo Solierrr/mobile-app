@@ -2,8 +2,12 @@
 
 package com.project.solaria_mobile.feature.communication
 
+import android.content.ClipData
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -12,44 +16,76 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
-import androidx.compose.material3.Icon
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.ClipEntry
+import androidx.compose.ui.platform.LocalClipboard
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.unit.dp
-import com.composables.icons.lucide.R as LucideR
-import com.project.solaria_mobile.core.designsystem.components.RoundIconButton
+import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.project.solaria_mobile.R
+import com.project.solaria_mobile.core.designsystem.components.AppButton
+import com.project.solaria_mobile.core.designsystem.components.AppDialog
+import com.project.solaria_mobile.core.designsystem.components.AppMenu
+import com.project.solaria_mobile.core.designsystem.components.AppMenuDivider
+import com.project.solaria_mobile.core.designsystem.components.AppMenuItem
 import com.project.solaria_mobile.core.designsystem.components.Avatar
-import com.project.solaria_mobile.core.designsystem.theme.AppTheme
-import com.project.solaria_mobile.core.designsystem.theme.Spacing
-import com.project.solaria_mobile.core.designsystem.theme.Sizing
-import com.project.solaria_mobile.core.designsystem.theme.Radius
+import com.project.solaria_mobile.core.designsystem.components.ButtonSize
+import com.project.solaria_mobile.core.designsystem.components.ButtonVariant
+import com.project.solaria_mobile.core.designsystem.components.RoundIconButton
+import com.project.solaria_mobile.core.designsystem.components.ScreenTitle
+import com.project.solaria_mobile.core.designsystem.components.Skeleton
+import com.project.solaria_mobile.core.designsystem.components.SkeletonGroup
+import com.project.solaria_mobile.core.designsystem.components.StateNotice
 import com.project.solaria_mobile.core.designsystem.components.UiStateHost
-import com.project.solaria_mobile.feature.communication.domain.ChatMessage
-import com.project.solaria_mobile.feature.communication.domain.MessageStatus
+import com.project.solaria_mobile.core.designsystem.components.userMessage
+import com.project.solaria_mobile.core.designsystem.icons.AppIcons
+import com.project.solaria_mobile.core.designsystem.theme.AppTheme
+import com.project.solaria_mobile.core.designsystem.theme.Radius
+import com.project.solaria_mobile.core.designsystem.theme.Sizing
+import com.project.solaria_mobile.core.designsystem.theme.Spacing
+import com.project.solaria_mobile.core.offline.LocalOffline
+import com.project.solaria_mobile.feature.communication.domain.MessageAttachment
+import kotlinx.coroutines.flow.filter
+import kotlinx.coroutines.launch
 
 @Composable
 fun ChatRoute(onBack: () -> Unit, viewModel: ChatViewModel = hiltViewModel()) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
-    UiStateHost(state, viewModel::load) { content ->
-        ChatScreen(content, viewModel::onDraftChange, viewModel::send, viewModel::retry, viewModel::discard, onBack)
+    UiStateHost(state, viewModel::load, onBack = onBack, header = { ScreenTitle(stringResource(R.string.ch_conversa), onBack) }, loading = { ChatSkeleton() }) { content ->
+        // Conversa arquivada sai da lista desta conta; volta para a lista em vez de manter a tela aberta.
+        LaunchedEffect(content.archived) { if (content.archived) onBack() }
+        ChatScreen(
+            content, viewModel::onDraftChange, viewModel::send, onBack, viewModel::retry, viewModel::discard,
+            ChatActions(viewModel::startEdit, viewModel::cancelEdit, viewModel::deleteMessage, viewModel::setMuted, viewModel::archive, viewModel::clearAction),
+            onLoadOlder = viewModel::loadOlder,
+            onAttachment = viewModel::sendAttachment,
+        )
     }
 }
 
@@ -58,148 +94,317 @@ fun ChatScreen(
     state: ChatUiState,
     onDraftChange: (String) -> Unit,
     onSend: () -> Unit,
-    onRetry: (String) -> Unit,
-    onDiscard: (String) -> Unit,
     onBack: () -> Unit,
+    onRetry: (String) -> Unit = {},
+    onDiscard: (String) -> Unit = {},
+    actions: ChatActions = ChatActions(),
+    onLoadOlder: () -> Unit = {},
+    onAttachment: (MessageAttachment) -> Unit = {},
 ) {
-    Column(modifier = Modifier.fillMaxSize().background(AppTheme.colors.surface)) {
+    val messagesState = rememberLazyListState()
+    var menuOpen by remember { mutableStateOf(false) }
+    var confirmDelete by remember { mutableStateOf<String?>(null) }
+    var confirmArchive by remember { mutableStateOf(false) }
+    var attachOpen by remember { mutableStateOf(false) }
+    var locationOpen by remember { mutableStateOf(false) }
+    var invalidAttachment by remember { mutableStateOf(false) }
+    val working = state.action is ChatAction.Working
+    val items = remember(state.messages, state.firstUnreadSequence, state.conversation.group) {
+        buildChatItems(state.messages, state.firstUnreadSequence, state.conversation.group)
+    }
+    val typing = state.typingCount > 0 || state.assistantThinking
+    val total = items.size + state.outgoing.size + if (typing) 1 else 0
+
+    // A lista só acompanha as mensagens novas quando a pessoa estava no fim (ou a mensagem é dela); ler o histórico antigo não é interrompido.
+    val nearBottom by remember {
+        derivedStateOf {
+            val info = messagesState.layoutInfo
+            (info.visibleItemsInfo.lastOrNull()?.index ?: 0) >= info.totalItemsCount - 2
+        }
+    }
+    var anchored by remember { mutableStateOf(true) }
+    var ready by remember(state.conversation.id) { mutableStateOf(false) }
+    LaunchedEffect(messagesState) {
+        snapshotFlow { messagesState.isScrollInProgress }.collect { scrolling -> if (!scrolling) anchored = nearBottom }
+    }
+    val lastKey = items.lastOrNull()?.key
+    LaunchedEffect(lastKey, state.outgoing.size, typing) {
+        if (total == 0) return@LaunchedEffect
+        val lastIsMine = (items.lastOrNull() as? ChatListItem.Entry)?.message?.mine == true
+        if (!ready) {
+            messagesState.scrollToItem(total - 1)
+            ready = true
+        } else if (anchored || state.outgoing.isNotEmpty() || lastIsMine) {
+            messagesState.animateScrollToItem(total - 1)
+        }
+    }
+    val canLoadOlder by rememberUpdatedState(ready && state.hasMore && !state.loadingOlder)
+    val loadOlder by rememberUpdatedState(onLoadOlder)
+    LaunchedEffect(messagesState) {
+        snapshotFlow { messagesState.firstVisibleItemIndex }.filter { it <= 3 }.collect { if (canLoadOlder) loadOlder() }
+    }
+    val scope = rememberCoroutineScope()
+
+    val sources = rememberChatAttachmentSources(onAttachment = onAttachment, onInvalid = { invalidAttachment = true })
+    val tooLong = state.draftLimitExceeded || state.draft.trim().length > MAX_MESSAGE_LENGTH
+    Column(modifier = Modifier.fillMaxSize().background(AppTheme.colors.surface).imePadding()) {
         Row(
             modifier = Modifier.fillMaxWidth().padding(horizontal = Spacing.screen).padding(top = Spacing.md, bottom = Spacing.md),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
         ) {
-            RoundIconButton(LucideR.drawable.lucide_ic_chevron_left, "Voltar", onBack, size = Sizing.compactHeaderControl)
-            Avatar(state.conversation.initials, size = Sizing.compactHeaderControl, color = state.conversation.tone.toColor(), online = true)
+            RoundIconButton(AppIcons.chevron_left, stringResource(R.string.common_back), onBack, size = Sizing.compactHeaderControl)
+            Avatar(state.conversation.initials, size = Sizing.compactHeaderControl, color = state.conversation.tone.toColor(), textColor = state.conversation.tone.toContentColor(), placeholderIcon = if (state.conversation.assistant) AppIcons.sparkles_filled else if (state.conversation.group) AppIcons.group_silhouette else AppIcons.user_silhouette)
             Column(modifier = Modifier.weight(1f)) {
-                Text(state.conversation.name, color = AppTheme.colors.onSurface, style = androidx.compose.material3.MaterialTheme.typography.titleMedium)
-                Text("Disponível", color = AppTheme.colors.primary, style = androidx.compose.material3.MaterialTheme.typography.labelMedium)
+                Text(state.conversation.name.ifBlank { stringResource(R.string.as_sessao) }, color = AppTheme.colors.onSurface, style = MaterialTheme.typography.titleSmall)
+                ChatStatusLine(state)
             }
-            RoundIconButton(LucideR.drawable.lucide_ic_phone, "Ligar", {}, size = Sizing.compactHeaderControl)
-            RoundIconButton(LucideR.drawable.lucide_ic_ellipsis, "Mais opções", {}, size = Sizing.compactHeaderControl)
-        }
-        Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(AppTheme.colors.outline))
-        if (!state.online) OfflineBanner()
-        val listState = rememberLazyListState()
-        LaunchedEffect(state.messages.lastOrNull()?.id) {
-            if (state.messages.isNotEmpty()) listState.scrollToItem(state.messages.size)
-        }
-        LazyColumn(
-            state = listState,
-            modifier = Modifier.weight(1f).fillMaxWidth(),
-            contentPadding = PaddingValues(horizontal = Spacing.screen, vertical = Spacing.lg),
-            verticalArrangement = Arrangement.spacedBy(Spacing.md),
-        ) {
-            item {
-                Text("Hoje", modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center, color = AppTheme.colors.onSurfaceMuted, style = androidx.compose.material3.MaterialTheme.typography.labelMedium)
-            }
-            items(state.messages, key = { it.id }) { message ->
-                MessageBubble(message, onRetry = { onRetry(message.id) }, onDiscard = { onDiscard(message.id) })
+            Box {
+                RoundIconButton(AppIcons.ellipsis, stringResource(R.string.ch_opcoes_da_conversa), { actions.onClearAction(); menuOpen = true }, size = Sizing.compactHeaderControl, enabled = !working)
+                AppMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+                    state.muted?.let { muted ->
+                        AppMenuItem(if (muted) stringResource(R.string.ch_reativar_notificacoes) else stringResource(R.string.ch_silenciar_conversa), { menuOpen = false; actions.onMute(!muted) }, icon = AppIcons.bell)
+                    }
+                    AppMenuItem(stringResource(R.string.ch_arquivar_conversa), { menuOpen = false; confirmArchive = true }, icon = AppIcons.folder)
+                }
             }
         }
-        if (state.conversation.accessLost) ReadOnlyNotice() else Row(
+        if (state.messages.isEmpty() && state.outgoing.isEmpty()) {
+            Box(Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()), contentAlignment = Alignment.Center) {
+                if (state.conversation.assistant) StateNotice(stringResource(R.string.as_comece_titulo), stringResource(R.string.as_comece_desc), icon = AppIcons.sparkles)
+                else StateNotice(stringResource(R.string.ch_comece_a_conversa), stringResource(R.string.ch_envie_a_primeira_mensagem_para), icon = AppIcons.message_circle)
+            }
+        } else {
+            Box(Modifier.weight(1f).fillMaxWidth()) {
+                LazyColumn(
+                    state = messagesState,
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(horizontal = Spacing.screen, vertical = Spacing.lg),
+                    // Entre mensagens seguidas da mesma pessoa; entre pessoas ou sequências, o balão ganha mais espaço no topo.
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                ) {
+                    if (state.loadingOlder) item(key = "loading-older") { OlderMessagesSkeleton() }
+                    items(items, key = { it.key }) { item ->
+                        when (item) {
+                            is ChatListItem.Day -> Box(Modifier.padding(vertical = Spacing.sm)) { DaySeparator(item.date) }
+                            ChatListItem.NewMessages -> Box(Modifier.padding(vertical = Spacing.sm)) { NewMessagesDivider() }
+                            is ChatListItem.Entry -> Box(Modifier.padding(top = if (item.firstInGroup) Spacing.sm else 0.dp)) {
+                                ChatMessageItem(item, state.conversation.group, state.conversation.assistant, editing = item.message.id == state.editingId, enabled = !working, onEdit = actions.onEdit, onDelete = { confirmDelete = it })
+                            }
+                        }
+                    }
+                    items(state.outgoing, key = { it.id }) { message -> Box(Modifier.padding(top = Spacing.sm)) { OutgoingBubble(message, onRetry, onDiscard) } }
+                    if (typing) item(key = "typing") { Box(Modifier.padding(top = Spacing.sm)) { TypingBubble() } }
+                }
+                ScrollToEndButton(!nearBottom, Modifier.align(Alignment.BottomEnd).padding(Spacing.md)) { scope.launch { messagesState.animateScrollToItem(total - 1) } }
+            }
+        }
+        state.action?.let { action ->
+            Text(
+                action.message(),
+                Modifier.padding(horizontal = Spacing.screen),
+                color = if (action is ChatAction.Failed) AppTheme.colors.danger else AppTheme.colors.onSurfaceMuted,
+                style = MaterialTheme.typography.bodyMedium,
+            )
+        }
+        if (state.editingId != null) {
+            Row(
+                Modifier.fillMaxWidth().padding(start = Spacing.screen, end = Spacing.sm),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(stringResource(R.string.ch_editando_mensagem), Modifier.weight(1f), color = AppTheme.colors.onSurfaceMuted, style = MaterialTheme.typography.labelLarge)
+                AppButton(stringResource(R.string.ch_cancelar), actions.onCancelEdit, variant = ButtonVariant.Text, size = ButtonSize.Medium, enabled = !working)
+            }
+        }
+        if (tooLong) Text(stringResource(R.string.ch_max_length, MAX_MESSAGE_LENGTH), Modifier.padding(horizontal = Spacing.screen), color = AppTheme.colors.danger, style = MaterialTheme.typography.bodySmall)
+        state.sendFailure?.let { failure ->
+            Text(failure.userMessage(), Modifier.padding(horizontal = Spacing.screen), color = AppTheme.colors.danger, style = MaterialTheme.typography.bodyMedium)
+        }
+        if (invalidAttachment) Text(stringResource(R.string.ch_arquivo_invalido), Modifier.padding(horizontal = Spacing.screen), color = AppTheme.colors.danger, style = MaterialTheme.typography.bodyMedium)
+        Row(
             modifier = Modifier.fillMaxWidth().padding(horizontal = Spacing.screen).padding(top = Spacing.sm, bottom = Spacing.md),
             horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            RoundIconButton(LucideR.drawable.lucide_ic_link, "Anexar arquivo", {}, size = Sizing.messageAction)
-            Surface(shape = RoundedCornerShape(Radius.pill), color = AppTheme.colors.inputFill, modifier = Modifier.weight(1f)) {
+            if (state.attachmentsEnabled && state.editingId == null) {
+                RoundIconButton(AppIcons.folder_plus, stringResource(R.string.ch_anexar), { invalidAttachment = false; attachOpen = true }, size = Sizing.compactHeaderControl, enabled = !working)
+            }
+            Surface(shape = RoundedCornerShape(Radius.large), color = AppTheme.colors.inputFill, modifier = Modifier.weight(1f)) {
                 BasicTextField(
                     value = state.draft,
                     onValueChange = onDraftChange,
-                    modifier = Modifier.padding(horizontal = Spacing.lg, vertical = 14.dp),
-                    textStyle = androidx.compose.material3.MaterialTheme.typography.bodyMedium.copy(color = AppTheme.colors.onSurface),
+                    modifier = Modifier.padding(horizontal = Spacing.lg, vertical = Spacing.sm),
+                    maxLines = 6,
+                    textStyle = MaterialTheme.typography.bodyLarge.copy(color = AppTheme.colors.onSurface),
+                    cursorBrush = androidx.compose.ui.graphics.SolidColor(AppTheme.colors.onSurface),
                     decorationBox = { inner ->
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Box(modifier = Modifier.weight(1f)) {
-                                if (state.draft.isEmpty()) Text("Insira sua mensagem aqui", color = AppTheme.colors.onSurfaceMuted, style = androidx.compose.material3.MaterialTheme.typography.bodyMedium)
+                                if (state.draft.isEmpty()) Text(stringResource(R.string.ch_mensagem), color = AppTheme.colors.onSurfaceMuted, style = MaterialTheme.typography.bodyMedium)
                                 inner()
-                            }
-                            if (state.draft.isEmpty()) {
-                                Icon(painter = painterResource(LucideR.drawable.lucide_ic_mic), contentDescription = "Mensagem de áudio", tint = AppTheme.colors.onSurfaceMuted, modifier = Modifier.size(Sizing.iconSmall))
                             }
                         }
                     },
                 )
             }
-            Surface(
-                modifier = Modifier.size(Sizing.messageAction),
-                onClick = onSend,
-                shape = CircleShape,
-                color = AppTheme.colors.primary,
-            ) {
-                Box(contentAlignment = Alignment.Center) {
-                    Icon(painter = painterResource(LucideR.drawable.lucide_ic_send), contentDescription = "Enviar mensagem", tint = AppTheme.colors.onAccent, modifier = Modifier.size(Sizing.icon))
-                }
+            val canSend = !tooLong && state.draft.isNotBlank() && !working
+            RoundIconButton(if (state.editingId != null) AppIcons.check else AppIcons.send, if (state.editingId != null) stringResource(R.string.ch_salvar_edicao) else stringResource(R.string.ch_enviar_mensagem), onSend,
+                enabled = canSend,
+                background = if (canSend) AppTheme.colors.action else AppTheme.colors.inputFill,
+                tint = if (canSend) AppTheme.colors.onAccent else AppTheme.colors.onSurfaceMuted)
+        }
+    }
+
+    if (attachOpen) AttachmentSheet(sources, onLocation = { locationOpen = true }, onDismiss = { attachOpen = false })
+    if (locationOpen) LocationShareSheet(
+        onDismiss = { locationOpen = false },
+        onSend = { latitude, longitude, label -> onAttachment(MessageAttachment.Location(latitude, longitude, label)) },
+    )
+    confirmDelete?.let { id ->
+        AppDialog(
+            onDismissRequest = { confirmDelete = null },
+            title = stringResource(R.string.ch_excluir_mensagem),
+            message = stringResource(R.string.ch_a_mensagem_sera_excluida_para),
+            confirmLabel = stringResource(R.string.ch_excluir),
+            onConfirm = { confirmDelete = null; actions.onDelete(id) },
+            dismissLabel = stringResource(R.string.ch_manter_mensagem),
+            destructive = true,
+        )
+    }
+    if (confirmArchive) {
+        AppDialog(
+            onDismissRequest = { confirmArchive = false },
+            title = stringResource(R.string.ch_arquivar_conversa_2),
+            message = stringResource(R.string.ch_a_conversa_sai_da_sua),
+            confirmLabel = stringResource(R.string.pd_arquivar),
+            onConfirm = { confirmArchive = false; actions.onArchive() },
+        )
+    }
+}
+
+/** Sob o nome: quem está digitando, depois online/offline (conversa direta) ou quantos estão online (grupo), e se está silenciada. */
+@Composable
+private fun ChatStatusLine(state: ChatUiState) {
+    val muted = state.muted == true
+    val typingText = when {
+        state.assistantThinking -> stringResource(R.string.as_pensando)
+        state.typingCount == 0 -> null
+        !state.conversation.group -> stringResource(R.string.ch_digitando)
+        state.typingCount == 1 && state.typingNames.size == 1 -> stringResource(R.string.ch_x_digitando, state.typingNames.first())
+        state.typingCount == 1 -> stringResource(R.string.ch_alguem_digitando)
+        else -> stringResource(R.string.ch_varios_digitando, state.typingCount)
+    }
+    val presenceText = when {
+        state.conversation.group -> if (state.onlineCount > 0) stringResource(R.string.ch_n_online, state.onlineCount) else null
+        state.online == true -> stringResource(R.string.ch_online)
+        state.online == false -> stringResource(R.string.ch_offline)
+        else -> null
+    }
+    val text = typingText ?: presenceText
+    if (text != null) {
+        val highlighted = typingText != null || state.online == true
+        Text(text, color = if (highlighted) AppTheme.colors.brandStrong else AppTheme.colors.onSurfaceMuted, style = MaterialTheme.typography.labelMedium)
+    }
+    if (muted) Text(stringResource(R.string.ch_silenciada), color = AppTheme.colors.onSurfaceMuted, style = MaterialTheme.typography.labelMedium)
+}
+
+/** Mensagem ainda na fila do aparelho: aguardando envio, ou recusada pelo servidor com as ações de tentar de novo e descartar. */
+@Composable
+private fun OutgoingBubble(message: OutgoingMessage, onRetry: (String) -> Unit, onDiscard: (String) -> Unit) {
+    val failure = message.failure
+    val status = when {
+        failure != null -> stringResource(R.string.ch_nao_enviada, failure.userMessage())
+        LocalOffline.current -> stringResource(R.string.ch_aguardando_conexao)
+        else -> stringResource(R.string.ch_enviando)
+    }
+    Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.End) {
+        Surface(
+            color = AppTheme.colors.action,
+            shape = RoundedCornerShape(topStart = 18.dp, topEnd = 18.dp, bottomStart = 18.dp, bottomEnd = 4.dp),
+            modifier = Modifier.padding(start = Spacing.xl),
+        ) {
+            MessageText(message.text, Modifier.padding(horizontal = Spacing.md, vertical = Spacing.sm), mine = true)
+        }
+        Text(status, modifier = Modifier.padding(top = 3.dp), color = if (failure != null) AppTheme.colors.danger else AppTheme.colors.onSurfaceMuted, style = MaterialTheme.typography.labelMedium)
+        if (failure != null) {
+            Row(horizontalArrangement = Arrangement.spacedBy(Spacing.xs)) {
+                AppButton(stringResource(R.string.ch_descartar), { onDiscard(message.id) }, variant = ButtonVariant.Secondary, size = ButtonSize.Medium)
+                AppButton(stringResource(R.string.pr_tentar_de_novo), { onRetry(message.id) }, variant = ButtonVariant.Text, size = ButtonSize.Medium)
             }
         }
     }
 }
 
-/**
- * Faixa mostrada quando o aparelho está sem internet.
- *
- * Avisa que as mensagens na tela são as salvas no aparelho e podem estar desatualizadas, e que o que o usuário enviar
- * sai quando a internet voltar. Sem rede, o app não recebe mensagens novas, edições nem exclusões. Elas entram na
- * próxima sincronização, quando a conexão volta. O chat abre pelo Room, então a faixa não impede a leitura.
- */
+/** Marcador do histórico anterior que está a caminho, no topo da lista. */
 @Composable
-private fun OfflineBanner() {
-    Row(
-        modifier = Modifier.fillMaxWidth().background(AppTheme.colors.inputFill).padding(horizontal = Spacing.screen, vertical = Spacing.xs),
-        horizontalArrangement = Arrangement.spacedBy(Spacing.xs),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Icon(painter = painterResource(LucideR.drawable.lucide_ic_wifi_off), contentDescription = null, tint = AppTheme.colors.onSurfaceMuted, modifier = Modifier.size(Sizing.iconSmall))
-        Text("Sem conexão. Você vê as mensagens salvas no aparelho, que podem estar desatualizadas. O que você enviar sai quando a internet voltar.", color = AppTheme.colors.onSurfaceMuted, style = androidx.compose.material3.MaterialTheme.typography.labelMedium)
+private fun OlderMessagesSkeleton() {
+    SkeletonGroup(Modifier.padding(vertical = Spacing.md), verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+        Skeleton(Modifier.fillMaxWidth(0.55f).height(Sizing.actionHeight), RoundedCornerShape(Radius.large))
+        Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.CenterEnd) { Skeleton(Modifier.fillMaxWidth(0.4f).height(Sizing.actionHeight), RoundedCornerShape(Radius.large)) }
     }
 }
 
+/** Balões alternados nas larguras típicas, sem texto falso. */
 @Composable
-private fun ReadOnlyNotice() {
-    Text(
-        "Você não participa mais desta conversa.",
-        modifier = Modifier.fillMaxWidth().background(AppTheme.colors.inputFill).padding(horizontal = Spacing.screen, vertical = Spacing.md),
-        textAlign = TextAlign.Center,
-        color = AppTheme.colors.onSurfaceMuted,
-        style = androidx.compose.material3.MaterialTheme.typography.labelMedium,
+private fun ChatSkeleton() {
+    SkeletonGroup(verticalArrangement = Arrangement.spacedBy(Spacing.md)) {
+        listOf(0.7f to false, 0.5f to true, 0.8f to false, 0.4f to true, 0.6f to true, 0.75f to false).forEach { (width, own) ->
+            Box(Modifier.fillMaxWidth(), contentAlignment = if (own) Alignment.CenterEnd else Alignment.CenterStart) {
+                Skeleton(Modifier.fillMaxWidth(width).height(Sizing.actionHeight), RoundedCornerShape(Radius.large))
+            }
+        }
+    }
+}
+
+/** Ações da conversa ligadas ao ViewModel; os padrões vazios servem para prévias e testes de tela. */
+data class ChatActions(
+    val onEdit: (String) -> Unit = {},
+    val onCancelEdit: () -> Unit = {},
+    val onDelete: (String) -> Unit = {},
+    val onMute: (Boolean) -> Unit = {},
+    val onArchive: () -> Unit = {},
+    val onClearAction: () -> Unit = {},
+)
+
+/**
+ * Mensagem do histórico. Toque longo abre copiar e, nas próprias, editar e excluir. Mensagem excluída aparece como marcador,
+ * sem menu, e a editada mostra a marca ao lado do horário.
+ */
+@Composable
+private fun ChatMessageItem(entry: ChatListItem.Entry, group: Boolean, assistant: Boolean, editing: Boolean, enabled: Boolean, onEdit: (String) -> Unit, onDelete: (String) -> Unit) {
+    val message = entry.message
+    val clock = message.clockTime(androidx.compose.ui.platform.LocalConfiguration.current.locales[0])
+    if (message.deleted) {
+        DeletedBubble(message.mine, stringResource(R.string.ch_mensagem_excluida), clock)
+        return
+    }
+    var open by remember { mutableStateOf(false) }
+    val clipboard = LocalClipboard.current
+    val scope = rememberCoroutineScope()
+    val time = listOfNotNull(clock.ifBlank { null }, stringResource(R.string.ch_editada).takeIf { message.edited }, stringResource(R.string.ch_editando).takeIf { editing }).joinToString(" · ")
+    MessageRow(
+        entry, group, time,
+        bubbleModifier = Modifier.combinedClickable(enabled = enabled, onLongClickLabel = stringResource(R.string.ch_opcoes_da_mensagem), onLongClick = { open = true }, onClick = {}),
+        menu = {
+            AppMenu(expanded = open, onDismissRequest = { open = false }) {
+                if (message.text.isNotBlank()) AppMenuItem(stringResource(R.string.ps_copiar), {
+                    open = false
+                    scope.launch { clipboard.setClipEntry(ClipEntry(ClipData.newPlainText("mensagem", message.text))) }
+                }, icon = AppIcons.copy)
+                if (message.mine && message.id.isNotBlank() && !assistant) {
+                    if (message.attachment == null) AppMenuItem(stringResource(R.string.common_edit), { open = false; onEdit(message.id) }, icon = AppIcons.pencil)
+                    AppMenuDivider()
+                    AppMenuItem(stringResource(R.string.ch_excluir), { open = false; onDelete(message.id) }, destructive = true, icon = AppIcons.trash)
+                }
+            }
+        },
     )
 }
 
+/** Botão para voltar às mensagens mais recentes, visível só quando a lista está longe do fim. */
 @Composable
-private fun MessageBubble(message: ChatMessage, onRetry: () -> Unit, onDiscard: () -> Unit) {
-    val mine = message.mine
-    Column(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalAlignment = if (mine) Alignment.End else Alignment.Start,
-    ) {
-        message.sender?.let { sender ->
-            Text(sender, modifier = Modifier.padding(bottom = 3.dp), color = AppTheme.colors.onSurfaceMuted, style = androidx.compose.material3.MaterialTheme.typography.labelMedium)
-        }
-        Surface(
-            color = if (mine) AppTheme.colors.ownMessage else AppTheme.colors.inputFill,
-            shape = RoundedCornerShape(topStart = 18.dp, topEnd = 18.dp, bottomStart = if (mine) 18.dp else 4.dp, bottomEnd = if (mine) 4.dp else 18.dp),
-        ) {
-            Text(message.text, modifier = Modifier.padding(horizontal = Spacing.md, vertical = Spacing.sm), color = AppTheme.colors.onSurface, style = androidx.compose.material3.MaterialTheme.typography.bodyMedium)
-        }
-        when (message.status) {
-            MessageStatus.SENT -> Text(if (message.edited) "${message.time} · editada" else message.time, modifier = Modifier.padding(top = 3.dp), color = AppTheme.colors.onSurfaceMuted, style = androidx.compose.material3.MaterialTheme.typography.labelMedium)
-            MessageStatus.PENDING -> Row(
-                modifier = Modifier.padding(top = 3.dp),
-                horizontalArrangement = Arrangement.spacedBy(Spacing.xxs),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Icon(painter = painterResource(LucideR.drawable.lucide_ic_clock), contentDescription = "Aguardando envio", tint = AppTheme.colors.onSurfaceMuted, modifier = Modifier.size(12.dp))
-                Text(message.time, color = AppTheme.colors.onSurfaceMuted, style = androidx.compose.material3.MaterialTheme.typography.labelMedium)
-            }
-            MessageStatus.FAILED -> Row(
-                modifier = Modifier.padding(top = 3.dp),
-                horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text("Não enviada", color = AppTheme.colors.danger, style = androidx.compose.material3.MaterialTheme.typography.labelMedium)
-                Text("Tentar de novo", modifier = Modifier.clickable(onClick = onRetry), color = AppTheme.colors.primary, style = androidx.compose.material3.MaterialTheme.typography.labelMedium)
-                Text("Descartar", modifier = Modifier.clickable(onClick = onDiscard), color = AppTheme.colors.onSurfaceMuted, style = androidx.compose.material3.MaterialTheme.typography.labelMedium)
-            }
-        }
+private fun ScrollToEndButton(visible: Boolean, modifier: Modifier, onClick: () -> Unit) {
+    AnimatedVisibility(visible, modifier, enter = fadeIn(), exit = fadeOut()) {
+        RoundIconButton(AppIcons.chevron_down, stringResource(R.string.ch_ir_para_o_fim), onClick, size = Sizing.compactHeaderControl)
     }
 }
