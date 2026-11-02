@@ -76,6 +76,10 @@ class MockApiInterceptor @Inject constructor(
     private val data: MockApiData,
     private val images: MockImageCatalog,
 ) : Interceptor {
+    init {
+        data.emptyAccount.value = mockMode.isEmptyAccount()
+    }
+
     private val apiHosts = listOf(
         BuildConfig.AUTH_BASE_URL,
         BuildConfig.CORE_BASE_URL,
@@ -374,7 +378,7 @@ class MockApiData internal constructor(private val profileStore: MockProfileStor
         NotificationDto("demo-read", "SERVICE_STATUS_CHANGED", "Serviço atualizado", "As informações do serviço foram atualizadas.", createdAt = java.time.Instant.now().minusSeconds(7200).toString(), readAt = java.time.Instant.now().minusSeconds(1800).toString()),
     )
 
-    @Synchronized fun notifications(): List<NotificationDto> = notificationList.map { item ->
+    @Synchronized fun notifications(): List<NotificationDto> = if (emptyAccount.value) emptyList() else notificationList.map { item ->
         if (item.type == "NEW_MESSAGE") item.copy(data = conversations().firstOrNull()?.id?.let { mapOf("chatId" to it) }.orEmpty()) else item
     }
 
@@ -409,8 +413,8 @@ class MockApiData internal constructor(private val profileStore: MockProfileStor
             endDate = OffsetDateTime.now().minusDays(2).toString(), location = projects[2].location),
     )
 
-    @Synchronized fun services() = serviceStore.values.toList()
-    @Synchronized fun service(id: String) = serviceStore[id]
+    @Synchronized fun services() = if (emptyAccount.value) emptyList() else serviceStore.values.toList()
+    @Synchronized fun service(id: String) = if (emptyAccount.value) null else serviceStore[id]
     @Synchronized fun changeService(id: String, decision: String, scheduledDate: String?): ServiceCallDto? {
         val current = serviceStore[id] ?: return null
         if (!current.canManage || current.managedByAgenda) return null
@@ -439,7 +443,7 @@ class MockApiData internal constructor(private val profileStore: MockProfileStor
     private var nextMessage = 1000
     private val selfId = "qa-mock-user"
 
-    /** Conta recém-criada: sem projetos, para ver o início vazio. Só vale até o app fechar. */
+    /** Conta recém-criada: sem projetos, chamados, conversas, conexões nem notificações, para ver o app vazio. */
     val emptyAccount = kotlinx.coroutines.flow.MutableStateFlow(false)
 
     @Synchronized fun projects() = if (emptyAccount.value) emptyList() else projects.toList()
@@ -755,7 +759,7 @@ class MockApiData internal constructor(private val profileStore: MockProfileStor
         return listOf(slot(12, 13), slot(15, 16))
     }
 
-    @Synchronized fun connections() = people.filter { it.id in connectedIds }.map { it.copy(connected = true) }
+    @Synchronized fun connections() = if (emptyAccount.value) emptyList() else people.filter { it.id in connectedIds }.map { it.copy(connected = true) }
 
     @Synchronized fun setConnection(id: String, connected: Boolean): UserDto {
         if (connected) connectedIds.add(id) else connectedIds.remove(id)
@@ -777,7 +781,7 @@ class MockApiData internal constructor(private val profileStore: MockProfileStor
     private val mutedConversations = mutableSetOf<String>()
     private val archivedConversations = mutableSetOf<String>()
 
-    @Synchronized fun conversations() = conversationList.filterNot { it.id in archivedConversations }
+    @Synchronized fun conversations() = if (emptyAccount.value) emptyList() else conversationList.filterNot { it.id in archivedConversations }
         .map { it.copy(muted = it.id in mutedConversations, archived = false, unreadCount = unread(it.id).toLong(), lastMessage = lastMessage(it.id)) }
         .sortedByDescending { conversationMessages[it.id]?.lastOrNull()?.timestamp.orEmpty() }
 
