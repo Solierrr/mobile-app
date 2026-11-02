@@ -918,6 +918,13 @@ class MockApiData internal constructor(private val profileStore: MockProfileStor
     }.getOrNull()
 
     private companion object {
-        const val MOCK_ACCESS_TOKEN = "eyJhbGciOiJub25lIn0.eyJzdWIiOiJxYS1tb2NrLXVzZXIiLCJlbWFpbCI6InBlc3NvYUBkZW1vbnN0cmFjYW8udGVzdCIsImV4cCI6OTk5OTk5OTk5OX0.mock"
+        private fun unsignedJwtPart(json: String) =
+            Base64.getUrlEncoder().withoutPadding().encodeToString(json.toByteArray(Charsets.UTF_8))
+
+        val MOCK_ACCESS_TOKEN: String = listOf(
+            unsignedJwtPart("""{"alg":"none"}"""),
+            unsignedJwtPart("""{"sub":"qa-mock-user","email":"pessoa@demonstracao.test","exp":9999999999}"""),
+            "mock",
+        ).joinToString(".")
     }
 }
