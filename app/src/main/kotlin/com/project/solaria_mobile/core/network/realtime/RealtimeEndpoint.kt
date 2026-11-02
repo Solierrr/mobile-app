@@ -1,6 +1,7 @@
 package com.project.solaria_mobile.core.network.realtime
 
 import com.project.solaria_mobile.BuildConfig
+import com.project.solaria_mobile.core.mock.MockModeStore
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -12,19 +13,23 @@ fun interface RealtimeEndpoint {
     fun url(): String?
 }
 
+/** ainda não fiz */
 @Singleton
-class MessengerRealtimeEndpoint @Inject constructor() : RealtimeEndpoint {
-    override fun url(): String? = websocketUrlOf(BuildConfig.MESSENGER_BASE_URL)
+class NoRealtimeEndpoint @Inject constructor() : RealtimeEndpoint {
+    override fun url(): String? = null
 }
 
-internal fun websocketUrlOf(baseUrl: String): String? {
-    val root = baseUrl.trim().removeSuffix("/")
-    val socketRoot = when {
-        root.startsWith("https://") -> "wss://" + root.removePrefix("https://")
-        root.startsWith("http://") -> "ws://" + root.removePrefix("http://")
-        else -> return null
-    }
-    return "$socketRoot/$WEBSOCKET_PATH"
+/**
+ * WebSocket do api-messenger no ambiente do app, derivado do endereço REST: `https://host/` vira `wss://host/messaging/ws`
+ * (o mesmo caminho em QA e produção). Sem URL no modo de demonstração, que tem o próprio cliente falso.
+ */
+@Singleton
+class MessengerRealtimeEndpoint @Inject constructor(private val mockMode: MockModeStore) : RealtimeEndpoint {
+    override fun url(): String? = if (mockMode.isEnabled()) null else messengerWebSocketUrl(BuildConfig.MESSENGER_BASE_URL)
 }
 
-private const val WEBSOCKET_PATH = "messaging/ws"
+internal fun messengerWebSocketUrl(baseUrl: String): String? {
+    val host = baseUrl.trim().trimEnd('/').takeIf { it.isNotEmpty() } ?: return null
+    val secure = host.replaceFirst(Regex("^http://"), "ws://").replaceFirst(Regex("^https://"), "wss://")
+    return "$secure/messaging/ws"
+}

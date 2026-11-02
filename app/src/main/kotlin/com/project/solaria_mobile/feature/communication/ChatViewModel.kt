@@ -1,17 +1,27 @@
 package com.project.solaria_mobile.feature.communication
 
+import com.project.solaria_mobile.R
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.project.solaria_mobile.core.common.ApiResult
 import com.project.solaria_mobile.core.common.ErrorKind
 import com.project.solaria_mobile.core.common.UiState
-import com.project.solaria_mobile.core.common.toUiState
 import com.project.solaria_mobile.feature.communication.domain.ChatMessage
-import com.project.solaria_mobile.feature.communication.domain.ChatPresence
 import com.project.solaria_mobile.feature.communication.domain.CommunicationRepository
 import com.project.solaria_mobile.feature.communication.domain.Conversation
-import com.project.solaria_mobile.feature.communication.domain.canChange
+import com.project.solaria_mobile.feature.communication.domain.AssistantReply
+import com.project.solaria_mobile.feature.communication.domain.AssistantRepository
+import com.project.solaria_mobile.feature.communication.domain.NEW_SESSION_PREFIX
+import com.project.solaria_mobile.feature.communication.domain.MessageAttachment
+import com.project.solaria_mobile.feature.communication.data.ChatCapabilities
+import com.project.solaria_mobile.feature.communication.data.ChatEvent
+import com.project.solaria_mobile.feature.communication.data.ChatRealtime
+import com.project.solaria_mobile.feature.communication.data.NoChatRealtime
+import com.project.solaria_mobile.feature.communication.data.PAGE_SIZE
+import com.project.solaria_mobile.feature.communication.data.toMessage
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import com.project.solaria_mobile.presentation.navigation.routeId
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
@@ -19,264 +29,496 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.distinctUntilChanged
-import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import com.project.solaria_mobile.feature.communication.data.MessageOutbox
+import com.project.solaria_mobile.feature.communication.data.PendingState
+import kotlinx.coroutines.flow.filter
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.onStart
 
-/**
- * Aviso curto que a tela mostra depois de uma ação que o servidor recusou ou que falhou.
- *
- * A tela traduz cada valor num texto e chama [ChatViewModel.dismissNotice] quando o usuário o fecha.
- */
-enum class ChatNotice {
-    /** Sem internet: editar e excluir só funcionam online. */
-    OFFLINE,
+/** Mensagem guardada na fila do aparelho: aguardando envio ou recusada pelo servidor. */
+data class OutgoingMessage(val id: String, val text: String, val failure: ErrorKind?)
 
-    /** O servidor recusou a mudança: prazo de 30 minutos vencido ou mensagem já excluída. */
-    NOT_ALLOWED,
+/** Ações sobre mensagens e sobre o estado pessoal da conversa. */
+enum class ChatOperation { EDIT, DELETE, MUTE, UNMUTE, ARCHIVE }
 
-    /** Alguém mudou a mensagem ao mesmo tempo (409). Tentar de novo costuma resolver. */
-    TRY_AGAIN,
-
-    /** A mensagem ou a conversa não está mais acessível (403 ou 404). */
-    NO_ACCESS,
-
-    /** Qualquer outra falha. */
-    FAILED,
+sealed interface ChatAction {
+    data class Working(val operation: ChatOperation) : ChatAction
+    data class Failed(val operation: ChatOperation, val kind: ErrorKind) : ChatAction
 }
 
-/**
- * Estado do chat.
- *
- * @property conversation conversa aberta.
- * @property draft texto do campo de mensagem. Em modo de edição, é o texto novo da mensagem.
- * @property messages mensagens confirmadas e pendentes, já com [ChatMessage.changeable] calculado.
- * @property online `true` se há internet.
- * @property editing mensagem em edição, ou `null`. Enquanto existe, o envio do campo de texto edita em vez de enviar.
- * @property notice aviso a mostrar, ou `null`.
- * @property presence presença do outro participante e quem está digitando.
- */
 data class ChatUiState(
     val conversation: Conversation,
     val draft: String = "",
     val messages: List<ChatMessage> = emptyList(),
-    val online: Boolean = true,
-    val editing: ChatMessage? = null,
-    val notice: ChatNotice? = null,
-    val presence: ChatPresence = ChatPresence(),
+    val sendFailure: ErrorKind? = null,
+    val draftLimitExceeded: Boolean = false,
+    val outgoing: List<OutgoingMessage> = emptyList(),
+    val editingId: String? = null,
+    val action: ChatAction? = null,
+    /** Nulo enquanto o estado pessoal não foi lido; o menu só oferece silenciar quando ele é conhecido. */
+    val muted: Boolean? = null,
+    val archived: Boolean = false,
+    /** Há histórico mais antigo no servidor para carregar ao rolar para cima. */
+    val hasMore: Boolean = false,
+    val loadingOlder: Boolean = false,
+    /** Primeira mensagem não lida ao abrir a conversa, onde aparece o divisor de novas mensagens. */
+    val firstUnreadSequence: Int? = null,
+    /** Nomes de quem está digitando, quando conhecidos, e quantas pessoas são no total. */
+    val typingNames: List<String> = emptyList(),
+    val typingCount: Int = 0,
+    /** Em conversa direta, se o outro participante está online; nulo quando não se sabe ou é grupo. */
+    val online: Boolean? = null,
+    val onlineCount: Int = 0,
+    /** Anexos (foto, documento, localização) só existem no modo de demonstração, até o messenger ter contrato para isso. */
+    val attachmentsEnabled: Boolean = false,
+    /** O assistente está elaborando a resposta de uma mensagem enviada nesta sessão. */
+    val assistantThinking: Boolean = false,
 )
 
-private data class Live(
-    val conversation: Conversation?,
+internal const val MAX_MESSAGE_LENGTH = 8_000
+
+private data class ChatContent(
+    val conversation: Conversation,
     val messages: List<ChatMessage>,
-    val online: Boolean,
-    val presence: ChatPresence,
+    val hasMore: Boolean = false,
+    val firstUnreadSequence: Int? = null,
 )
 
-private data class Local(
-    val opened: UiState<Unit>,
-    val draft: String,
-    val editing: ChatMessage?,
-    val notice: ChatNotice?,
+private data class LivePresence(val typing: Set<String> = emptySet(), val online: Map<String, Boolean> = emptyMap(), val loadingOlder: Boolean = false, val thinking: Boolean = false)
+
+private data class ChatControls(
+    val editingId: String?,
+    val action: ChatAction?,
+    val muted: Boolean?,
+    val archived: Boolean,
 )
 
-/**
- * ViewModel do chat de uma conversa.
- *
- * Além de ler e enviar, marca a conversa como lida enquanto a tela está aberta, edita e exclui mensagens próprias
- * (só com internet e até 30 minutos depois do envio), e silencia e arquiva a conversa.
- *
- * Depende de:
- * - [CommunicationRepository] -> conversa, mensagens e as ações.
- *
- * Principais operações:
- * - [send] -> envia a mensagem, ou grava a edição quando há uma mensagem em edição.
- * - [startEdit] | [cancelEdit] -> entra e sai do modo de edição.
- * - [delete] -> exclui uma mensagem própria para todos.
- * - [toggleMute] | [toggleArchive] -> silencia ou arquiva a conversa.
- * - [retry] | [discard] -> reenvia ou descarta uma mensagem que não saiu.
- */
 @HiltViewModel
 class ChatViewModel @Inject constructor(
-    savedStateHandle: SavedStateHandle,
+    private val savedStateHandle: SavedStateHandle,
     private val repository: CommunicationRepository,
+    private val outbox: MessageOutbox,
+    private val realtime: ChatRealtime,
+    private val capabilities: ChatCapabilities,
+    private val assistantRepository: AssistantRepository,
 ) : ViewModel() {
+    internal constructor(savedStateHandle: SavedStateHandle, repository: CommunicationRepository, outbox: MessageOutbox) :
+        this(savedStateHandle, repository, outbox, NoChatRealtime, ChatCapabilities { false }, NoAssistant)
+    internal constructor(savedStateHandle: SavedStateHandle, repository: CommunicationRepository, outbox: MessageOutbox, realtime: ChatRealtime, capabilities: ChatCapabilities) :
+        this(savedStateHandle, repository, outbox, realtime, capabilities, NoAssistant)
+
     private val conversationId = savedStateHandle.routeId()
-    private val draft = MutableStateFlow("")
-    private val opened = MutableStateFlow<UiState<Unit>>(UiState.Loading)
-    private val editing = MutableStateFlow<ChatMessage?>(null)
-    private val notice = MutableStateFlow<ChatNotice?>(null)
 
-    // Relógio da janela de edição. Só os testes trocam.
-    internal var now: () -> Long = System::currentTimeMillis
+    /** Sessão do assistente que ainda não tem conversa no messenger: o resto do identificador é o da sessão. */
+    private val newSession = conversationId.startsWith(NEW_SESSION_PREFIX)
 
-    private val live = combine(
-        repository.conversation(conversationId),
-        repository.messages(conversationId),
-        repository.online,
-        repository.presence(conversationId),
-    ) { conversation, messages, online, presence -> Live(conversation, messages, online, presence) }
+    /** Conversa no messenger; numa sessão nova só existe depois da primeira resposta. */
+    private var remoteId: String? = conversationId.takeUnless { newSession }
+    private var threadId: String? = if (newSession) conversationId.removePrefix(NEW_SESSION_PREFIX) else null
+    private val assistantPending = MutableStateFlow<List<OutgoingMessage>>(emptyList())
 
-    private val local = combine(opened, draft, editing, notice) { open, text, edited, aviso -> Local(open, text, edited, aviso) }
+    private fun remote(): String = remoteId ?: conversationId
+    private fun isAssistant(): Boolean = (content.value as? UiState.Content)?.data?.conversation?.assistant == true
+    private val draft = savedStateHandle.getStateFlow("draft", "")
+    private val sendFailure = MutableStateFlow<ErrorKind?>(null)
+    private val draftLimitExceeded = MutableStateFlow(false)
+    private val content = MutableStateFlow<UiState<ChatContent>>(UiState.Loading)
+    private val controls = MutableStateFlow(ChatControls(savedStateHandle["editing"], null, null, false))
 
-    val uiState: StateFlow<UiState<ChatUiState>> = combine(live, local) { data, state ->
-        val conversation = data.conversation
-        when {
-            state.opened is UiState.Error -> state.opened
-            conversation != null -> UiState.Content(
-                ChatUiState(
-                    conversation = conversation,
-                    draft = state.draft,
-                    messages = data.messages.map { it.copy(changeable = canChange(it, conversation, data.online, now())) },
-                    online = data.online,
-                    editing = state.editing,
-                    notice = state.notice,
-                    presence = data.presence,
-                ),
-            )
-            else -> UiState.Loading
+    private val outgoing = outbox.observe(conversationId)
+        .map { queued -> queued.map { OutgoingMessage(it.id, it.text, it.failure.takeIf { _ -> it.state == PendingState.FAILED }) } }
+        .onStart { emit(emptyList()) }
+
+    private val composer = combine(draft, sendFailure, draftLimitExceeded) { text, failure, exceeded -> Triple(text, failure, exceeded) }
+    private val live = MutableStateFlow(LivePresence())
+    private val myId = repository.currentUserId()
+    private val typingTimeouts = mutableMapOf<String, Job>()
+
+    private val allOutgoing = combine(outgoing, assistantPending) { queued, assistant -> queued + assistant }
+
+    val uiState: StateFlow<UiState<ChatUiState>> = combine(content, composer, allOutgoing, controls, live) { loaded, (text, failure, exceeded), queued, control, presence ->
+        when (loaded) {
+            is UiState.Content -> {
+                val names = loaded.data.messages.mapNotNull { message -> message.senderId?.let { id -> id to message.senderName } }.toMap()
+                val others = presence.online.filterKeys { it != myId }
+                UiState.Content(
+                    ChatUiState(
+                        loaded.data.conversation, text, loaded.data.messages, failure, exceeded, queued,
+                        control.editingId, control.action, control.muted, control.archived,
+                        hasMore = loaded.data.hasMore, loadingOlder = presence.loadingOlder, firstUnreadSequence = loaded.data.firstUnreadSequence,
+                        typingNames = presence.typing.mapNotNull { names[it]?.takeIf(String::isNotBlank) },
+                        typingCount = presence.typing.size,
+                        online = if (loaded.data.conversation.group || others.isEmpty()) null else others.values.any { it },
+                        onlineCount = others.values.count { it },
+                        attachmentsEnabled = capabilities.attachments() && !loaded.data.conversation.assistant,
+                        assistantThinking = presence.thinking,
+                    ),
+                )
+            }
+            UiState.Loading -> UiState.Loading
+            UiState.Empty -> UiState.Empty
+            is UiState.Error -> loaded
         }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), UiState.Loading)
 
     init {
         load()
-        viewModelScope.launch { repository.refreshNames(conversationId) }
-        // Cada mensagem confirmada nova, vista com o chat aberto, avança a leitura. Funciona offline: o Room guarda e o
-        // envio ao servidor sai quando a internet volta.
         viewModelScope.launch {
-            repository.messages(conversationId)
-                .map { list -> list.maxOfOrNull { it.sequence ?: 0 } ?: 0 }
-                .distinctUntilChanged()
-                .collect { if (it > 0) repository.markRead(conversationId) }
+            outbox.delivered.filter { it.conversationId == conversationId }.collect { delivered ->
+                val message = delivered.message
+                if (message == null) refreshMessages() else appendMessage(message)
+            }
         }
-    }
-
-    override fun onCleared() {
-        repository.stopTyping(conversationId)
-    }
-
-    fun load() {
+        if (!newSession) viewModelScope.launch { realtime.conversationEvents(conversationId).collect(::onEvent) }
         viewModelScope.launch {
-            opened.value = UiState.Loading
-            opened.value = repository.open(conversationId).toUiState()
-        }
-    }
-
-    fun onDraftChange(value: String) {
-        draft.value = value
-        if (value.isNotEmpty() && editing.value == null && canSignalTyping()) {
-            repository.typing(conversationId)
-        } else {
-            repository.stopTyping(conversationId)
-        }
-    }
-
-    fun send() {
-        val text = draft.value
-        if (text.isBlank()) return
-        repository.stopTyping(conversationId)
-        val target = editing.value
-        if (target != null) {
-            saveEdit(target, text)
-            return
-        }
-        draft.value = ""
-        viewModelScope.launch {
-            val result = repository.sendMessage(conversationId, text)
-            if (result is ApiResult.Failure && draft.value.isEmpty()) draft.value = text
-        }
-    }
-
-    fun retry(messageId: String) {
-        viewModelScope.launch { repository.retryMessage(messageId) }
-    }
-
-    fun discard(messageId: String) {
-        viewModelScope.launch { repository.discardMessage(messageId) }
-    }
-
-    /**
-     * Entra no modo de edição com o texto da mensagem no campo. Ignora mensagem que não pode mais ser alterada.
-     *
-     * @param messageId id da mensagem, o mesmo de [ChatMessage.id].
-     */
-    fun startEdit(messageId: String) {
-        val message = currentMessages().firstOrNull { it.id == messageId && it.changeable } ?: return
-        editing.value = message
-        draft.value = message.text
-        repository.stopTyping(conversationId)
-    }
-
-    /** Sai do modo de edição e limpa o campo de texto. */
-    fun cancelEdit() {
-        editing.value = null
-        draft.value = ""
-    }
-
-    /**
-     * Exclui a mensagem para todos os participantes.
-     *
-     * A tela deve pedir confirmação antes. Se o servidor recusar, mostra o [ChatNotice] correspondente.
-     *
-     * @param messageId id da mensagem, o mesmo de [ChatMessage.id].
-     */
-    fun delete(messageId: String) {
-        if (currentMessages().none { it.id == messageId && it.changeable }) return
-        viewModelScope.launch {
-            val result = repository.deleteMessage(messageId)
-            if (result is ApiResult.Failure) notice.value = noticeOf(result.kind)
-        }
-    }
-
-    /** Silencia a conversa, ou reativa se já está silenciada. Só com internet. */
-    fun toggleMute() {
-        val current = currentConversation() ?: return
-        viewModelScope.launch {
-            val result = repository.setMuted(conversationId, !current.muted)
-            if (result is ApiResult.Failure) notice.value = noticeOf(result.kind)
-        }
-    }
-
-    /** Arquiva a conversa, ou tira do arquivo se já está arquivada. Só com internet. */
-    fun toggleArchive() {
-        val current = currentConversation() ?: return
-        viewModelScope.launch {
-            val result = repository.setArchived(conversationId, !current.archived)
-            if (result is ApiResult.Failure) notice.value = noticeOf(result.kind)
-        }
-    }
-
-    /** Fecha o aviso atual. */
-    fun dismissNotice() {
-        notice.value = null
-    }
-
-    private fun saveEdit(target: ChatMessage, text: String) {
-        viewModelScope.launch {
-            when (val result = repository.editMessage(target.id, text)) {
-                is ApiResult.Success -> {
-                    editing.value = null
-                    draft.value = ""
-                }
-                // Mantém o texto no campo para o usuário tentar de novo ou copiar
-                is ApiResult.Failure -> notice.value = noticeOf(result.kind)
+            // Quem estava fora do ar recupera o que perdeu assim que a conexão volta.
+            var wasDown = false
+            realtime.connected.collect { connected ->
+                if (!connected) wasDown = true else if (wasDown) { wasDown = false; catchUp() }
             }
         }
     }
 
-    // Conversa com o chatbot ou sem acesso não tem "digitando" para os outros
-    private fun canSignalTyping(): Boolean = currentConversation()?.let { !it.chatbot && !it.accessLost } ?: false
-
-    private fun currentConversation(): Conversation? = (uiState.value as? UiState.Content)?.data?.conversation
-
-    private fun currentMessages(): List<ChatMessage> = (uiState.value as? UiState.Content)?.data?.messages.orEmpty()
-
-    private fun noticeOf(kind: ErrorKind): ChatNotice = when (kind) {
-        ErrorKind.CONNECTIVITY, ErrorKind.TIMEOUT -> ChatNotice.OFFLINE
-        ErrorKind.VALIDATION -> ChatNotice.NOT_ALLOWED
-        ErrorKind.CONFLICT -> ChatNotice.TRY_AGAIN
-        ErrorKind.FORBIDDEN, ErrorKind.NOT_FOUND -> ChatNotice.NO_ACCESS
-        else -> ChatNotice.FAILED
+    fun load() {
+        viewModelScope.launch {
+            if (newSession) {
+                content.value = UiState.Content(ChatContent(Conversation(conversationId, "", "", "", "", com.project.solaria_mobile.feature.communication.domain.AvatarTone.ORANGE, assistant = true, threadId = threadId), emptyList()))
+                return@launch
+            }
+            content.value = UiState.Loading
+            val conversation = repository.conversation(remote())
+            val messages = repository.messages(remote())
+            content.value = when {
+                conversation is ApiResult.Failure -> UiState.Error(conversation.kind)
+                messages is ApiResult.Failure -> UiState.Error(messages.kind)
+                conversation is ApiResult.Success && messages is ApiResult.Success ->
+                    UiState.Content(
+                        ChatContent(
+                            conversation.data, messages.data,
+                            hasMore = messages.data.size >= PAGE_SIZE,
+                            firstUnreadSequence = firstUnread(messages.data, conversation.data.unread),
+                        ),
+                    )
+                else -> UiState.Error(ErrorKind.UNKNOWN)
+            }
+            (conversation as? ApiResult.Success)?.data?.threadId?.let { threadId = it }
+            // O mesmo PATCH marca como lido até a última mensagem carregada e devolve o estado pessoal; se falhar, o menu não oferece silenciar.
+            val lastRead = (messages as? ApiResult.Success)?.data?.maxOfOrNull { it.sequence }?.takeIf { it > 0 }
+            (repository.conversationState(remote(), lastReadSequence = lastRead) as? ApiResult.Success)?.data?.let { state ->
+                controls.value = controls.value.copy(muted = state.muted)
+            }
+        }
     }
+
+    fun onDraftChange(value: String) {
+        draftLimitExceeded.value = value.length > MAX_MESSAGE_LENGTH
+        if (!draftLimitExceeded.value) savedStateHandle["draft"] = value
+        if (value.isNotBlank() && controls.value.editingId == null && !isAssistant()) announceTyping() else stopTyping()
+    }
+
+    private var typingStopJob: Job? = null
+    private var typingAnnouncedAt = 0L
+
+    /** Avisa que está digitando; o servidor encerra o aviso sozinho em 5 s, então renova a cada 3 s e para depois de 4 s parado. */
+    private fun announceTyping() {
+        val now = System.currentTimeMillis()
+        if (now - typingAnnouncedAt >= TYPING_RENEW_MILLIS) {
+            typingAnnouncedAt = now
+            viewModelScope.launch { realtime.typing(conversationId, true) }
+        }
+        typingStopJob?.cancel()
+        typingStopJob = viewModelScope.launch { delay(TYPING_IDLE_MILLIS); stopTyping() }
+    }
+
+    private fun stopTyping() {
+        typingStopJob?.cancel()
+        if (typingAnnouncedAt == 0L) return
+        typingAnnouncedAt = 0L
+        viewModelScope.launch { realtime.typing(conversationId, false) }
+    }
+
+    /** Carrega o histórico anterior à mensagem mais antiga que já está na tela. */
+    fun loadOlder() {
+        val current = content.value as? UiState.Content ?: return
+        if (!current.data.hasMore || live.value.loadingOlder) return
+        val oldest = current.data.messages.firstOrNull { it.sequence > 0 }?.sequence ?: return
+        live.value = live.value.copy(loadingOlder = true)
+        viewModelScope.launch {
+            val older = repository.olderMessages(remote(), oldest)
+            val latest = content.value as? UiState.Content
+            if (latest != null && older is ApiResult.Success) {
+                val known = latest.data.messages.map { it.id }.toSet()
+                val added = older.data.filter { it.id !in known }
+                content.value = UiState.Content(latest.data.copy(messages = added + latest.data.messages, hasMore = older.data.size >= PAGE_SIZE))
+            }
+            live.value = live.value.copy(loadingOlder = false)
+        }
+    }
+
+    /** Envia uma foto, um documento ou uma localização; só o modo de demonstração aceita, enquanto o messenger não tem contrato para isso. */
+    fun sendAttachment(attachment: MessageAttachment) {
+        sendFailure.value = null
+        viewModelScope.launch {
+            when (val result = repository.sendAttachment(remote(), attachment)) {
+                is ApiResult.Success -> appendMessage(result.data)
+                is ApiResult.Failure -> sendFailure.value = result.kind
+            }
+        }
+    }
+
+    private fun firstUnread(messages: List<ChatMessage>, unread: Int): Int? =
+        if (unread <= 0) null else messages.filter { !it.mine && it.sequence > 0 }.takeLast(unread).firstOrNull()?.sequence
+
+    private fun onEvent(event: ChatEvent) {
+        when (event) {
+            // Numa sessão do assistente a resposta vem no retorno do turno; o evento só duplicaria a mensagem.
+            is ChatEvent.MessageCreated, is ChatEvent.MessageChanged -> if (!isAssistant()) onMessageEvent(event)
+            is ChatEvent.Typing -> onTyping(event.userId, event.started)
+            is ChatEvent.Presence -> live.value = live.value.copy(online = live.value.online + (event.userId to event.online))
+            is ChatEvent.PresenceSnapshot -> live.value = live.value.copy(online = event.users)
+            is ChatEvent.ConversationRemoved -> controls.value = controls.value.copy(archived = true)
+        }
+    }
+
+    private fun onMessageEvent(event: ChatEvent) {
+        when (event) {
+            is ChatEvent.MessageCreated -> {
+                val message = event.message.toMessage(myId)
+                appendMessage(message)
+                if (!message.mine && message.sequence > 0) viewModelScope.launch { repository.conversationState(remote(), lastReadSequence = message.sequence) }
+            }
+            is ChatEvent.MessageChanged -> replaceOrAppend(event.message.toMessage(myId))
+            else -> Unit
+        }
+    }
+
+    private fun onTyping(userId: String, started: Boolean) {
+        if (userId == myId) return
+        typingTimeouts.remove(userId)?.cancel()
+        live.value = live.value.copy(typing = if (started) live.value.typing + userId else live.value.typing - userId)
+        if (started) typingTimeouts[userId] = viewModelScope.launch {
+            // Sem renovação, o aviso some sozinho, mesmo que o "parou de digitar" se perca.
+            delay(TYPING_EXPIRE_MILLIS)
+            live.value = live.value.copy(typing = live.value.typing - userId)
+        }
+    }
+
+    /** Busca o que foi publicado depois da última mensagem conhecida, depois de uma queda da conexão. */
+    private fun catchUp() {
+        val last = currentMessages().maxOfOrNull { it.sequence } ?: return
+        viewModelScope.launch {
+            val missed = repository.messagesSince(remote(), last) as? ApiResult.Success ?: return@launch
+            missed.data.forEach(::replaceOrAppend)
+        }
+    }
+
+    /** Guarda a mensagem na fila do aparelho e limpa o campo; a fila envia assim que houver conexão. Em edição, salva a mensagem. */
+    fun send() {
+        stopTyping()
+        val text = draft.value.trim()
+        if (text.isBlank() || draftLimitExceeded.value || text.length > MAX_MESSAGE_LENGTH) return
+        controls.value.editingId?.let { id -> saveEdit(id, text); return }
+        sendFailure.value = null
+        savedStateHandle["draft"] = ""
+        if (isAssistant()) { askAssistant(text); return }
+        viewModelScope.launch {
+            if (!outbox.enqueue(conversationId, text)) {
+                savedStateHandle["draft"] = text
+                sendFailure.value = ErrorKind.UNAUTHORIZED
+            }
+        }
+    }
+
+    /** Leva o texto da própria mensagem para o campo; o rascunho em andamento volta ao cancelar. */
+    fun startEdit(id: String) {
+        val message = currentMessages().firstOrNull { it.id == id && it.mine && !it.deleted } ?: return
+        if (controls.value.editingId == null) savedStateHandle["draftBeforeEdit"] = draft.value
+        savedStateHandle["editing"] = id
+        savedStateHandle["draft"] = message.text
+        draftLimitExceeded.value = false
+        controls.value = controls.value.copy(editingId = id, action = null)
+    }
+
+    fun cancelEdit() {
+        savedStateHandle["draft"] = savedStateHandle.get<String>("draftBeforeEdit").orEmpty()
+        finishEdit()
+    }
+
+    fun deleteMessage(id: String) {
+        if (controls.value.action is ChatAction.Working) return
+        if (currentMessages().none { it.id == id && it.mine && !it.deleted }) return
+        run(ChatOperation.DELETE) {
+            when (val result = repository.deleteMessage(id)) {
+                // Só some da conversa o que o servidor confirmou como excluído.
+                is ApiResult.Success -> { replaceMessage(result.data); if (controls.value.editingId == id) cancelEdit(); null }
+                is ApiResult.Failure -> result.kind
+            }
+        }
+    }
+
+    fun setMuted(muted: Boolean) {
+        run(if (muted) ChatOperation.MUTE else ChatOperation.UNMUTE) {
+            when (val result = repository.conversationState(remote(), muted = muted)) {
+                is ApiResult.Success -> { controls.value = controls.value.copy(muted = result.data.muted); null }
+                is ApiResult.Failure -> result.kind
+            }
+        }
+    }
+
+    /** Arquivar vale só para esta conta; os outros participantes continuam com a conversa. */
+    fun archive() {
+        run(ChatOperation.ARCHIVE) {
+            when (val result = repository.conversationState(remote(), archived = true)) {
+                is ApiResult.Success -> { controls.value = controls.value.copy(archived = result.data.archived); null }
+                is ApiResult.Failure -> result.kind
+            }
+        }
+    }
+
+    fun clearAction() {
+        if (controls.value.action is ChatAction.Failed) controls.value = controls.value.copy(action = null)
+    }
+
+    fun retry(id: String) {
+        assistantPending.value.firstOrNull { it.id == id }?.let { askAssistant(it.text, id); return }
+        viewModelScope.launch { outbox.retry(id) }
+    }
+
+    fun discard(id: String) {
+        if (assistantPending.value.any { it.id == id }) {
+            assistantPending.value = assistantPending.value.filterNot { it.id == id }
+            return
+        }
+        viewModelScope.launch { outbox.discard(id) }
+    }
+
+    /**
+     * Envia a mensagem à sessão pelo ai-assistant (e não pelo messenger, que só guardaria a pergunta sem ninguém para responder).
+     * Enquanto o turno roda, a mensagem fica na fila local e o assistente aparece "pensando"; a resposta vem no próprio retorno.
+     */
+    private fun askAssistant(text: String, id: String = java.util.UUID.randomUUID().toString()) {
+        val thread = threadId ?: return
+        assistantPending.value = assistantPending.value.filterNot { it.id == id } + OutgoingMessage(id, text, null)
+        live.value = live.value.copy(thinking = true)
+        viewModelScope.launch {
+            when (val result = assistantRepository.send(thread, text)) {
+                is ApiResult.Success -> {
+                    assistantPending.value = assistantPending.value.filterNot { it.id == id }
+                    result.data.messengerConversationId?.let { remoteId = it }
+                    showAssistantTurn(text, result.data)
+                }
+                is ApiResult.Failure -> assistantPending.value = assistantPending.value.map { if (it.id == id) it.copy(failure = result.kind) else it }
+            }
+            live.value = live.value.copy(thinking = assistantPending.value.any { it.failure == null })
+        }
+    }
+
+    /** Mostra a pergunta e a resposta na hora e depois troca pelas mensagens gravadas no messenger, com os ids e horários reais. */
+    private suspend fun showAssistantTurn(text: String, reply: AssistantReply) {
+        val now = java.time.OffsetDateTime.now()
+        appendMessage(ChatMessage(text, true, "", id = "local-${java.util.UUID.randomUUID()}", sentAt = now, senderId = myId))
+        appendMessage(ChatMessage(reply.text, false, "", id = "local-${java.util.UUID.randomUUID()}", sentAt = now))
+        val id = remoteId ?: return
+        val messages = (repository.messages(id) as? ApiResult.Success)?.data?.takeIf { it.isNotEmpty() } ?: return
+        val conversation = (repository.conversation(id) as? ApiResult.Success)?.data
+        val current = content.value as? UiState.Content ?: return
+        content.value = UiState.Content(current.data.copy(conversation = conversation ?: current.data.conversation, messages = messages, hasMore = messages.size >= PAGE_SIZE))
+    }
+
+    private fun saveEdit(id: String, text: String) {
+        if (controls.value.action is ChatAction.Working) return
+        val original = currentMessages().firstOrNull { it.id == id }
+        if (original == null || original.deleted) { cancelEdit(); return }
+        if (original.text == text) { cancelEdit(); return }
+        run(ChatOperation.EDIT) {
+            when (val result = repository.editMessage(id, text)) {
+                is ApiResult.Success -> {
+                    replaceMessage(result.data)
+                    savedStateHandle["draft"] = savedStateHandle.get<String>("draftBeforeEdit").orEmpty()
+                    finishEdit()
+                    null
+                }
+                // O texto editado continua no campo para nova tentativa.
+                is ApiResult.Failure -> result.kind
+            }
+        }
+    }
+
+    private fun run(operation: ChatOperation, block: suspend () -> ErrorKind?) {
+        if (controls.value.action is ChatAction.Working) return
+        controls.value = controls.value.copy(action = ChatAction.Working(operation))
+        viewModelScope.launch {
+            val failure = block()
+            controls.value = controls.value.copy(action = failure?.let { ChatAction.Failed(operation, it) })
+        }
+    }
+
+    private fun finishEdit() {
+        savedStateHandle.remove<String>("editing")
+        savedStateHandle.remove<String>("draftBeforeEdit")
+        controls.value = controls.value.copy(editingId = null)
+    }
+
+    private fun currentMessages(): List<ChatMessage> = (content.value as? UiState.Content)?.data?.messages.orEmpty()
+
+    private fun replaceMessage(updated: ChatMessage) {
+        val current = content.value as? UiState.Content ?: return
+        content.value = current.copy(data = current.data.copy(messages = current.data.messages.map { if (it.id == updated.id) updated else it }))
+    }
+
+    /** A mensagem própria chega pelo envio e pelo evento em tempo real; vale a primeira, pelo identificador do servidor. */
+    private fun appendMessage(message: ChatMessage) {
+        val current = content.value as? UiState.Content ?: return
+        if (message.id.isNotBlank() && current.data.messages.any { it.id == message.id }) return
+        content.value = UiState.Content(current.data.copy(messages = current.data.messages + message))
+    }
+
+    private fun replaceOrAppend(message: ChatMessage) {
+        if (currentMessages().any { it.id == message.id }) replaceMessage(message) else appendMessage(message)
+    }
+
+    /** Recarrega o histórico sem voltar ao esqueleto, quando a entrega foi confirmada pelo próprio histórico. */
+    private fun refreshMessages() {
+        viewModelScope.launch {
+            val current = content.value as? UiState.Content ?: return@launch
+            val messages = repository.messages(remote()) as? ApiResult.Success ?: return@launch
+            content.value = UiState.Content(current.data.copy(messages = messages.data, hasMore = messages.data.size >= PAGE_SIZE))
+        }
+    }
+}
+
+private const val TYPING_RENEW_MILLIS = 3_000L
+private const val TYPING_IDLE_MILLIS = 4_000L
+private const val TYPING_EXPIRE_MILLIS = 8_000L
+
+/** Texto curto para o resultado de uma ação da conversa. */
+internal fun ChatAction.message(resources: android.content.res.Resources): String = when (this) {
+    is ChatAction.Working -> when (operation) {
+        ChatOperation.EDIT -> resources.getString(R.string.cm_salvando_edicao)
+        ChatOperation.DELETE -> resources.getString(R.string.cm_excluindo_mensagem)
+        ChatOperation.MUTE -> resources.getString(R.string.cm_silenciando_conversa)
+        ChatOperation.UNMUTE -> resources.getString(R.string.cm_reativando_notificacoes)
+        ChatOperation.ARCHIVE -> resources.getString(R.string.cm_arquivando_conversa)
+    }
+    is ChatAction.Failed -> when (kind) {
+        ErrorKind.FORBIDDEN -> resources.getString(R.string.cm_voce_nao_tem_permissao_para)
+        ErrorKind.NOT_FOUND -> resources.getString(R.string.cm_a_mensagem_ou_conversa_nao)
+        ErrorKind.CONNECTIVITY -> resources.getString(R.string.cm_sem_conexao_nada_foi_alterado)
+        else -> when (operation) {
+            ChatOperation.EDIT -> resources.getString(R.string.cm_nao_foi_possivel_salvar_a)
+            ChatOperation.DELETE -> resources.getString(R.string.cm_nao_foi_possivel_excluir_a)
+            ChatOperation.MUTE, ChatOperation.UNMUTE -> resources.getString(R.string.cm_nao_foi_possivel_alterar_as)
+            ChatOperation.ARCHIVE -> resources.getString(R.string.cm_nao_foi_possivel_arquivar_a)
+        }
+    }
+}
+
+@androidx.compose.runtime.Composable
+internal fun ChatAction.message(): String = message(androidx.compose.ui.platform.LocalContext.current.resources)
+
+/** Sem assistente: usado pelos testes que não tratam sessões. */
+private object NoAssistant : AssistantRepository {
+    override suspend fun send(threadId: String, text: String): ApiResult<AssistantReply> = ApiResult.Failure(ErrorKind.NOT_SUPPORTED)
 }

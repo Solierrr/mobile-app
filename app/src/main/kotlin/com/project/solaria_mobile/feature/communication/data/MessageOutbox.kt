@@ -1,250 +1,223 @@
 package com.project.solaria_mobile.feature.communication.data
 
-import com.project.solaria_mobile.core.auth.currentUserId
+import androidx.room.Dao
+import androidx.room.Database
+import androidx.room.Entity
+import androidx.room.Insert
+import androidx.room.PrimaryKey
+import androidx.room.Query
+import androidx.room.RoomDatabase
+import androidx.room.Update
 import com.project.solaria_mobile.core.common.ApiResult
-import com.project.solaria_mobile.core.common.ApplicationScope
 import com.project.solaria_mobile.core.common.ErrorKind
-import com.project.solaria_mobile.core.common.map
-import com.project.solaria_mobile.core.database.PendingMessageDao
-import com.project.solaria_mobile.core.database.PendingMessageEntity
-import com.project.solaria_mobile.core.network.ApiCallExecutor
-import com.project.solaria_mobile.core.network.CredentialProvider
-import com.project.solaria_mobile.core.network.NetworkMonitor
+import com.project.solaria_mobile.core.offline.LocalDataCleaner
+import com.project.solaria_mobile.feature.communication.domain.ChatMessage
+import com.project.solaria_mobile.feature.communication.domain.CommunicationRepository
 import java.util.UUID
-import java.util.concurrent.atomic.AtomicBoolean
-import javax.inject.Inject
-import javax.inject.Singleton
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.emptyFlow
+import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withTimeoutOrNull
-import kotlin.coroutines.cancellation.CancellationException
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+import androidx.room.migration.Migration
+import androidx.sqlite.db.SupportSQLiteDatabase
+
+enum class PendingState { PENDING, SENDING, FAILED }
 
 /**
- * Fila de envio das mensagens do chat: grava no banco antes e envia por REST depois.
+ * Mensagem escrita pelo usuário e ainda não confirmada pelo servidor.
  *
- * Cada mensagem vai para a tabela `pending_messages` ([PendingMessageDao]) antes do POST. Assim, um envio feito
- * sem internet fica guardado e sai quando a conexão volta. Um único worker envia em ordem de gravação.
- *
- * Regras de reenvio:
- * - Falha temporária (sem rede, timeout, 5xx, 429 ou 409) com internet: nova tentativa com espera de 15 s, 30 s,
- *   60 s, 120 s e 240 s. Um gatilho (internet voltou, mensagem nova ou "Tentar de novo") antecipa a espera.
- * - 401: a fila para até o próximo gatilho.
- * - 400/422, 403 e 404: a mensagem vai para `failed`, sem travar as demais.
- * - Mensagem já tentada antes (`attempts > 0`): confere as últimas 100 mensagens da conversa antes de reenviar,
- *   porque o messenger não deduplica pelo `clientMessageId`.
- *
- * Depende de:
- * - [PendingMessageDao] -> fila local.
- * - [MessengerApi] -> envio e histórico.
- * - [MessageStore] -> recebe a mensagem confirmada, antes de ela sair da fila.
- * - [ApiCallExecutor] -> executa a chamada e devolve o [ApiResult], com o [ErrorKind] na falha.
- * - [NetworkMonitor] -> avisa quando a internet volta.
- * - [CredentialProvider] -> `sub` do usuário logado.
- * - [ApplicationScope] -> escopo do worker.
- *
- * Principais operações:
- * - [start] -> liga o monitor de rede e o worker. Chamadas seguintes não têm efeito.
- * - [enqueue] -> grava a mensagem e pede o envio.
- * - [observe] -> acompanha as mensagens pendentes de uma conversa.
- * - [retry] -> libera uma mensagem recusada para novo envio.
- * - [discard] -> apaga uma mensagem da fila sem enviá-la.
+ * `id` vai para o messenger como `clientMessageId`, que volta no histórico. `uncertain` marca que uma tentativa anterior
+ * pode ter chegado ao servidor; antes de reenviar, a fila procura esse identificador no histórico para não duplicar.
  */
-@Singleton
-class MessageOutbox @Inject constructor(
+@Entity(tableName = "pending_message")
+data class PendingMessage(
+    @PrimaryKey val id: String,
+    val account: String,
+    val conversationId: String,
+    val text: String,
+    val createdAt: Long,
+    val state: PendingState = PendingState.PENDING,
+    val uncertain: Boolean = false,
+    val failure: ErrorKind? = null,
+)
+
+@Dao
+interface PendingMessageDao {
+    @Query("SELECT * FROM pending_message WHERE account = :account AND conversationId = :conversationId ORDER BY createdAt")
+    fun observe(account: String, conversationId: String): Flow<List<PendingMessage>>
+
+    @Query("SELECT * FROM pending_message WHERE account = :account AND state = 'PENDING' ORDER BY createdAt")
+    suspend fun pending(account: String): List<PendingMessage>
+
+    @Query("SELECT * FROM pending_message WHERE id = :id")
+    suspend fun get(id: String): PendingMessage?
+
+    @Insert
+    suspend fun insert(message: PendingMessage)
+
+    @Update
+    suspend fun update(message: PendingMessage)
+
+    @Query("DELETE FROM pending_message WHERE id = :id")
+    suspend fun delete(id: String)
+
+    @Query("UPDATE pending_message SET state = 'PENDING' WHERE state = 'SENDING'")
+    suspend fun resetInterrupted()
+
+    @Query("DELETE FROM pending_message")
+    suspend fun clear()
+}
+
+@Database(entities = [PendingMessage::class], version = 2, exportSchema = false)
+abstract class OutboxDatabase : RoomDatabase() {
+    abstract fun dao(): PendingMessageDao
+}
+
+/** A versão 1 guardava uma contagem de mensagens com o mesmo texto, trocada pelo identificador do app; as mensagens são mantidas. */
+val OUTBOX_MIGRATION_1_2 = object : Migration(1, 2) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL(
+            "CREATE TABLE pending_message_new (id TEXT NOT NULL, account TEXT NOT NULL, conversationId TEXT NOT NULL, text TEXT NOT NULL, " +
+                "createdAt INTEGER NOT NULL, state TEXT NOT NULL, uncertain INTEGER NOT NULL, failure TEXT, PRIMARY KEY(id))",
+        )
+        db.execSQL(
+            "INSERT INTO pending_message_new (id, account, conversationId, text, createdAt, state, uncertain, failure) " +
+                "SELECT id, account, conversationId, text, createdAt, state, uncertain, failure FROM pending_message",
+        )
+        db.execSQL("DROP TABLE pending_message")
+        db.execSQL("ALTER TABLE pending_message_new RENAME TO pending_message")
+    }
+}
+
+/** Conta e ambiente donos da fila; o modo mock tem a sua própria. */
+fun interface OutboxAccount {
+    fun current(): String?
+}
+
+/** Mensagem entregue: `message` vem da resposta do envio, ou é nula quando a entrega foi confirmada pelo histórico. */
+data class Delivered(val conversationId: String, val message: ChatMessage?)
+
+/** Resultado de uma passada pela fila: `retryLater` quando a rede ou o servidor falharam e vale tentar de novo. */
+internal data class DrainResult(val retryLater: Boolean)
+
+/**
+ * Fila local de mensagens do chat. Guarda cada mensagem antes de enviar, envia na ordem de criação quando há conexão e
+ * retoma depois de falhas de rede, de reinício do app ou de troca de tela.
+ */
+class MessageOutbox(
     private val dao: PendingMessageDao,
-    private val api: MessengerApi,
-    private val executor: ApiCallExecutor,
-    private val networkMonitor: NetworkMonitor,
-    private val credentials: CredentialProvider,
-    private val store: MessageStore,
-    @ApplicationScope private val scope: CoroutineScope,
-) {
-    private val drainRequests = Channel<Unit>(Channel.CONFLATED)
-    private val started = AtomicBoolean(false)
+    private val repository: CommunicationRepository,
+    private val account: OutboxAccount,
+    private val canSend: Flow<Boolean>,
+    private val dispatcher: CoroutineDispatcher,
+    private val clock: () -> Long = System::currentTimeMillis,
+) : LocalDataCleaner {
+    private val lock = Mutex()
+    private val trigger = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
+    private val mutableDelivered = MutableSharedFlow<Delivered>(extraBufferCapacity = DELIVERED_BUFFER)
+    val delivered: SharedFlow<Delivered> = mutableDelivered
+    private var started = false
 
-    // Escrito pela coleta de rede e lido pelo worker, em corrotinas diferentes: por isso é @Volatile.
-    @Volatile
-    private var online = false
+    fun observe(conversationId: String): Flow<List<PendingMessage>> {
+        val owner = account.current() ?: return emptyFlow()
+        return dao.observe(owner, conversationId)
+    }
 
-    /**
-     * Liga o monitor de rede e o worker de envio. Só a primeira chamada tem efeito.
-     *
-     * Chamado na abertura do app.
-     */
+    /** Guarda a mensagem para envio. Devolve falso sem conta ativa, quando não há a quem atribuir a mensagem. */
+    suspend fun enqueue(conversationId: String, text: String): Boolean {
+        val owner = account.current() ?: return false
+        dao.insert(PendingMessage(UUID.randomUUID().toString(), owner, conversationId, text, clock()))
+        trigger.tryEmit(Unit)
+        return true
+    }
+
+    suspend fun retry(id: String) {
+        val message = dao.get(id) ?: return
+        dao.update(message.copy(state = PendingState.PENDING, failure = null))
+        trigger.tryEmit(Unit)
+    }
+
+    suspend fun discard(id: String) = dao.delete(id)
+
+    override suspend fun clear() = dao.clear()
+
+    /** Começa a enviar a fila em segundo plano enquanto o app estiver aberto. Chamadas repetidas não têm efeito. */
     fun start() {
-        if (!started.compareAndSet(false, true)) return
-        scope.launch {
-            networkMonitor.isOnline.collect { isOnline ->
-                online = isOnline
-                if (isOnline) drainRequests.trySend(Unit)
+        if (started) return
+        started = true
+        CoroutineScope(SupervisorJob() + dispatcher).launch {
+            dao.resetInterrupted()
+            combine(canSend, trigger.onStart { emit(Unit) }) { allowed, _ -> allowed }.collectLatest { allowed ->
+                var attempt = 0
+                while (allowed && drain().retryLater) {
+                    delay(RETRY_DELAYS_MILLIS[attempt.coerceAtMost(RETRY_DELAYS_MILLIS.lastIndex)])
+                    attempt++
+                }
             }
         }
-        scope.launch { runWorker() }
     }
 
-    /**
-     * Grava a mensagem na fila com o usuário logado como remetente e pede o envio.
-     *
-     * Sucesso quer dizer gravada, não entregue: o POST acontece depois, em segundo plano.
-     *
-     * @param conversationId conversa de destino.
-     * @param messageType tipo exigido pelo servidor para a conversa.
-     * @param content texto da mensagem.
-     * @return [ApiResult.Success] quando gravada. Sem sessão, [ErrorKind.UNAUTHORIZED]; se o banco falhar, [ErrorKind.UNKNOWN].
-     */
-    suspend fun enqueue(conversationId: String, messageType: String, content: String): ApiResult<Unit> {
-        val senderId = credentials.currentUserId() ?: return ApiResult.Failure(ErrorKind.UNAUTHORIZED)
-        val message = PendingMessageEntity(
-            clientMessageId = UUID.randomUUID().toString(),
-            senderId = senderId,
-            conversationId = conversationId,
-            messageType = messageType,
-            content = content,
-            createdAt = System.currentTimeMillis(),
-        )
-        try {
-            dao.insert(message)
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Exception) {
-            return ApiResult.Failure(ErrorKind.UNKNOWN)
-        }
-        drainRequests.trySend(Unit)
-        return ApiResult.Success(Unit)
-    }
-
-    /**
-     * Acompanha as mensagens pendentes de uma conversa do usuário logado, em ordem de gravação.
-     *
-     * Sem sessão, emite uma lista vazia.
-     */
-    fun observe(conversationId: String): Flow<List<PendingMessageEntity>> {
-        val senderId = credentials.currentUserId() ?: return flowOf(emptyList())
-        return dao.observe(senderId, conversationId)
-    }
-
-    /**
-     * Libera uma mensagem recusada (`failed = false`) e pede novo envio.
-     *
-     * @param clientMessageId id da mensagem na fila.
-     */
-    suspend fun retry(clientMessageId: String) {
-        dao.setFailed(clientMessageId, failed = false)
-        drainRequests.trySend(Unit)
-    }
-
-    /**
-     * Apaga a mensagem da fila sem enviá-la.
-     *
-     * @param clientMessageId id da mensagem na fila.
-     */
-    suspend fun discard(clientMessageId: String) {
-        dao.delete(clientMessageId)
-    }
-
-    // Único consumidor da fila: pedidos repetidos se fundem (CONFLATED) e nunca há dois envios ao mesmo tempo
-    private suspend fun runWorker() {
-        var failures = 0
-        while (true) {
-            if (failures == 0) {
-                drainRequests.receive()
-            } else {
-                withTimeoutOrNull(retryDelayMillis(failures)) { drainRequests.receive() }
+    internal suspend fun drain(): DrainResult = lock.withLock {
+        val owner = account.current() ?: return DrainResult(retryLater = false)
+        for (queued in dao.pending(owner)) {
+            if (account.current() != owner) return DrainResult(retryLater = false)
+            val message = dao.get(queued.id)?.takeIf { it.state == PendingState.PENDING } ?: continue
+            dao.update(message.copy(state = PendingState.SENDING))
+            if (message.uncertain) {
+                when (alreadyDelivered(message)) {
+                    true -> {
+                        dao.delete(message.id)
+                        mutableDelivered.emit(Delivered(message.conversationId, null))
+                        continue
+                    }
+                    null -> {
+                        dao.update(message.copy(state = PendingState.PENDING))
+                        return DrainResult(retryLater = true)
+                    }
+                    false -> Unit
+                }
             }
-            // Sem internet não há tentativa agendada: a fila espera o próximo gatilho, em geral a volta da conexão.
-            if (!online) {
-                failures = 0
-                continue
-            }
-            failures = if (drainSafely() == Outcome.RETRY_LATER) failures + 1 else 0
-        }
-    }
-
-    // Uma falha do banco não pode matar o worker, senão a fila para de andar até o app reiniciar
-    private suspend fun drainSafely(): Outcome =
-        try {
-            drainOnce()
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Exception) {
-            Outcome.RETRY_LATER
-        }
-
-    private suspend fun drainOnce(): Outcome {
-        val senderId = credentials.currentUserId() ?: return Outcome.STOP
-        for (message in dao.sendable(senderId)) {
-            when (val outcome = deliver(message)) {
-                Outcome.DELIVERED -> Unit
-                Outcome.REJECTED -> dao.setFailed(message.clientMessageId, failed = true)
-                Outcome.RETRY_LATER, Outcome.STOP -> return outcome
+            when (val result = repository.sendMessage(message.conversationId, message.text, message.id)) {
+                is ApiResult.Success -> {
+                    dao.delete(message.id)
+                    mutableDelivered.emit(Delivered(message.conversationId, result.data))
+                }
+                is ApiResult.Failure -> when (result.kind) {
+                    // A requisição pode ter sido gravada antes da falha: confere o histórico antes de reenviar.
+                    ErrorKind.CONNECTIVITY, ErrorKind.TIMEOUT, ErrorKind.SERVER, ErrorKind.SERIALIZATION, ErrorKind.UNKNOWN -> {
+                        dao.update(message.copy(state = PendingState.PENDING, uncertain = true))
+                        return DrainResult(retryLater = true)
+                    }
+                    // Recusada antes de gravar: tenta de novo depois, sem precisar conferir o histórico.
+                    ErrorKind.UNAUTHORIZED, ErrorKind.RATE_LIMITED -> {
+                        dao.update(message.copy(state = PendingState.PENDING))
+                        return DrainResult(retryLater = true)
+                    }
+                    else -> dao.update(message.copy(state = PendingState.FAILED, failure = result.kind))
+                }
             }
         }
-        return Outcome.DELIVERED
+        DrainResult(retryLater = false)
     }
 
-    private suspend fun deliver(message: PendingMessageEntity): Outcome {
-        // O messenger não deduplica: se uma tentativa anterior pode ter gravado, confere o histórico antes de repetir
-        if (message.attempts > 0) {
-            when (val found = findOnServer(message)) {
-                is ApiResult.Failure -> return outcomeOf(found.kind)
-                is ApiResult.Success -> found.data?.let { return confirm(message, it) }
-            }
-        }
-        dao.countAttempt(message.clientMessageId)
-        val request = SendMessageRequest(
-            conversationId = message.conversationId,
-            messageType = message.messageType,
-            content = message.content,
-            clientMessageId = message.clientMessageId,
-        )
-        return when (val result = executor.execute { api.send(request) }) {
-            is ApiResult.Success -> confirm(message, result.data)
-            is ApiResult.Failure -> outcomeOf(result.kind)
-        }
+    /** Verdadeiro se o histórico já tem a mensagem com este identificador; nulo se o histórico não pôde ser lido. */
+    private suspend fun alreadyDelivered(message: PendingMessage): Boolean? {
+        val history = repository.messages(message.conversationId) as? ApiResult.Success ?: return null
+        return history.data.any { it.clientMessageId == message.id }
     }
-
-    private suspend fun findOnServer(message: PendingMessageEntity): ApiResult<MessageDto?> =
-        executor.execute { api.messages(message.conversationId, limit = HISTORY_CHECK_LIMIT) }
-            .map { recent -> recent.firstOrNull { it.clientMessageId.equals(message.clientMessageId, ignoreCase = true) } }
-
-    private suspend fun confirm(message: PendingMessageEntity, sent: MessageDto): Outcome {
-        if (credentials.currentUserId() == message.senderId) store.apply(listOf(sent))
-        dao.delete(message.clientMessageId)
-        return Outcome.DELIVERED
-    }
-
-    /**
-     * Resultado de uma tentativa de envio, que decide o próximo passo do worker.
-     *
-     * - `DELIVERED` -> enviada e confirmada, ou nada mais a enviar.
-     * - `REJECTED` -> recusada pelo servidor. A mensagem vai para `failed`.
-     * - `RETRY_LATER` -> falha temporária. O worker repete com espera crescente.
-     * - `STOP` -> 401. O worker para até o próximo gatilho.
-     */
-    private enum class Outcome { DELIVERED, REJECTED, RETRY_LATER, STOP }
-
-    /**
-     * Decide o que o worker faz com um erro: recusar a mensagem, parar até o próximo gatilho ou tentar de novo depois.
-     */
-    private fun outcomeOf(kind: ErrorKind): Outcome = when (kind) {
-        ErrorKind.VALIDATION, ErrorKind.FORBIDDEN, ErrorKind.NOT_FOUND -> Outcome.REJECTED
-        ErrorKind.UNAUTHORIZED -> Outcome.STOP
-        else -> Outcome.RETRY_LATER
-    }
-
-    // 15 s, 30 s, 60 s, 120 s e 240 s
-    private fun retryDelayMillis(failures: Int): Long =
-        (RETRY_BASE_MILLIS shl (failures - 1).coerceAtMost(4)).coerceAtMost(RETRY_MAX_MILLIS)
 
     private companion object {
-        /** Quantas mensagens recentes da conversa são conferidas antes de um reenvio. */
-        const val HISTORY_CHECK_LIMIT = 100
-        /** Primeira espera entre tentativas de envio: 15 s. */
-        const val RETRY_BASE_MILLIS = 15_000L
-        /** Teto da espera entre tentativas de envio: 240 s. */
-        const val RETRY_MAX_MILLIS = 240_000L
+        const val DELIVERED_BUFFER = 16
+        val RETRY_DELAYS_MILLIS = listOf(5_000L, 15_000L, 30_000L, 60_000L)
     }
 }

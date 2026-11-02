@@ -2,9 +2,6 @@ package com.project.solaria_mobile
 
 import android.app.Application
 import com.project.solaria_mobile.core.network.realtime.RealtimeLifecycleBinder
-import com.project.solaria_mobile.feature.communication.data.ConversationStateSync
-import com.project.solaria_mobile.feature.communication.data.MessageOutbox
-import com.project.solaria_mobile.feature.communication.data.MessageSync
 import dagger.hilt.android.HiltAndroidApp
 import javax.inject.Inject
 
@@ -13,16 +10,11 @@ import javax.inject.Inject
  */
 @HiltAndroidApp
 class App : Application() {
-    @Inject lateinit var realtimeLifecycleBinder: RealtimeLifecycleBinder
-    @Inject lateinit var messageOutbox: MessageOutbox
-    @Inject lateinit var messageSync: MessageSync
-    @Inject lateinit var conversationStateSync: ConversationStateSync
+    @Inject lateinit var realtime: RealtimeLifecycleBinder
 
     override fun onCreate() {
         super.onCreate()
-        realtimeLifecycleBinder.bind()
-        messageOutbox.start()
-        messageSync.start()
-        conversationStateSync.start()
+        // O tempo real do messenger liga quando o app vai para a frente e desliga quando sai dela.
+        realtime.bind()
     }
 }

@@ -23,6 +23,8 @@ import androidx.compose.ui.graphics.asAndroidPath
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.drawscope.clipPath
+import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Matrix
 import androidx.compose.ui.graphics.asComposePath
@@ -31,6 +33,9 @@ import androidx.graphics.shapes.Morph
 import androidx.graphics.shapes.toPath
 
 private const val CYCLE_MILLIS_PER_SHAPE = 1400
+
+/** Parte do quadrado da marca que a forma ocupa (a maior dimensão). */
+internal const val BRAND_SHAPE_SCALE = 0.9f
 
 private val shapes = listOf(
     MorphShapes.hexagon,
@@ -45,6 +50,8 @@ private val shapes = listOf(
 @Composable
 fun MorphingHexagon(
     modifier: Modifier = Modifier,
+    rotateShape: Boolean = false,
+    millisPerShape: Int = CYCLE_MILLIS_PER_SHAPE,
 ) {
     val morphs = remember {
         shapes.indices.map { Morph(shapes[it], shapes[(it + 1) % shapes.size]) }
@@ -56,7 +63,7 @@ fun MorphingHexagon(
             initialValue = 0f,
             targetValue = morphs.size.toFloat(),
             animationSpec = infiniteRepeatable(
-                animation = tween(durationMillis = CYCLE_MILLIS_PER_SHAPE * morphs.size, easing = LinearEasing),
+                animation = tween(durationMillis = millisPerShape * morphs.size, easing = LinearEasing),
                 repeatMode = RepeatMode.Restart,
             ),
             label = "hexagon-position",
@@ -82,45 +89,90 @@ fun MorphingHexagon(
                 translate(CENTER / SHAPE_SCALE, CENTER / SHAPE_SCALE)
             },
         )
-        drawBrandShape(path)
+        rotate(if (rotateShape) position / morphs.size * 360f else 0f) {
+            drawBrandShape(path)
+        }
     }
 }
 
 private const val CENTER = 0.5f
-private const val SHAPE_SCALE = 0.88f
+private const val SHAPE_SCALE = BRAND_SHAPE_SCALE
 private val BRAND_TOP = Color(0xFFF57D2D)
 private val BRAND_BOTTOM = Color(0xFFE85900)
+private val RADIAL_CENTER = Color(0xFFFF5900)
+private val RADIAL_EDGE = Color(0xFFFFAC65)
 
-/** Degradê vertical da marca (como no web) com uma sombra bem difusa, sem contornos. */
+/**
+ * Marca como no Figma: sombra suave, degradê vertical laranja, duas camadas leves por cima (radial e diagonal) e um
+ * brilho branco interno que deixa a borda clara e o centro mais escuro. As medidas seguem a altura da forma.
+ */
 private fun DrawScope.drawBrandShape(path: Path) {
-    val unit = size.minDimension
+    val bounds = path.getBounds()
+    val height = bounds.height
+    if (height <= 0f) return
     drawIntoCanvas { canvas ->
         val shadow = Paint().asFrameworkPaint().apply {
             isAntiAlias = true
             color = android.graphics.Color.argb(SHADOW_ALPHA, 0, 0, 0)
-            maskFilter = BlurMaskFilter(unit * SHADOW_BLUR, BlurMaskFilter.Blur.NORMAL)
+            maskFilter = BlurMaskFilter(height * SHADOW_BLUR, BlurMaskFilter.Blur.NORMAL)
         }
         canvas.save()
-        canvas.translate(0f, unit * SHADOW_SHIFT)
+        canvas.translate(0f, height * SHADOW_SHIFT)
         canvas.nativeCanvas.drawPath(path.asAndroidPath(), shadow)
         canvas.restore()
     }
     drawPath(
         path,
-        Brush.linearGradient(
+        Brush.verticalGradient(
             colors = listOf(BRAND_TOP, BRAND_BOTTOM),
-            start = Offset(size.width / 2, size.height * 0.08f),
-            end = Offset(size.width / 2, size.height * 0.92f),
+            startY = bounds.top - height * GRADIENT_OVERSHOOT,
+            endY = bounds.bottom + height * GRADIENT_OVERSHOOT,
         ),
     )
+    drawPath(
+        path,
+        Brush.radialGradient(
+            colors = listOf(RADIAL_CENTER.copy(alpha = RADIAL_ALPHA), RADIAL_EDGE.copy(alpha = RADIAL_ALPHA)),
+            center = bounds.center,
+            radius = height / 2f,
+        ),
+    )
+    drawPath(
+        path,
+        Brush.linearGradient(
+            colors = listOf(Color.White.copy(alpha = DIAGONAL_TOP_ALPHA), BRAND_BOTTOM.copy(alpha = DIAGONAL_BOTTOM_ALPHA)),
+            start = bounds.topLeft,
+            end = bounds.bottomRight,
+        ),
+    )
+    clipPath(path) {
+        drawIntoCanvas { canvas ->
+            val glow = Paint().asFrameworkPaint().apply {
+                isAntiAlias = true
+                style = android.graphics.Paint.Style.STROKE
+                strokeWidth = height * GLOW_INSET * 2f
+                color = android.graphics.Color.argb(GLOW_ALPHA, 255, 255, 255)
+                maskFilter = BlurMaskFilter(height * GLOW_BLUR, BlurMaskFilter.Blur.NORMAL)
+            }
+            canvas.nativeCanvas.drawPath(path.asAndroidPath(), glow)
+        }
+    }
 }
 
-private const val SHADOW_ALPHA = 36
-private const val SHADOW_BLUR = 0.03f
-private const val SHADOW_SHIFT = 0.02f
+private const val SHADOW_ALPHA = 26
+private const val SHADOW_BLUR = 0.063f
+private const val SHADOW_SHIFT = 0.0365f
+private const val GRADIENT_OVERSHOOT = 0.008f
+private const val RADIAL_ALPHA = 0.05f
+private const val DIAGONAL_TOP_ALPHA = 0.08f
+private const val DIAGONAL_BOTTOM_ALPHA = 0.2f
+private const val GLOW_INSET = 0.0307f
+private const val GLOW_BLUR = 0.063f
+private const val GLOW_ALPHA = 64
 
+/** Falso quando o aparelho zerou a escala de animação; a marca então fica parada no hexágono. */
 @Composable
-private fun animationsEnabled(): Boolean {
+internal fun animationsEnabled(): Boolean {
     val resolver = LocalContext.current.contentResolver
     return remember(resolver) {
         Settings.Global.getFloat(resolver, Settings.Global.ANIMATOR_DURATION_SCALE, 1f) > 0f

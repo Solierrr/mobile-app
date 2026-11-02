@@ -4,55 +4,51 @@ enum class AvatarTone { ORANGE, BLUE, GREEN, PINK }
 
 enum class ServiceCallIcon { HASH, PHONE, SHIELD_ALERT }
 
-enum class MessageStatus { SENT, PENDING, FAILED }
+data class Conversation(val id: String, val initials: String, val name: String, val preview: String, val time: String, val tone: AvatarTone, val muted: Boolean = false, val unread: Int = 0, val group: Boolean = false,
+    /** Sessão do assistente (conversa do tipo CHAT_BOT); só aparece na página do assistente. */
+    val assistant: Boolean = false,
+    /** Sessão do assistente geográfico, ligada a um projeto do mapa; o `id` é `geo:<projeto>:<sessão>`. */
+    val geo: Boolean = false,
+    /** Identificador da sessão no ai-assistant, guardado pela conversa em `userDetails.threadId`. */
+    val threadId: String? = null)
 
-data class Conversation(
-    val id: String,
-    val initials: String,
-    val name: String,
-    val preview: String,
-    val time: String,
-    val tone: AvatarTone,
-    val accessLost: Boolean = false,
-    val unreadCount: Int = 0,
-    val muted: Boolean = false,
-    val archived: Boolean = false,
-    val group: Boolean = false,
-    val chatbot: Boolean = false,
-)
-
+/**
+ * `clientMessageId` é o identificador que o app gerou ao enviar, devolvido pelo messenger no histórico. Mensagem excluída
+ * continua no histórico como marcador, sem o texto.
+ */
 data class ChatMessage(
-    val id: String,
     val text: String,
     val mine: Boolean,
     val time: String,
-    val sequence: Int? = null,
     val clientMessageId: String? = null,
-    val status: MessageStatus = MessageStatus.SENT,
-    val sender: String? = null,
+    val id: String = "",
     val edited: Boolean = false,
     val deleted: Boolean = false,
-    val sentAt: Long? = null,
-    val changeable: Boolean = false,
+    val sequence: Int = 0,
+    val sentAt: java.time.OffsetDateTime? = null,
+    val senderId: String? = null,
+    val senderName: String? = null,
+    val attachment: MessageAttachment? = null,
 )
-
-data class ServiceCall(val id: String, val title: String, val detail: String, val icon: ServiceCallIcon, val badge: String? = null)
-
-data class NotificationGroup(val title: String, val calls: List<ServiceCall>)
 
 /**
- * O que a tela mostra de ao vivo numa conversa.
- *
- * @property known `false` enquanto não há conexão em tempo real ou o servidor ainda não mandou o retrato da presença.
- *   A tela não deve mostrar "offline" nesse caso, só esconder a informação.
- * @property peerOnline na conversa direta, se o outro participante está online. `null` fora da conversa direta ou com
- *   [known] falso.
- * @property onlineCount no grupo, quantos participantes além do usuário estão online.
- * @property typingNames nomes de quem está digitando agora, sem o usuário.
+ * Conteúdo além do texto. O api-messenger ainda não tem contrato para anexos (a proposta está no VersioSpec), então só o
+ * modo de demonstração produz estes valores; o servidor real devolve apenas texto.
  */
-data class ChatPresence(
-    val known: Boolean = false,
-    val peerOnline: Boolean? = null,
-    val onlineCount: Int = 0,
-    val typingNames: List<String> = emptyList(),
+sealed interface MessageAttachment {
+    data class Image(val url: String) : MessageAttachment
+    data class File(val name: String, val sizeBytes: Long, val mimeType: String, val url: String) : MessageAttachment
+    data class Location(val latitude: Double, val longitude: Double, val label: String = "") : MessageAttachment
+}
+
+/** Estado pessoal da conversa: silenciar e arquivar valem só para a própria conta. */
+data class ConversationState(val muted: Boolean, val archived: Boolean)
+
+data class ServiceCall(
+    val id: String, val title: String, val detail: String, val icon: ServiceCallIcon, val badge: String? = null,
+    val projectId: String? = null, val projectName: String = "", val status: String? = null,
+    val scheduledAt: java.time.OffsetDateTime? = null, val acceptedAt: java.time.OffsetDateTime? = null,
+    val endedAt: java.time.OffsetDateTime? = null, val address: String = "", val canManage: Boolean = false,
+    val hasExecutors: Boolean = false, val managedByAgenda: Boolean = false,
 )
+

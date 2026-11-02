@@ -28,22 +28,24 @@ fun RoundIconButton(
     modifier: Modifier = Modifier,
     size: Dp = Sizing.headerButton,
     tint: Color = AppTheme.colors.onSurface,
-    background: Color = AppTheme.colors.surface,
+    background: Color = AppTheme.colors.inputFill,
     badge: String? = null,
+    enabled: Boolean = true,
 ) {
-    Box(modifier = modifier.size(size)) {
+    Box(modifier = modifier.size(size.coerceAtLeast(Sizing.touchTarget))) {
         Surface(
             modifier = Modifier.matchParentSize(),
             onClick = onClick,
+            enabled = enabled,
             shape = CircleShape,
             color = background,
-            shadowElevation = 2.dp,
+            shadowElevation = com.project.solaria_mobile.core.designsystem.theme.Elevation.flat,
         ) {
             Box(contentAlignment = Alignment.Center) {
                 Icon(
                     painter = painterResource(icon),
                     contentDescription = contentDescription,
-                    tint = tint,
+                    tint = if (enabled) tint else tint.copy(alpha = 0.45f),
                     modifier = Modifier.size(Sizing.icon),
                 )
             }

@@ -1,104 +1,108 @@
-@file:OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
-
 package com.project.solaria_mobile.feature.profile
 
-import com.project.solaria_mobile.feature.profile.domain.Connection
-
-import androidx.compose.foundation.background
+import com.project.solaria_mobile.R
+import androidx.compose.ui.res.stringResource
+import com.project.solaria_mobile.core.designsystem.components.ListRow
+import com.project.solaria_mobile.core.designsystem.components.InlineLoader
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Icon
-import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.Surface
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.layout.size
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.hilt.navigation.compose.hiltViewModel
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
+import androidx.compose.runtime.key
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.res.painterResource
-import com.composables.icons.lucide.R as LucideR
-import com.project.solaria_mobile.core.designsystem.components.ActionRow
-import com.project.solaria_mobile.core.designsystem.components.AvatarPalette
+import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.project.solaria_mobile.core.common.UiState
+import com.project.solaria_mobile.core.designsystem.components.UiStateHost
+import com.project.solaria_mobile.core.designsystem.components.Avatar
+import com.project.solaria_mobile.core.designsystem.components.PrimaryButton
+import com.project.solaria_mobile.core.designsystem.components.RefreshButton
+import com.project.solaria_mobile.core.designsystem.components.ResourceStatus
 import com.project.solaria_mobile.core.designsystem.components.ScreenTitle
 import com.project.solaria_mobile.core.designsystem.components.SearchField
-import com.project.solaria_mobile.core.designsystem.components.Avatar
+import com.project.solaria_mobile.core.designsystem.components.SegmentedControl
+import com.project.solaria_mobile.core.designsystem.components.StateNotice
+import com.project.solaria_mobile.core.designsystem.icons.AppIcons
 import com.project.solaria_mobile.core.designsystem.theme.AppTheme
+import com.project.solaria_mobile.core.designsystem.theme.appBackground
 import com.project.solaria_mobile.core.designsystem.theme.Spacing
-import com.project.solaria_mobile.core.designsystem.theme.Sizing
-import com.project.solaria_mobile.core.designsystem.theme.Radius
-import com.project.solaria_mobile.core.designsystem.components.UiStateHost
+import com.project.solaria_mobile.core.images.ImageLoaderViewModel
+import com.project.solaria_mobile.feature.profile.domain.Connection
+import com.project.solaria_mobile.core.designsystem.components.ListSkeleton
 
 @Composable
-fun ConnectionsRoute(
-    onBack: () -> Unit,
-    onOpenProfile: (String) -> Unit,
-    viewModel: ConnectionsViewModel = hiltViewModel(),
-) {
+fun ConnectionsRoute(onBack: () -> Unit, onOpenProfile: (String) -> Unit,
+    viewModel: ConnectionsViewModel = hiltViewModel(), images: ImageLoaderViewModel = hiltViewModel(),
+    /** Modo "Iniciar conversa": só as conexões, e tocar numa delas chama [onPick] em vez de abrir o perfil. */
+    pick: Boolean = false, onPick: (com.project.solaria_mobile.feature.profile.domain.Connection) -> Unit = {}, status: String? = null, statusIsError: Boolean = false) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
-    UiStateHost(state, viewModel::load) { content -> ConnectionsScreen(content, viewModel::onQueryChange, onBack, onOpenProfile) }
-}
-
-@Composable
-fun ConnectionsScreen(
-    state: ConnectionsUiState,
-    onQueryChange: (String) -> Unit,
-    onBack: () -> Unit,
-    onOpenProfile: (String) -> Unit,
-) {
-    var filterOpen by remember { mutableStateOf(false) }
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-
-    Column(modifier = Modifier.fillMaxSize().background(AppTheme.colors.surface).padding(horizontal = Spacing.screen).padding(top = Spacing.lg)) {
-        ScreenTitle("Conexões", onBack, trailingIcon = LucideR.drawable.lucide_ic_ellipsis, trailingLabel = "Opções", onTrailingClick = { filterOpen = true })
-        Row(modifier = Modifier.padding(top = Spacing.md), horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-            SearchField("Busque um usuário", state.query, onQueryChange, modifier = Modifier.weight(1f), trailingIcon = LucideR.drawable.lucide_ic_sliders_horizontal, onTrailingClick = { filterOpen = true })
-        }
-        LazyColumn(modifier = Modifier.padding(top = Spacing.md), verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-            items(state.connections) { user ->
-                ConnectionRow(user, onClick = { onOpenProfile(user.id) })
-            }
-        }
-    }
-
-    if (filterOpen) {
-        ModalBottomSheet(
-            onDismissRequest = { filterOpen = false }, sheetState = sheetState, containerColor = AppTheme.colors.surface,
-            shape = RoundedCornerShape(topStart = Radius.sheet, topEnd = Radius.sheet), dragHandle = null,
-        ) {
-            Column(modifier = Modifier.fillMaxWidth().padding(horizontal = Spacing.screen).padding(top = Spacing.xxl, bottom = Spacing.screenBottom), verticalArrangement = Arrangement.spacedBy(Spacing.md)) {
-                ScreenTitle("Conexões", onBack = { filterOpen = false })
-                ActionRow("Aguardando aprovação", LucideR.drawable.lucide_ic_user_round_check, { filterOpen = false })
-                ActionRow("Convidar pessoa", LucideR.drawable.lucide_ic_user_round_plus, { filterOpen = false })
-                ActionRow("Conexões por projeto", LucideR.drawable.lucide_ic_folder, { filterOpen = false })
-            }
+    val query by viewModel.query.collectAsStateWithLifecycle()
+    val discover by viewModel.discover.collectAsStateWithLifecycle()
+    DisposableEffect(Unit) { viewModel.load(); onDispose { } }
+    val resource = state as? UiState.Content
+    Column(Modifier.fillMaxSize().appBackground().padding(horizontal = Spacing.screen).padding(top = Spacing.lg),
+        verticalArrangement = Arrangement.spacedBy(Spacing.md)) {
+        ScreenTitle(stringResource(if (pick) R.string.cv_iniciar_conversa else R.string.pf_conexoes), onBack, actions = { RefreshButton(viewModel::load, resource?.refreshing == true, stringResource(R.string.cn_atualizar_conexoes)) })
+        if (!pick) SegmentedControl(listOf(stringResource(R.string.ps_minhas_conexoes), stringResource(R.string.cn_encontrar_pessoas)), if (discover) 1 else 0,
+            { viewModel.selectDiscover(it == 1) }, Modifier.fillMaxWidth())
+        status?.let { androidx.compose.material3.Text(it, color = if (statusIsError) com.project.solaria_mobile.core.designsystem.theme.AppTheme.colors.danger else com.project.solaria_mobile.core.designsystem.theme.AppTheme.colors.onSurfaceMuted, style = androidx.compose.material3.MaterialTheme.typography.bodyMedium) }
+        SearchField(if (discover) stringResource(R.string.cn_busque_pessoas) else stringResource(R.string.cn_busque_nas_suas_conexoes), query, viewModel::onQueryChange)
+        resource?.let { ResourceStatus(it) }
+        UiStateHost(state, viewModel::load, modifier = Modifier.weight(1f), inline = true, loading = { ListSkeleton() }) { content ->
+            ConnectionsList(content, onOpenProfile, viewModel::more, { viewModel.onQueryChange("") }, images::bytes, if (pick) onPick else null)
         }
     }
 }
 
 @Composable
-private fun ConnectionRow(connection: Connection, onClick: () -> Unit) {
-    Surface(modifier = Modifier.fillMaxWidth(), onClick = onClick, color = AppTheme.colors.surface) {
-        Row(modifier = Modifier.padding(vertical = Spacing.xs), horizontalArrangement = Arrangement.spacedBy(Spacing.sm), verticalAlignment = Alignment.CenterVertically) {
-            Avatar(connection.initials, color = AvatarPalette(connection.name.length))
-            Column(modifier = Modifier.weight(1f)) {
-                Text(connection.name, color = AppTheme.colors.onSurface, style = androidx.compose.material3.MaterialTheme.typography.titleMedium)
-                Text(connection.handle, color = AppTheme.colors.onSurfaceMuted, style = androidx.compose.material3.MaterialTheme.typography.bodyMedium)
-            }
-            Icon(painter = painterResource(LucideR.drawable.lucide_ic_ellipsis), contentDescription = "Opções de ${connection.name}", tint = AppTheme.colors.onSurfaceMuted, modifier = Modifier.size(Sizing.icon))
+private fun ConnectionsList(state: ConnectionsUiState, onOpenProfile: (String) -> Unit, onMore: () -> Unit,
+    onClear: () -> Unit, loadImage: suspend (String) -> ByteArray?,
+    onPick: ((com.project.solaria_mobile.feature.profile.domain.Connection) -> Unit)? = null) {
+    val listState = rememberLazyListState()
+    // Carrega a próxima página sozinho ao chegar perto do fim da lista, em vez de pedir um botão.
+    val nearEnd by remember {
+        derivedStateOf {
+            val info = listState.layoutInfo
+            (info.visibleItemsInfo.lastOrNull()?.index ?: 0) >= info.totalItemsCount - 3
         }
     }
+    LaunchedEffect(nearEnd, state.hasMore, state.loadingMore, state.connections.size) {
+        if (nearEnd && state.hasMore && !state.loadingMore) onMore()
+    }
+    LazyColumn(Modifier.fillMaxSize(), state = listState, verticalArrangement = Arrangement.spacedBy(Spacing.xxs), contentPadding = PaddingValues(bottom = Spacing.screenBottom)) {
+        if (state.connections.isEmpty()) item {
+            StateNotice(if (state.discover) stringResource(R.string.cn_nenhuma_pessoa_encontrada) else stringResource(R.string.cn_nenhuma_conexao_encontrada),
+                if (state.query.isNotBlank()) stringResource(R.string.cn_tente_outro_nome_ou_limpe)
+                else if (state.discover) stringResource(R.string.cn_nao_encontramos_pessoas_disponiveis_para)
+                else stringResource(R.string.cn_use_encontrar_pessoas_para_adicionar), icon = AppIcons.users,
+                actions = if (state.query.isNotBlank()) { { PrimaryButton(stringResource(R.string.settings_clear_search), onClear, secondary = true, compact = true) } } else null)
+        }
+        items(state.connections, key = { it.id }) { user -> ConnectionRow(user, { if (onPick != null) onPick(user) else onOpenProfile(user.id) }, loadImage) }
+        if (state.loadingMore) item { InlineLoader() }
+    }
+}
+
+@Composable
+private fun ConnectionRow(connection: Connection, onClick: () -> Unit, loadImage: suspend (String) -> ByteArray?) {
+    ListRow(
+        title = connection.name,
+        subtitle = connection.handle,
+        onClick = onClick,
+        leading = { Avatar(connection.initials, imageUrl = connection.avatarUrl, loadImage = loadImage) },
+    )
 }

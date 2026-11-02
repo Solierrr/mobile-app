@@ -1,7 +1,6 @@
 package com.project.solaria_mobile.core.network.realtime
 
 import com.project.solaria_mobile.core.common.ApiResult
-import com.project.solaria_mobile.core.common.ApplicationScope
 import com.project.solaria_mobile.core.common.ErrorKind
 import com.project.solaria_mobile.core.network.CredentialProvider
 import kotlinx.coroutines.CoroutineScope
@@ -49,7 +48,7 @@ class StompRealtimeClient @Inject constructor(
     private val connector: StompConnector,
     private val endpoint: RealtimeEndpoint,
     private val credentials: CredentialProvider,
-    @ApplicationScope private val scope: CoroutineScope,
+    private val scope: CoroutineScope,
 ) : RealtimeClient {
 
     private val _state = MutableStateFlow<RealtimeState>(RealtimeState.Disconnected)
