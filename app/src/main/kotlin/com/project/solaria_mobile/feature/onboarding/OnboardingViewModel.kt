@@ -5,7 +5,6 @@ import androidx.lifecycle.viewModelScope
 import com.project.solaria_mobile.core.common.ApiResult
 import com.project.solaria_mobile.core.common.ErrorKind
 import com.project.solaria_mobile.feature.discovery.JourneyDraft
-import com.project.solaria_mobile.feature.discovery.domain.WorkJourney
 import com.project.solaria_mobile.feature.discovery.domain.WorkJourneyRepository
 import com.project.solaria_mobile.feature.discovery.draftOf
 import com.project.solaria_mobile.feature.discovery.pendingDays

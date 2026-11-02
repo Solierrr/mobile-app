@@ -11,11 +11,8 @@ import com.project.solaria_mobile.feature.project.domain.ProjectInviteLink
 import com.project.solaria_mobile.feature.project.domain.InviteLinkValidity
 import com.project.solaria_mobile.feature.project.domain.INVITE_LINK_ROLES
 import com.project.solaria_mobile.core.designsystem.components.SegmentedControl
-import androidx.compose.ui.semantics.selected
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.IntrinsicSize
-import androidx.compose.material3.Surface
 import androidx.compose.foundation.layout.navigationBarsPadding
 import com.project.solaria_mobile.core.images.shareImage
 import com.project.solaria_mobile.core.images.saveImageToGallery
@@ -66,7 +63,6 @@ import com.project.solaria_mobile.core.designsystem.components.ListSkeleton
 import androidx.compose.foundation.clickable
 import androidx.compose.material3.Icon
 import androidx.compose.ui.res.painterResource
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.ui.layout.ContentScale
 import com.project.solaria_mobile.core.common.UiState
 import com.project.solaria_mobile.core.designsystem.components.StateNotice
@@ -103,16 +99,7 @@ import com.project.solaria_mobile.feature.project.domain.ProjectPhoto
 import com.project.solaria_mobile.feature.project.domain.ActivityDraft
 import com.project.solaria_mobile.feature.project.domain.ActivityField
 import com.project.solaria_mobile.feature.project.domain.ActivityTypeOption
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.DatePicker
-import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.TimePicker
-import androidx.compose.material3.rememberDatePickerState
-import androidx.compose.material3.rememberTimePickerState
-import java.time.Instant
-import java.time.LocalTime
-import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 import com.project.solaria_mobile.feature.project.domain.ProjectActivity

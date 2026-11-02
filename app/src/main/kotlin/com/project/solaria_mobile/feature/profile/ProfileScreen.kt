@@ -5,9 +5,6 @@ package com.project.solaria_mobile.feature.profile
 import com.project.solaria_mobile.R
 import androidx.compose.ui.res.stringResource
 import com.project.solaria_mobile.core.designsystem.components.AppDialog
-import com.project.solaria_mobile.core.designsystem.components.AppButton
-import com.project.solaria_mobile.core.designsystem.components.ButtonVariant
-import com.project.solaria_mobile.core.designsystem.components.ButtonSize
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -37,7 +34,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.dp
 import com.project.solaria_mobile.core.designsystem.icons.AppIcons
 import com.project.solaria_mobile.core.designsystem.components.ActionRow
 import com.project.solaria_mobile.core.designsystem.components.AvatarPalette
@@ -60,13 +56,11 @@ import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.material3.AlertDialog
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.platform.LocalContext
 import com.project.solaria_mobile.core.designsystem.components.FormField
-import com.project.solaria_mobile.core.designsystem.components.PrimaryButton
 import com.project.solaria_mobile.core.images.readPickedImage
 import com.project.solaria_mobile.feature.profile.domain.ProfilePhotoType
 import com.project.solaria_mobile.feature.profile.domain.UserProfile

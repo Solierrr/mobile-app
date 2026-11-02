@@ -5,7 +5,6 @@ package com.project.solaria_mobile.feature.project
 import com.project.solaria_mobile.R
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
-import com.project.solaria_mobile.core.designsystem.components.SegmentedControl
 import com.project.solaria_mobile.core.designsystem.components.SearchField
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.foundation.layout.PaddingValues
@@ -23,7 +22,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import com.project.solaria_mobile.core.common.UiState
 import com.project.solaria_mobile.core.designsystem.components.ResourceStatus
 import com.project.solaria_mobile.core.designsystem.components.RefreshButton
-import com.project.solaria_mobile.core.designsystem.theme.Elevation
 import com.project.solaria_mobile.core.designsystem.theme.Sizing
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.GridCells

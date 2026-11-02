@@ -7,20 +7,12 @@ import com.project.solaria_mobile.core.designsystem.components.ToastKind
 import com.project.solaria_mobile.core.designsystem.components.rememberToastState
 import com.project.solaria_mobile.core.designsystem.components.AppSwitchRow
 import com.project.solaria_mobile.core.designsystem.components.AppDialog
-import com.project.solaria_mobile.core.designsystem.components.AppButton
-import com.project.solaria_mobile.core.designsystem.components.ButtonVariant
-import com.project.solaria_mobile.core.designsystem.components.ButtonSize
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.selection.toggleable
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.semantics.Role
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import android.content.Intent
@@ -34,13 +26,8 @@ import com.project.solaria_mobile.core.designsystem.components.SheetSize
 import com.project.solaria_mobile.core.locale.AppLanguage
 import com.project.solaria_mobile.core.locale.AppLocale
 import com.project.solaria_mobile.core.locale.findActivity
-import androidx.compose.material3.SnackbarHost
-import androidx.compose.material3.SnackbarHostState
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Text
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Switch
-import androidx.compose.material3.SwitchDefaults
 import androidx.compose.foundation.layout.Box
 import androidx.compose.ui.Alignment
 import androidx.compose.runtime.remember
@@ -63,7 +50,6 @@ import com.project.solaria_mobile.core.designsystem.components.SearchField
 import com.project.solaria_mobile.core.designsystem.components.SectionHeading
 import com.project.solaria_mobile.core.designsystem.theme.Spacing
 import com.project.solaria_mobile.core.designsystem.theme.AppTheme
-import com.project.solaria_mobile.core.designsystem.theme.Radius
 
 @Composable
 fun SettingsRoute(onBack: () -> Unit, onOpenProfile: () -> Unit, onOpenDiagnostics: () -> Unit, onSignOut: () -> Unit, onOnboardingRestarted: () -> Unit = {}, viewModel: SettingsViewModel = hiltViewModel()) {

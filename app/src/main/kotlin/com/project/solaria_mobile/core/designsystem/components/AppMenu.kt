@@ -47,7 +47,6 @@ import androidx.compose.ui.window.PopupProperties
 import com.project.solaria_mobile.core.designsystem.theme.AppTheme
 import com.project.solaria_mobile.core.designsystem.theme.Radius
 import com.project.solaria_mobile.core.designsystem.theme.Spacing
-import com.project.solaria_mobile.core.designsystem.theme.containerFill
 
 private val MenuMinWidth = 208.dp
 private val MenuIconSize = 20.dp

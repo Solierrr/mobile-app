@@ -48,7 +48,6 @@ import java.time.DayOfWeek
 import java.time.LocalTime
 import java.time.format.DateTimeFormatter
 import java.time.format.TextStyle
-import java.util.Locale
 
 private val HOUR = DateTimeFormatter.ofPattern("HH:mm")
 

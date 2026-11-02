@@ -5,9 +5,6 @@ package com.project.solaria_mobile.feature.project
 import com.project.solaria_mobile.core.designsystem.components.localizedStatus
 import com.project.solaria_mobile.R
 import androidx.compose.ui.res.stringResource
-import com.project.solaria_mobile.core.designsystem.components.AppButton
-import com.project.solaria_mobile.core.designsystem.components.ButtonVariant
-import com.project.solaria_mobile.core.designsystem.components.ButtonSize
 import androidx.compose.material3.MaterialTheme
 import com.project.solaria_mobile.core.designsystem.components.ActionTile
 import androidx.compose.foundation.background
@@ -66,12 +63,10 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.foundation.layout.size
 import androidx.compose.ui.Alignment
 import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.rememberUpdatedState
 import com.project.solaria_mobile.core.designsystem.components.SheetSize
 import com.project.solaria_mobile.core.designsystem.components.rememberSheetState
 import androidx.compose.runtime.LaunchedEffect
 import com.project.solaria_mobile.feature.project.domain.ProjectStatusOption
-import com.project.solaria_mobile.core.designsystem.components.PrimaryButton
 
 @Composable
 fun ProjectDetailRoute(

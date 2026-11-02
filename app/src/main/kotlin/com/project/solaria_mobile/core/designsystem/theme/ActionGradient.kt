@@ -4,7 +4,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
 
 /** Degradê dos botões de ação: laranja claro no topo e laranja da marca embaixo, a 177° como no web. */
 fun Modifier.actionGradient(alpha: Float = 1f): Modifier = drawWithCache {

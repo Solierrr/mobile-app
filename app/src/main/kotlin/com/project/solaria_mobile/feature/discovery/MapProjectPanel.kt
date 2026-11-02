@@ -52,7 +52,6 @@ import com.project.solaria_mobile.core.designsystem.theme.Radius
 import com.project.solaria_mobile.core.designsystem.theme.Sizing
 import com.project.solaria_mobile.core.designsystem.theme.Spacing
 import com.project.solaria_mobile.feature.project.domain.ProjectSummary
-import com.project.solaria_mobile.feature.project.domain.hasCoordinates
 import com.project.solaria_mobile.feature.project.ProjectCardImage
 import com.project.solaria_mobile.feature.project.projectStatusTint
 import com.project.solaria_mobile.core.designsystem.components.StatusBadge

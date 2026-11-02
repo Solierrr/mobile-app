@@ -12,7 +12,6 @@ import com.project.solaria_mobile.feature.discovery.withAllHours
 import com.project.solaria_mobile.feature.discovery.withHours
 import com.project.solaria_mobile.feature.discovery.domain.WorkJourney
 import com.project.solaria_mobile.feature.discovery.domain.WorkShift
-import com.project.solaria_mobile.feature.discovery.journeyOf
 import com.project.solaria_mobile.feature.discovery.draftOf
 import com.project.solaria_mobile.feature.discovery.preset
 import com.project.solaria_mobile.feature.discovery.withPreset
