@@ -47,8 +47,11 @@ fun CallsBottomSheet(
                 StateNotice(message.title, message.description, icon = AppIcons.phone,
                     actions = if (message.canRetry) { { PrimaryButton(stringResource(R.string.cb_ver_todos_os_chamados), onOpenAll, compact = true) } } else null)
             } else {
-                SearchField(stringResource(R.string.cl_buscar_chamado), query, onQueryChange)
-                SectionHeading(stringResource(R.string.cl_recentes), faded = true, action = stringResource(R.string.hm_ver_todos), navigation = true, onAction = onOpenAll)
+                // Sem nenhum chamado não há o que buscar nem listar; fica só o aviso.
+                if (calls.isNotEmpty() || query.isNotBlank()) {
+                    SearchField(stringResource(R.string.cl_buscar_chamado), query, onQueryChange)
+                    SectionHeading(stringResource(R.string.cl_recentes), faded = true, action = stringResource(R.string.hm_ver_todos), navigation = true, onAction = onOpenAll)
+                }
                 if (calls.isEmpty()) StateNotice(
                     if (query.isBlank()) stringResource(R.string.cb_nenhum_chamado_ainda) else stringResource(R.string.cb_nenhum_chamado_encontrado),
                     if (query.isBlank()) stringResource(R.string.cb_seus_chamados_aparecerao_aqui) else stringResource(R.string.settings_no_results_description),
