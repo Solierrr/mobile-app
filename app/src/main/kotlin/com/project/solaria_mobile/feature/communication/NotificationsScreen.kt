@@ -4,7 +4,7 @@ package com.project.solaria_mobile.feature.communication
 
 import com.project.solaria_mobile.R
 import androidx.compose.ui.res.stringResource
-import com.project.solaria_mobile.core.designsystem.components.SegmentedControl
+import com.project.solaria_mobile.core.designsystem.components.SelectableChip
 import com.project.solaria_mobile.core.designsystem.components.AppCard
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -181,7 +181,10 @@ private fun NotificationsHeader(
             if ((state.unreadCount ?: 0) > 0) RoundIconButton(AppIcons.check, stringResource(R.string.nt_marcar_todas_como_lidas), onReadAll, enabled = !busy)
         })
         onEnablePush?.let { enable -> PrimaryButton(stringResource(R.string.nt_ativar_avisos_no_aparelho), enable, secondary = true, compact = true) }
-        SegmentedControl(listOf(stringResource(R.string.nt_todas), stringResource(R.string.nt_nao_lidas)), if (state.unreadOnly) 1 else 0, { onFilter(it == 1) }, enabled = !busy)
+        androidx.compose.foundation.layout.Row(horizontalArrangement = Arrangement.spacedBy(Spacing.xs)) {
+            SelectableChip(stringResource(R.string.nt_todas), !state.unreadOnly, { onFilter(false) }, enabled = !busy)
+            SelectableChip(stringResource(R.string.nt_nao_lidas), state.unreadOnly, { onFilter(true) }, enabled = !busy)
+        }
         state.unreadCount?.let { count ->
             if (count > 0) Text(if (count == 1L) stringResource(R.string.nt_1_notificacao_nao_lida) else "$count notificações não lidas",
                 style = MaterialTheme.typography.bodyMedium, color = AppTheme.colors.onSurfaceMuted)
