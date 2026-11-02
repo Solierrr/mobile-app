@@ -48,7 +48,6 @@
     <string name="common_edit">Edit</string>
     <string name="common_try_again">Try again</string>
     <string name="step_flow_step_of">Step %1$d of %2$d</string>
-    <string name="step_flow_step_label">Step %1$d of %2$d · %3$s</string>
     <string name="step_flow_exit_title">Leave without finishing?</string>
     <string name="step_flow_exit_message">What you filled in so far will be discarded.</string>
     <string name="step_flow_exit_confirm">Leave</string>

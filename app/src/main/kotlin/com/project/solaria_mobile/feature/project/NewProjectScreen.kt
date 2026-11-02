@@ -80,7 +80,6 @@ fun NewProjectScreen(
     var step by rememberSaveable { mutableIntStateOf(STEP_DATA) }
     val addressErrors = state.errors.mapNotNull { it.toAddressField() }.toSet()
     StepFlow(
-        title = if (state.editing) stringResource(R.string.pd_editar_projeto) else stringResource(R.string.pd_novo_projeto),
         steps = steps(),
         step = step,
         onStepChange = { step = it },

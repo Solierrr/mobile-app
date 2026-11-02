@@ -98,7 +98,6 @@ private fun OnboardingScreen(state: OnboardingUiState, viewModel: OnboardingView
     // O endereço só cobra os campos obrigatórios depois que a pessoa chega à revisão.
     var reviewed by rememberSaveable { mutableIntStateOf(0) }
     StepFlow(
-        title = stringResource(R.string.onboarding_title),
         steps = parts.map { stringResource(it.label) },
         step = step,
         onStepChange = { step = it },
@@ -125,9 +124,6 @@ private fun OnboardingScreen(state: OnboardingUiState, viewModel: OnboardingView
         onFinish = viewModel::complete,
         busy = state.saving,
         canFinish = state.canComplete,
-        stepTitles = true,
-        showStepLabel = false,
-        bottomBack = false,
         canExit = false,
         footer = {
             state.failure?.let { Text(it.userMessage(), color = AppTheme.colors.danger, style = MaterialTheme.typography.bodyMedium) }

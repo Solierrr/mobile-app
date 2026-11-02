@@ -48,7 +48,6 @@
     <string name="common_edit">Editar</string>
     <string name="common_try_again">Tentar novamente</string>
     <string name="step_flow_step_of">Passo %1$d de %2$d</string>
-    <string name="step_flow_step_label">Passo %1$d de %2$d · %3$s</string>
     <string name="step_flow_exit_title">Sair sem concluir?</string>
     <string name="step_flow_exit_message">O que você preencheu até aqui será descartado.</string>
     <string name="step_flow_exit_confirm">Sair</string>
