@@ -22,9 +22,12 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.project.solaria_mobile.core.designsystem.theme.AppColors
+import androidx.compose.ui.draw.clip
 import com.project.solaria_mobile.core.designsystem.theme.AppTheme
+import com.project.solaria_mobile.core.designsystem.theme.actionGradient
 import com.project.solaria_mobile.core.designsystem.theme.Radius
 import com.project.solaria_mobile.core.designsystem.theme.Sizing
 import com.project.solaria_mobile.core.designsystem.theme.Spacing
@@ -37,8 +40,8 @@ data class ButtonPalette(val container: Color, val content: Color, val border: C
 
 fun buttonPalette(variant: ButtonVariant, colors: AppColors): ButtonPalette = when (variant) {
     ButtonVariant.Primary -> ButtonPalette(colors.action, colors.onAccent, null)
-    ButtonVariant.Secondary -> ButtonPalette(colors.surface, colors.onSurface, colors.outline)
-    ButtonVariant.Text -> ButtonPalette(Color.Transparent, colors.action, null)
+    ButtonVariant.Secondary -> ButtonPalette(colors.inputFill, colors.onSurface, null)
+    ButtonVariant.Text -> ButtonPalette(Color.Transparent, colors.brandStrong, null)
     ButtonVariant.Destructive -> ButtonPalette(colors.danger, colors.onAccent, null)
 }
 
@@ -60,20 +63,24 @@ fun AppButton(
 ) {
     val palette = buttonPalette(variant, AppTheme.colors)
     val interactive = buttonInteractive(enabled, loading)
+    // O botão primário é o degradê laranja da marca; o Material só desenha o toque e o conteúdo por cima.
+    val gradient = variant == ButtonVariant.Primary
+    val shape = RoundedCornerShape(Radius.medium)
     androidx.compose.material3.Button(
         onClick = onClick,
         enabled = interactive,
         modifier = modifier
             .then(if (fillWidth) Modifier.fillMaxWidth() else Modifier)
             .heightIn(min = buttonMinHeight(size))
+            .then(if (gradient) Modifier.clip(shape).actionGradient(if (interactive) 1f else DISABLED_ALPHA) else Modifier)
             .semantics { if (loading) stateDescription = "Carregando" },
         contentPadding = PaddingValues(horizontal = Spacing.xl, vertical = if (size == ButtonSize.Large) Spacing.md else Spacing.sm),
-        shape = RoundedCornerShape(Radius.medium),
+        shape = shape,
         border = palette.border?.let { BorderStroke(Sizing.hairline, it) },
         colors = ButtonDefaults.buttonColors(
-            containerColor = palette.container,
+            containerColor = if (gradient) Color.Transparent else palette.container,
             contentColor = palette.content,
-            disabledContainerColor = palette.container.copy(alpha = DISABLED_ALPHA),
+            disabledContainerColor = if (gradient) Color.Transparent else palette.container.copy(alpha = DISABLED_ALPHA),
             disabledContentColor = palette.content.copy(alpha = DISABLED_ALPHA),
         ),
     ) {
@@ -89,7 +96,7 @@ fun AppButton(
                 Icon(painterResource(leadingIcon), contentDescription = null, modifier = Modifier.size(Sizing.iconSmall - 4.dp))
                 Spacer(Modifier.width(Spacing.xs))
             }
-            Text(text, style = MaterialTheme.typography.titleSmall)
+            Text(text, style = MaterialTheme.typography.titleSmall, textAlign = TextAlign.Center)
         }
     }
 }

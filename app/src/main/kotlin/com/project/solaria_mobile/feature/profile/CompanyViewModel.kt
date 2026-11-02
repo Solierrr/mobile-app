@@ -9,7 +9,6 @@ import com.project.solaria_mobile.core.common.UiState
 import com.project.solaria_mobile.core.common.collectRead
 import com.project.solaria_mobile.feature.profile.domain.CompanyProfile
 import com.project.solaria_mobile.feature.profile.domain.ProfileRepository
-import com.project.solaria_mobile.feature.profile.domain.companyFromProjects
 import com.project.solaria_mobile.feature.project.domain.ProjectRepository
 import com.project.solaria_mobile.presentation.navigation.routeIdOrNull
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -21,6 +20,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
+import com.project.solaria_mobile.feature.profile.domain.companyProfile
 
 @HiltViewModel
 class CompanyViewModel @Inject constructor(
@@ -51,10 +51,12 @@ class CompanyViewModel @Inject constructor(
                 state.value = UiState.Empty
                 return@launch
             }
+            val catalog = (profiles.companyCatalog() as? ApiResult.Success)?.data
+            val photos = (profiles.companyPhotos(id) as? ApiResult.Success)?.data
             state.collectRead(projects.observeProjects().map { read ->
                 val result = when (val source = read.result) {
-                    is ApiResult.Failure -> source
-                    is ApiResult.Success -> companyFromProjects(id, source.data)?.let { ApiResult.Success(it) }
+                    is ApiResult.Failure -> catalog?.let { companyProfile(id, it, emptyList()) }?.let { ApiResult.Success(it.copy(logoUrl = photos?.logoUrl, bannerUrl = photos?.bannerUrl)) } ?: source
+                    is ApiResult.Success -> companyProfile(id, catalog, source.data)?.let { ApiResult.Success(it.copy(logoUrl = it.logoUrl ?: photos?.logoUrl, bannerUrl = photos?.bannerUrl)) }
                         ?: ApiResult.Success(CompanyProfile(id, "Empresa vinculada", null, emptyList(), detailsAvailable = false))
                 }
                 ReadResult(result, read.syncedAt, read.cached, read.refreshing, read.refreshError)

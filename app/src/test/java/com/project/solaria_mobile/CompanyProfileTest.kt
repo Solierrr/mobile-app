@@ -17,6 +17,10 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Rule
 import org.junit.Test
+import com.project.solaria_mobile.feature.profile.domain.CatalogCompany
+import com.project.solaria_mobile.feature.profile.domain.companyProfile
+import com.project.solaria_mobile.feature.profile.domain.ProfileRepository
+import org.junit.Assert.assertTrue
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class CompanyProfileTest {
@@ -50,4 +54,32 @@ class CompanyProfileTest {
         advanceUntilIdle()
         assertEquals("c2", (model.uiState.value as UiState.Content).data.id)
     }
+    @Test fun companyWithoutProjectsKeepsItsCatalogIdentity() {
+        val company = companyProfile("c9", listOf(CatalogCompany("c9", "Solar Norte", "Recife, PE")), emptyList())!!
+        assertEquals("Solar Norte", company.name)
+        assertEquals("Recife, PE", company.place)
+        assertEquals(emptyList<ProjectSummary>(), company.projects)
+        assertTrue(company.detailsAvailable)
+    }
+
+    @Test fun companyOutsideTheCatalogAndProjectsIsUnavailable() {
+        assertNull(companyProfile("x", listOf(CatalogCompany("c9", "Solar Norte", "")), listOf(project("a", "c1"))))
+    }
+
+    @Test fun screenUsesTheCatalogNameAndTheLinkedProjects() = runTest {
+        val repository = object : ProjectRepository {
+            override suspend fun projects() = ApiResult.Success(listOf(project("a", "c1"), project("b", "c2")))
+            override suspend fun project(id: String) = ApiResult.Failure(ErrorKind.NOT_FOUND)
+            override suspend fun create(draft: NewProjectDraft) = ApiResult.Failure(ErrorKind.FORBIDDEN)
+        }
+        val profiles = object : ProfileRepository by FakeProfileRepository() {
+            override suspend fun companyCatalog() = ApiResult.Success(listOf(CatalogCompany("c1", "Solar Sul", "Curitiba, PR")))
+        }
+        val model = CompanyViewModel(SavedStateHandle(mapOf("id" to "c1")), repository, profiles)
+        advanceUntilIdle()
+        val company = (model.uiState.value as UiState.Content).data
+        assertEquals("Solar Sul", company.name)
+        assertEquals(listOf("a"), company.projects.map { it.id })
+    }
+
 }

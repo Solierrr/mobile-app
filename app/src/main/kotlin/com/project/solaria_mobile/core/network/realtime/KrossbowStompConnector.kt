@@ -1,5 +1,6 @@
 package com.project.solaria_mobile.core.network.realtime
 
+import com.project.solaria_mobile.core.auth.accessTokenSubject
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.flow
@@ -52,7 +53,7 @@ class KrossbowStompConnector @Inject constructor(
             // Um frame ERROR durante o CONNECT só acontece por recusa de autenticação
             throw authFailureOf(e)?.let { StompAuthException(it, e) } ?: e
         }
-        return KrossbowStompLink(session)
+        return KrossbowStompLink(session, accessTokenSubject(token))
     }
 
     private companion object {
@@ -62,6 +63,7 @@ class KrossbowStompConnector @Inject constructor(
 
 private class KrossbowStompLink(
     private val session: StompSession,
+    private val userId: String?,
 ) : StompLink {
 
     override fun subscribe(destination: String): Flow<String> =
@@ -75,18 +77,20 @@ private class KrossbowStompLink(
         session.disconnect()
     }
 
-    override suspend fun awaitLoss(): AuthFailure? =
-        try {
-            session.subscribeText(PERSONAL_ERRORS_QUEUE).collect { }
+    /**
+     * Fica na fila de erros da própria conta (`/topic/users.{id}.errors`, a única que o messenger permite assinar para isso)
+     * até a sessão cair. Sem identificador no token não há fila para assinar.
+     */
+    override suspend fun awaitLoss(): AuthFailure? {
+        val destination = userId?.let { "/topic/users.$it.errors" } ?: return AuthFailure.TOKEN_REJECTED
+        return try {
+            session.subscribeText(destination).collect { }
             null
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
             authFailureOf(e)
         }
-
-    private companion object {
-        const val PERSONAL_ERRORS_QUEUE = "/user/queue/errors"
     }
 }
 

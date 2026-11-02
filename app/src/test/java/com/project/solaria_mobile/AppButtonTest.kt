@@ -16,9 +16,9 @@ import org.junit.Test
 
 class AppButtonTest {
     @Test
-    fun primaryUsesActionColor() {
+    fun primaryUsesTheBrandColor() {
         val palette = buttonPalette(ButtonVariant.Primary, LightAppColors)
-        assertEquals(LightAppColors.action, palette.container)
+        assertEquals(com.project.solaria_mobile.core.designsystem.theme.Brand.base, palette.container)
         assertEquals(LightAppColors.onAccent, palette.content)
         assertNull(palette.border)
     }
@@ -29,8 +29,10 @@ class AppButtonTest {
     }
 
     @Test
-    fun secondaryHasBorder() {
-        assertNotNull(buttonPalette(ButtonVariant.Secondary, LightAppColors).border)
+    fun secondaryIsSoftFillWithoutBorder() {
+        val palette = buttonPalette(ButtonVariant.Secondary, LightAppColors)
+        assertEquals(LightAppColors.inputFill, palette.container)
+        assertNull(palette.border)
     }
 
     @Test

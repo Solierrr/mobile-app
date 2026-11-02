@@ -1,5 +1,8 @@
 package com.project.solaria_mobile.feature.project
 
+import androidx.compose.ui.graphics.RectangleShape
+import androidx.compose.foundation.layout.PaddingValues
+import com.project.solaria_mobile.core.designsystem.components.ListRow
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -23,6 +26,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.project.solaria_mobile.core.designsystem.icons.AppIcons
 import com.project.solaria_mobile.core.designsystem.theme.AppTheme
+import com.project.solaria_mobile.core.designsystem.theme.containerFill
 import com.project.solaria_mobile.core.designsystem.theme.Radius
 import com.project.solaria_mobile.core.designsystem.theme.Sizing
 import com.project.solaria_mobile.core.designsystem.theme.Spacing
@@ -30,19 +34,19 @@ import com.project.solaria_mobile.feature.project.domain.ProjectSummary
 
 @Composable
 fun RecentProjectItem(project: ProjectSummary, onClick: () -> Unit, modifier: Modifier = Modifier) {
-    Surface(onClick = onClick, modifier = modifier.fillMaxWidth(), color = AppTheme.colors.inputFill) {
-        Row(Modifier.padding(vertical = Spacing.md, horizontal = Spacing.sm), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-            ProjectCardImage(project.id, Modifier.width(64.dp).height(72.dp).clip(RoundedCornerShape(Radius.medium)), contentScale = ContentScale.Crop)
-            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(Spacing.xxs)) {
-                Text(project.displayName, style = MaterialTheme.typography.titleSmall, color = AppTheme.colors.onSurface, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                Column {
-                    if (project.companyName.isNotBlank()) Text(project.companyName, style = MaterialTheme.typography.bodyMedium, color = AppTheme.colors.onSurfaceMuted, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    if (project.place.isNotBlank()) Text(project.place, style = MaterialTheme.typography.bodyMedium, color = AppTheme.colors.onSurfaceMuted, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                }
-            }
-            Icon(painterResource(AppIcons.chevron_right), null, Modifier.size(Sizing.icon), tint = AppTheme.colors.onSurfaceMuted)
-        }
-    }
+    ListRow(
+        title = project.displayName,
+        subtitle = project.companyName,
+        supporting = project.place,
+        onClick = onClick,
+        modifier = modifier,
+        leading = { ProjectCardImage(project.id, Modifier.width(Sizing.thumbnailWidth).height(Sizing.thumbnailHeight).clip(RoundedCornerShape(Radius.medium)), contentScale = ContentScale.Crop) },
+        trailing = { Icon(painterResource(AppIcons.chevron_right), null, Modifier.size(Sizing.icon), tint = AppTheme.colors.onSurfaceMuted) },
+        container = containerFill(),
+        shape = RectangleShape,
+        contentPadding = PaddingValues(vertical = Spacing.md, horizontal = Spacing.sm),
+        titleMaxLines = 2,
+    )
 }
 
 internal val ProjectSummary.displayName: String

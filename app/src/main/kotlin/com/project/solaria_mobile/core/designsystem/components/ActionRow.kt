@@ -18,6 +18,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextOverflow
 import com.project.solaria_mobile.core.designsystem.theme.AppTheme
+import com.project.solaria_mobile.core.designsystem.theme.containerFill
 import com.project.solaria_mobile.core.designsystem.theme.Spacing
 import com.project.solaria_mobile.core.designsystem.theme.Sizing
 import com.project.solaria_mobile.core.designsystem.theme.Radius
@@ -32,12 +33,14 @@ fun ActionRow(
     trailing: String? = null,
     subtitle: String? = null,
     compact: Boolean = false,
+    enabled: Boolean = true,
 ) {
     Surface(
         modifier = modifier.fillMaxWidth(),
         onClick = onClick,
+        enabled = enabled,
         shape = RoundedCornerShape(Radius.medium),
-        color = AppTheme.colors.inputFill,
+        color = containerFill(),
     ) {
         Row(
             modifier = Modifier

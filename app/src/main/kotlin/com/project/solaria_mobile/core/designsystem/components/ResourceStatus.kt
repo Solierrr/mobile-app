@@ -1,5 +1,7 @@
 package com.project.solaria_mobile.core.designsystem.components
 
+import com.project.solaria_mobile.R
+import androidx.compose.ui.res.stringResource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.material3.MaterialTheme
@@ -14,7 +16,7 @@ import com.project.solaria_mobile.core.offline.LocalOffline
 fun ResourceStatus(state: UiState.Content<*>) {
     if (LocalOffline.current || state.refreshError == null) return
     Column(verticalArrangement = Arrangement.spacedBy(Spacing.xxs)) {
-        Text("Você está vendo os dados salvos", style = MaterialTheme.typography.titleSmall, color = AppTheme.colors.onSurface)
-        Text("Não conseguimos atualizar agora. Você pode continuar consultando este conteúdo.", style = MaterialTheme.typography.bodyMedium, color = AppTheme.colors.onSurfaceMuted)
+        Text(stringResource(R.string.rs_voce_esta_vendo_os_dados), style = MaterialTheme.typography.titleSmall, color = AppTheme.colors.onSurface)
+        Text(stringResource(R.string.rs_nao_conseguimos_atualizar_agora_voce), style = MaterialTheme.typography.bodyMedium, color = AppTheme.colors.onSurfaceMuted)
     }
 }

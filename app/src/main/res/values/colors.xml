@@ -1,10 +1,29 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="purple_200">#FFBB86FC</color>
-    <color name="purple_500">#FF6200EE</color>
-    <color name="purple_700">#FF3700B3</color>
-    <color name="teal_200">#FF03DAC5</color>
-    <color name="teal_700">#FF018786</color>
-    <color name="black">#FF000000</color>
-    <color name="white">#FFFFFFFF</color>
+    <!-- Laranja da marca em escala tonal. Os mesmos valores estão em core/designsystem/theme/BrandPalette.kt. -->
+    <color name="brand_50">#FFFFF3EA</color>
+    <color name="brand_100">#FFFFE4D1</color>
+    <color name="brand_200">#FFFFC9A3</color>
+    <color name="brand_300">#FFFF9B52</color>
+    <color name="brand_400">#FFFF8A3D</color>
+    <color name="brand_500">#FFFF650A</color>
+    <color name="brand_600">#FFE85505</color>
+    <color name="brand_700">#FFC2410C</color>
+    <color name="brand_800">#FF9A3412</color>
+    <color name="brand_900">#FF7C2D12</color>
+
+    <!-- Funções -->
+    <color name="brand_flat">#FFFF8236</color>
+    <color name="brand_primary">@color/brand_flat</color>
+    <color name="brand_primary_highlight">@color/brand_300</color>
+    <color name="brand_primary_text">@color/brand_700</color>
+    <color name="brand_primary_container">@color/brand_50</color>
+
+    <!-- Neutros e estados -->
+    <color name="surface">#FFFFFFFF</color>
+    <color name="on_surface">#FF202124</color>
+    <color name="on_surface_muted">#FF686B70</color>
+    <color name="outline">#FFE6E7E9</color>
+    <color name="danger">#FFB42318</color>
+    <color name="success">#FF217A50</color>
 </resources>

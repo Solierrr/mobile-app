@@ -16,7 +16,7 @@ import com.project.solaria_mobile.core.designsystem.theme.Spacing
 @Composable
 fun ScreenTitle(
     title: String,
-    onBack: () -> Unit,
+    onBack: (() -> Unit)?,
     modifier: Modifier = Modifier,
     @DrawableRes trailingIcon: Int? = null,
     trailingLabel: String? = null,
@@ -28,11 +28,13 @@ fun ScreenTitle(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(Spacing.md),
     ) {
-        RoundIconButton(
-            icon = AppIcons.chevron_left,
-            contentDescription = "Voltar",
-            onClick = onBack,
-        )
+        if (onBack != null) {
+            RoundIconButton(
+                icon = AppIcons.chevron_left,
+                contentDescription = "Voltar",
+                onClick = onBack,
+            )
+        }
         Text(
             text = title,
             modifier = Modifier.weight(1f),

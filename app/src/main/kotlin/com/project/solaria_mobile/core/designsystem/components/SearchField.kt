@@ -5,13 +5,12 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -36,11 +35,11 @@ fun SearchField(
 ) {
     Surface(
         modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(Radius.medium),
+        shape = RoundedCornerShape(Radius.pill),
         color = AppTheme.colors.inputFill,
     ) {
         Row(
-            modifier = Modifier.height(Sizing.actionHeight).padding(horizontal = Spacing.md),
+            modifier = Modifier.heightIn(min = Sizing.touchTarget).padding(horizontal = Spacing.md),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
         ) {
@@ -72,14 +71,7 @@ fun SearchField(
                 },
             )
             if (trailingIcon != null && onTrailingClick != null) {
-                IconButton(onClick = onTrailingClick, modifier = Modifier.size(Sizing.touchTarget)) {
-                    Icon(
-                        painter = painterResource(trailingIcon),
-                        contentDescription = "Filtrar",
-                        tint = AppTheme.colors.onSurfaceMuted,
-                        modifier = Modifier.size(Sizing.iconSmall),
-                    )
-                }
+                RoundIconButton(trailingIcon, "Filtrar", onTrailingClick, background = androidx.compose.ui.graphics.Color.Transparent, tint = AppTheme.colors.onSurfaceMuted)
             }
         }
     }

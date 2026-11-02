@@ -1,6 +1,6 @@
 package com.project.solaria_mobile.core.designsystem.components
 
-import androidx.compose.foundation.BorderStroke
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -10,19 +10,30 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.foundation.layout.defaultMinSize
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.material3.Text
+import androidx.compose.foundation.border
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import com.project.solaria_mobile.core.designsystem.theme.actionGradient
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.unit.dp
 import com.project.solaria_mobile.core.designsystem.theme.AppTheme
 import com.project.solaria_mobile.core.designsystem.theme.Radius
 import com.project.solaria_mobile.core.designsystem.theme.Spacing
 import com.project.solaria_mobile.core.designsystem.theme.Sizing
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun FormField(
     label: String,
@@ -36,31 +47,61 @@ fun FormField(
     keyboardType: KeyboardType = KeyboardType.Text,
     imeAction: ImeAction = ImeAction.Next,
     enabled: Boolean = true,
+    focusRequester: androidx.compose.ui.focus.FocusRequester? = null,
+    visualTransformation: androidx.compose.ui.text.input.VisualTransformation = androidx.compose.ui.text.input.VisualTransformation.None,
 ) {
     Column(modifier = modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
-        OutlinedTextField(
+        // Campo preenchido sem contorno: o rótulo é o placeholder enquanto vazio e sobe para o topo do próprio campo ao digitar.
+        // Só o erro ganha borda; em foco o campo não muda de aparência além do cursor e da cor do rótulo.
+        val shape = androidx.compose.foundation.shape.RoundedCornerShape(Radius.medium)
+        val clear = androidx.compose.ui.graphics.Color.Transparent
+        val interaction = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
+        val colors = TextFieldDefaults.colors(
+            focusedContainerColor = AppTheme.colors.inputFill,
+            unfocusedContainerColor = AppTheme.colors.inputFill,
+            disabledContainerColor = AppTheme.colors.inputFill,
+            errorContainerColor = AppTheme.colors.inputFill,
+            focusedIndicatorColor = clear,
+            unfocusedIndicatorColor = clear,
+            disabledIndicatorColor = clear,
+            errorIndicatorColor = clear,
+            focusedLabelColor = AppTheme.colors.onSurfaceMuted,
+            errorLabelColor = AppTheme.colors.danger,
+        )
+        val errorBorder = if (error != null) Modifier.border(1.5.dp, AppTheme.colors.danger, shape) else Modifier
+        BasicTextField(
             value = value,
             onValueChange = { if (it.length <= maxLength) onValueChange(it) },
-            modifier = Modifier.fillMaxWidth(),
-            label = { Text(label) },
+            modifier = Modifier.fillMaxWidth().defaultMinSize(minHeight = TextFieldDefaults.MinHeight).clip(shape).then(errorBorder)
+                .then(if (focusRequester != null) Modifier.focusRequester(focusRequester) else Modifier),
+            enabled = enabled,
             singleLine = singleLine,
             minLines = minLines,
-            enabled = enabled,
-            isError = error != null,
-            shape = androidx.compose.foundation.shape.RoundedCornerShape(Radius.medium),
+            textStyle = MaterialTheme.typography.bodyLarge.copy(color = AppTheme.colors.onSurface),
+            cursorBrush = androidx.compose.ui.graphics.SolidColor(AppTheme.colors.onSurface),
             keyboardOptions = KeyboardOptions(keyboardType = keyboardType, imeAction = imeAction),
-            colors = OutlinedTextFieldDefaults.colors(
-                focusedBorderColor = AppTheme.colors.primary,
-                unfocusedBorderColor = androidx.compose.ui.graphics.Color.Transparent,
-                focusedContainerColor = AppTheme.colors.inputFill,
-                unfocusedContainerColor = AppTheme.colors.inputFill,
-                focusedLabelColor = AppTheme.colors.primary,
-                errorBorderColor = AppTheme.colors.danger,
-                errorLabelColor = AppTheme.colors.danger,
-            ),
+            visualTransformation = visualTransformation,
+            interactionSource = interaction,
+            decorationBox = { inner ->
+                TextFieldDefaults.DecorationBox(
+                    value = value,
+                    innerTextField = inner,
+                    enabled = enabled,
+                    singleLine = singleLine,
+                    visualTransformation = visualTransformation,
+                    interactionSource = interaction,
+                    isError = error != null,
+                    label = { Text(label) },
+                    shape = shape,
+                    colors = colors,
+                    // Menos espaço acima do rótulo sobe o texto pequeno; o de baixo compensa para o campo não encolher.
+                    contentPadding = TextFieldDefaults.contentPaddingWithLabel(top = 4.dp, bottom = 12.dp),
+                    container = { TextFieldDefaults.Container(enabled, error != null, interaction, Modifier, colors, shape) },
+                )
+            },
         )
         if (error != null) {
-            Text(error, color = AppTheme.colors.danger, style = MaterialTheme.typography.bodySmall)
+            Appear { Text(error, color = AppTheme.colors.danger, style = MaterialTheme.typography.bodySmall) }
         }
     }
 }
@@ -74,18 +115,12 @@ fun PrimaryButton(
     secondary: Boolean = false,
     compact: Boolean = false,
 ) {
-    Button(
+    AppButton(
+        text = text,
         onClick = onClick,
+        modifier = modifier,
+        variant = if (secondary) ButtonVariant.Secondary else ButtonVariant.Primary,
+        size = if (compact) ButtonSize.Medium else ButtonSize.Large,
         enabled = enabled,
-        modifier = modifier.then(if (compact) Modifier else Modifier.fillMaxWidth()).heightIn(min = if (compact) Sizing.touchTarget else Sizing.actionHeight),
-        contentPadding = PaddingValues(horizontal = Spacing.xl, vertical = if (compact) Spacing.sm else Spacing.md),
-        shape = androidx.compose.foundation.shape.RoundedCornerShape(Radius.medium),
-        border = if (secondary) BorderStroke(1.dp, AppTheme.colors.outline) else null,
-        colors = ButtonDefaults.buttonColors(
-            containerColor = if (secondary) AppTheme.colors.surface else AppTheme.colors.primary,
-            contentColor = if (secondary) AppTheme.colors.onSurface else AppTheme.colors.onAccent,
-        ),
-    ) {
-        Text(text, style = MaterialTheme.typography.titleSmall)
-    }
+    )
 }

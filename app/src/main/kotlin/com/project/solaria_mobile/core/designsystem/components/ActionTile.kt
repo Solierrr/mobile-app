@@ -24,7 +24,7 @@ import com.project.solaria_mobile.core.designsystem.theme.Spacing
 @Composable
 fun ActionTile(title: String, @DrawableRes icon: Int, onClick: () -> Unit, modifier: Modifier = Modifier) {
     Surface(onClick = onClick, modifier = modifier, shape = RoundedCornerShape(Radius.medium), color = AppTheme.colors.inputFill) {
-        Column(Modifier.fillMaxWidth().defaultMinSize(minHeight = 96.dp).padding(Spacing.md), verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+        Column(Modifier.fillMaxWidth().defaultMinSize(minHeight = Sizing.tile).padding(Spacing.md), verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
             Icon(painterResource(icon), null, Modifier.size(Sizing.icon), tint = AppTheme.colors.onSurface)
             Text(title, style = MaterialTheme.typography.bodyLarge, color = AppTheme.colors.onSurface)
         }

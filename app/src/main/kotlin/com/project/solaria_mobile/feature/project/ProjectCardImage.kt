@@ -10,14 +10,18 @@ import com.project.solaria_mobile.core.designsystem.components.RemoteImage
 import com.project.solaria_mobile.feature.project.domain.ProjectDetailRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
-import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.last
+import kotlinx.coroutines.flow.transformWhile
 
 @HiltViewModel
 class ProjectImageViewModel @Inject constructor(private val repository: ProjectDetailRepository) : ViewModel() {
     suspend fun cover(id: String): ByteArray? {
-        val photos = repository.observePhotos(id).first().result as? ApiResult.Success ?: return null
+        // Espera a atualização terminar: a primeira emissão pode ser a lista antiga do cache, com a capa já trocada.
+        val result = repository.observePhotos(id).transformWhile { emit(it); it.refreshing }.last().result
+        val photos = result as? ApiResult.Success ?: throw java.io.IOException("Não foi possível carregar as fotos")
         val photo = photos.data.firstOrNull { it.cover } ?: photos.data.firstOrNull() ?: return null
         return (repository.photoContent(id, photo.id) as? ApiResult.Success)?.data
+            ?: throw java.io.IOException("Não foi possível carregar a imagem")
     }
 }
 

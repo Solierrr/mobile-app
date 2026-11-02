@@ -23,7 +23,7 @@ fun CountBadge(value: String, modifier: Modifier = Modifier) {
     ) {
         Text(
             text = value,
-            color = AppTheme.colors.primary,
+            color = AppTheme.colors.brandStrong,
             style = androidx.compose.material3.MaterialTheme.typography.labelMedium,
         )
     }

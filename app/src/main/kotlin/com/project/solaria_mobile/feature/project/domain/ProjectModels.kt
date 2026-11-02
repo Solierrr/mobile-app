@@ -23,3 +23,19 @@ fun ProjectSummary.hasCoordinates(): Boolean {
         java.time.OffsetDateTime.parse(geocodedAt).isAfter(java.time.OffsetDateTime.now().minusDays(29))
     }.getOrDefault(false)
 }
+
+/** Situações aceitas pelo api-core; `label` é o texto mostrado no app. */
+enum class ProjectStatusOption(val api: String, val label: String) {
+    OPEN("OPEN", "Aberto"),
+    IN_PROGRESS("IN_PROGRESS", "Em andamento"),
+    COMPLETED("COMPLETED", "Concluído"),
+    CANCELED("CANCELED", "Cancelado"),
+    ;
+
+    /** Concluir ou cancelar exige que atividades e serviços do projeto estejam encerrados. */
+    val closes: Boolean get() = this == COMPLETED || this == CANCELED
+
+    companion object {
+        fun fromLabel(label: String): ProjectStatusOption? = entries.firstOrNull { it.label == label }
+    }
+}

@@ -31,6 +31,9 @@ fun Avatar(
     loadImage: (suspend (String) -> ByteArray?)? = null,
     textColor: Color = AppTheme.colors.onSurface,
     imageContentScale: ContentScale = ContentScale.Crop,
+    contentPadding: Dp = 0.dp,
+    /** Silhueta no lugar das iniciais, para quem ainda não tem foto: um modelo vazio de usuário. */
+    @androidx.annotation.DrawableRes placeholderIcon: Int? = null,
 ) {
     Box(modifier = modifier.size(size)) {
         Box(
@@ -42,11 +45,12 @@ fun Avatar(
         ) {
             val fallback: @Composable () -> Unit = {
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Text(initials, color = textColor, style = androidx.compose.material3.MaterialTheme.typography.titleMedium)
+                    if (placeholderIcon != null) androidx.compose.material3.Icon(androidx.compose.ui.res.painterResource(placeholderIcon), null, Modifier.size(size * 0.6f), tint = textColor)
+                    else Text(initials, color = textColor, style = androidx.compose.material3.MaterialTheme.typography.titleMedium)
                 }
             }
             if (imageUrl != null && loadImage != null) {
-                RemoteImage(imageUrl, loadImage, null, Modifier.matchParentSize(), contentScale = imageContentScale, placeholder = false, fallback = fallback)
+                RemoteImage(imageUrl, loadImage, null, Modifier.matchParentSize().padding(contentPadding), contentScale = imageContentScale, placeholder = false, fallback = fallback)
             } else {
                 fallback()
             }
@@ -60,7 +64,7 @@ fun Avatar(
                     .background(AppTheme.colors.surface)
                     .padding(2.dp)
                     .clip(CircleShape)
-                    .background(AppTheme.colors.primary),
+                    .background(AppTheme.colors.success),
             )
         }
     }

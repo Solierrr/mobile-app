@@ -32,6 +32,7 @@ class RemoteAuthRepository @Inject constructor(
     private val tokenStore: TokenStore,
     private val flavorLogin: FlavorLogin,
     private val offline: com.project.solaria_mobile.core.offline.OfflineStore,
+    private val push: com.project.solaria_mobile.feature.communication.data.PushRegistration,
 ) : AuthRepository {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
@@ -84,8 +85,10 @@ class RemoteAuthRepository @Inject constructor(
     }
 
     override suspend fun signOut(): ApiResult<Unit> {
+        push.beforeSignOut()
         executor.execute { api.logout() }
         tokenStore.clearTokens()
+        push.afterSignOut()
         offline.clearAll()
         return ApiResult.Success(Unit)
     }
