@@ -164,7 +164,7 @@ Os itens marcados na seção 5 têm implementação; não atestam execução em 
 
 A fila passa a guardar `conversationType` e `authAttempts` (Room 3, migração aditiva 2→3), limita recusas 401 a três tentativas e consulta páginas anteriores do histórico pelo `clientMessageId` antes de reenviar. Mensagens interrompidas em `SENDING` voltam como incertas. O envio continua no processo; WorkManager foi avaliado e permanece pendente, porque exige coordenar conta, ciclo de sessão e um único consumidor da fila. O servidor continua sem deduplicação: a consulta de histórico reduz duplicatas, sem garantir entrega única.
 
-Operações incertas de grupo e comunidade relêem o estado antes de liberar nova ação. Se a releitura falhar, a gestão fica bloqueada até conferir o estado. A criação de grupo atualiza a lista para a pessoa conferir antes de tentar criar de novo.
+Operações incertas de grupo e comunidade relêem o estado antes de liberar nova ação. Se a releitura falhar, a gestão fica bloqueada até conferir o estado. A criação de grupo aplica a lista confirmada para a pessoa conferir antes de tentar criar de novo e mantém bloqueio se essa consulta falhar. Edição/exclusão e envio de anexos também conferem a mensagem alvo em páginas anteriores; os identificadores pendentes ficam no SavedStateHandle da rota.
 
 Validação tentada:
 - `gradlew.bat` falha com `&` no caminho da pasta; a execução direta do JAR evita o wrapper.
@@ -173,6 +173,7 @@ Validação tentada:
 - O projeto tem flavors: usar `:app:testQaDebugUnitTest :app:assembleQaDebug :app:lintQaDebug`, não `testDebugUnitTest` (ambíguo).
 - A tentativa real de testes/build chegou ao KSP e falhou internamente: `Unexpected owner function: null` em `:app:kspQaDebugKotlin`. Não houve resultado de testes nem APK validado.
 - A compilação Kotlin completa de QA passou com KSP desativado por um init script temporário em `build/skip-ksp.init.gradle`: `:app:compileQaDebugKotlin` retornou `BUILD SUCCESSFUL`. Isso cobre Compose, navegação e recursos Kotlin, mas não valida processadores Hilt/Room nem geração/instalação de APK.
+- A tentativa final de `:app:testQaDebugUnitTest` com KSP desativado concluiu `:app:compileQaDebugKotlin`, mas parou no Java: a toolchain 25 selecionou o JRE da extensão Java do VS Code sem `jlink.exe`. Nenhum teste foi executado nessa tentativa.
 - ADB não conseguiu iniciar seu daemon; fluxos em aparelho/emulador e QA real permanecem sem validação.
 
 Não incluir ajustes locais em `gradle.properties` ou `.idea/`. Os recursos novos existem em português, inglês e espanhol. O tema do projeto só fornece a paleta clara; a revisão completa em tema escuro continua pendente.
