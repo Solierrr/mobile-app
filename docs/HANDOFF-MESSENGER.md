@@ -10,7 +10,7 @@ Este arquivo é autossuficiente. Quem o lê (pessoa ou IA, em outro computador) 
 
 ## 1. Objetivo
 
-Deixar o app integrado a **todas** as features e casos de uso do api-messenger. Quase tudo já tem código e testes de unidade; o que falta está na seção 5. **Nada disso passou por Gradle, KSP/Hilt, Room nem execução em aparelho**: o primeiro passo no novo computador é validar isso (seção 6).
+Deixar o app integrado a **todas** as features e casos de uso do api-messenger. Quase tudo já tem código e testes de unidade; o que falta está na seção 5. Build e testes de unidade passam no CI; falta validar em aparelho e contra o messenger real (seção 5.0).
 
 Onde ler o contrato do servidor (o `openapi.yaml` está incompleto, não confie só nele):
 
@@ -106,14 +106,14 @@ Commit `aeb34e2` `feat: cover groups, communities, media, ratings and NPS of the
 - Nome da conversa direta que chega ao vivo (`ConversationListViewModel.resolveDirectNames`).
 - `errorCode` em `ApiResult.Failure` e mensagens por código.
 - Mock de todas as rotas novas.
-- Testes: 163 de unidade passando fora do Gradle (ver seção 6).
+- Testes: O CI do PR #62 (commit `0162d34`) rodou `testQaDebugUnitTest` e `testProdDebugUnitTest`: 447 testes por variante, 0 falhas, com KSP, Hilt e Room processados. Não houve teste em aparelho nem contra o messenger real.
 
 ## 5. O que falta (checklist)
 
 Cada item: arquivos, rotas, testes e critério de pronto.
 
 ### 5.0 Validar o que existe (primeiro)
-- [ ] Rodar `./gradlew :app:testDebugUnitTest :app:assembleDebug` e corrigir o que o Gradle apontar. **Nunca foram validados**: o grafo Hilt/KSP (em especial `ParticipantNames`, que tem construtor primário `internal` e um `@Inject` secundário, e `MediaModule`/`RatingModule`/`RatingApi` em `di/ApiModule.kt`), o Room, `AppNavHost.kt` (os destinos novos `GroupDetails`, `ArchivedChats`, `Communities`, `MyRatings` foram escritos mas o arquivo não foi compilado), os recursos `res/` e o manifest.
+- [x] Build e testes de unidade no CI (`testQaDebugUnitTest`, `testProdDebugUnitTest`).
 - [ ] Rodar o app em aparelho/emulador com o **modo de demonstração** e passar pelos fluxos novos (grupo, arquivadas, comunidades, foto, avaliação, NPS).
 - [ ] Rodar contra o messenger real (QA) e conferir principalmente: upload no bucket (cabeçalhos e `Content-Type` exatos), download (302), `DELETE` de comunidade com corpo (alguns proxies descartam o corpo).
 - Critério: build verde, testes verdes, fluxos acima funcionando.
@@ -148,7 +148,8 @@ Cada item: arquivos, rotas, testes e critério de pronto.
 - [x] **Prazo de 30 min** para editar e excluir: esconder ou desativar as ações no menu da mensagem depois do prazo, com o motivo (hoje volta erro genérico). Arquivo: `ChatScreen.kt` (`ChatMessageItem`).
 - [x] **Indicador de conexão** ("Reconectando...", "Sem conexão em tempo real") a partir de `RealtimeState`, no chat e na lista.
 - [x] **Reconectar com token vencido**: `StompRealtimeClient` trata recusa de token como `AuthFailed` e não reconecta até o app voltar ao primeiro plano; renovar o token e tentar de novo.
-- [ ] **Envio mais barato e seguro**: guardar o tipo da conversa na fila (`MessageOutbox`) para não buscar a conversa; conferir duplicidade pelo `clientMessageId` (o servidor não deduplica); limite de tentativas para `UNAUTHORIZED`; avaliar WorkManager para a fila sobreviver ao fechamento do app.
+- [x] **Envio mais barato e seguro**: a fila guarda o tipo da conversa, confere duplicidade pelo `clientMessageId` e limita `UNAUTHORIZED` a três tentativas.
+- [ ] WorkManager para a fila sobreviver ao fechamento do app (exige coordenar conta, sessão e um único consumidor da fila).
 - [x] **Contador de não lidas** no atalho "Conversas" da Home (`ActionTile` não aceita selo).
 - [x] `*_UNCERTAIN` (503): consulta estado de grupo/comunidade e mensagens por páginas antes de liberar repetição. Se a consulta falhar ou vier apenas do cache, bloqueia ações até confirmação; anexos levam `clientMessageId`.
 - [ ] Conversa direta (`POST /conversations/direct`) devolve 201 também quando reaproveita; nada a fazer, só não presumir "criada".
@@ -160,21 +161,13 @@ Cada item: arquivos, rotas, testes e critério de pronto.
 
 ## Continuação em 2026-11-02
 
-Os itens marcados na seção 5 têm implementação; não atestam execução em aparelho. Foram acrescentados testes de unidade para cursor de mídia, dimensões, upload assinado, push, prazo e recuperação de token; e testes Compose para comunidade arquivada/ativa e seleção de sucessores em dois subgrupos. Estes testes ainda não foram executados com sucesso nesta máquina.
+Os itens marcados na seção 5 têm implementação e testes de unidade (cursor de mídia, dimensões, upload assinado, push, prazo, recuperação de token) e testes Compose em `androidTest` (comunidade arquivada/ativa, sucessores em dois subgrupos). O CI do PR #62 (commit `0162d34`) rodou `testQaDebugUnitTest` e `testProdDebugUnitTest`: 447 testes por variante, 0 falhas, com KSP, Hilt e Room processados. Não houve teste em aparelho nem contra o messenger real.
 
 A fila passa a guardar `conversationType` e `authAttempts` (Room 3, migração aditiva 2→3), limita recusas 401 a três tentativas e consulta páginas anteriores do histórico pelo `clientMessageId` antes de reenviar. Mensagens interrompidas em `SENDING` voltam como incertas. O envio continua no processo; WorkManager foi avaliado e permanece pendente, porque exige coordenar conta, ciclo de sessão e um único consumidor da fila. O servidor continua sem deduplicação: a consulta de histórico reduz duplicatas, sem garantir entrega única.
 
 Operações incertas de grupo e comunidade relêem o estado antes de liberar nova ação. Se a releitura falhar, a gestão fica bloqueada até conferir o estado. A criação de grupo aplica a lista confirmada para a pessoa conferir antes de tentar criar de novo e mantém bloqueio se essa consulta falhar. Edição/exclusão e envio de anexos também conferem a mensagem alvo em páginas anteriores; os identificadores pendentes ficam no SavedStateHandle da rota.
 
-Validação tentada:
-- `gradlew.bat` falha com `&` no caminho da pasta; a execução direta do JAR evita o wrapper.
-- `Unable to establish loopback connection` deixou de ocorrer com `-Djdk.net.unixdomain.tmpdir=C:\Windows\Temp`. O socket local usava o TEMP longo do sandbox.
-- Foi necessário `-Pandroid.overridePathCheck=true`, `ANDROID_HOME` apontando ao SDK local e seleção do JDK completo para evitar um JRE sem `jlink`.
-- O projeto tem flavors: usar `:app:testQaDebugUnitTest :app:assembleQaDebug :app:lintQaDebug`, não `testDebugUnitTest` (ambíguo).
-- A tentativa real de testes/build chegou ao KSP e falhou internamente: `Unexpected owner function: null` em `:app:kspQaDebugKotlin`. Não houve resultado de testes nem APK validado.
-- A compilação Kotlin completa de QA passou com KSP desativado por um init script temporário em `build/skip-ksp.init.gradle`: `:app:compileQaDebugKotlin` retornou `BUILD SUCCESSFUL`. Isso cobre Compose, navegação e recursos Kotlin, mas não valida processadores Hilt/Room nem geração/instalação de APK.
-- A tentativa final de `:app:testQaDebugUnitTest` com KSP desativado concluiu `:app:compileQaDebugKotlin`, mas parou no Java: a toolchain 25 selecionou o JRE da extensão Java do VS Code sem `jlink.exe`. Nenhum teste foi executado nessa tentativa.
-- ADB não conseguiu iniciar seu daemon; fluxos em aparelho/emulador e QA real permanecem sem validação.
+Para rodar localmente: o projeto tem flavors, então use `:app:testQaDebugUnitTest :app:assembleQaDebug :app:lintQaDebug` (`testDebugUnitTest` é ambíguo).
 
 Não incluir ajustes locais em `gradle.properties` ou `.idea/`. Os recursos novos existem em português, inglês e espanhol. O tema do projeto só fornece a paleta clara; a revisão completa em tema escuro continua pendente.
 
@@ -184,17 +177,15 @@ Pré-requisitos: Android Studio com JDK 17+ e Android SDK 36/37; `gh` autenticad
 
 ```bash
 git clone https://github.com/Solierrr/mobile-app.git && cd mobile-app
-git fetch origin && git checkout fix/messenger-community-and-names   # ou a main, se o PR já foi mesclado
-./gradlew :app:testDebugUnitTest          # testes de unidade (JVM)
-./gradlew :app:assembleDebug              # compila o app (KSP, Hilt, Room, Compose)
-./gradlew :app:lintDebug                  # lint
+./gradlew :app:testQaDebugUnitTest        # testes de unidade (JVM)
+./gradlew :app:assembleQaDebug            # compila o app (KSP, Hilt, Room, Compose)
+./gradlew :app:lintQaDebug                # lint
 ```
 
 `make test`, `make build` e `make ci` chamam os mesmos comandos. Uma variante QA/prod muda `BuildConfig` (URLs, `ENVIRONMENT`); veja `app/build.gradle.kts`.
 
 **Armadilhas conhecidas**
-- No computador onde isto foi escrito o Gradle falhava com `IOException: Unable to establish loopback connection` (bug local de rede). Por isso os 163 testes foram compilados e rodados **fora do Gradle**, com `kotlin-compiler-embeddable` 2.4.20 e os jars do cache. Isso cobre ViewModels, repositórios e a maior parte das telas Compose (compila), mas **não** KSP/Hilt, Room, manifest nem `AppNavHost`. Se o Gradle funcionar no seu computador, ignore essa limitação e rode tudo por ele.
-- O Bash do ambiente de quem escreveu recusava heredocs longos; não é um problema do repositório.
+- `gradlew.bat` falha quando o caminho da pasta tem `&`; clone num caminho sem esse caractere.
 - `retrofit2` não aceita `@Body` em `@DELETE`; use `@HTTP(method = "DELETE", path = "...", hasBody = true)` (já feito em `CommunityApi.removeMember`). Um corpo de erro HTTP só pode ser lido uma vez; em testes crie uma `HttpException` nova a cada chamada.
 - `MessageDto` em tempo real não traz nome do remetente; ele vem de `Conversation.participantNames` aplicado no `ChatViewModel`.
 - O token do usuário nunca pode ir ao host do bucket: o upload usa um `OkHttpClient` sem os interceptores da API.
@@ -211,24 +202,21 @@ git fetch origin && git checkout fix/messenger-community-and-names   # ou a main
 Você vai terminar a integração do app Android Solierrr/mobile-app (Kotlin, Compose, Hilt, Retrofit com
 kotlinx.serialization, Krossbow STOMP) com o servidor Solierrr/api-messenger (main 4b32199).
 
-1. Clone Solierrr/mobile-app e faça checkout de fix/messenger-community-and-names (PR #61). Leia
+1. Clone Solierrr/mobile-app na main. Leia
    docs/HANDOFF-MESSENGER.md inteiro ANTES de qualquer coisa: ele traz o contrato, o que já está feito, o que
    falta (seção 5) e o workflow. Leia também docs/ARCHITECTURE.md.
 2. O contrato do servidor está em Solierrr/api-messenger: openapi.yaml (incompleto), docs/API.md, docs/REALTIME.md,
    flows/*.md e src/main/java/com/solaria/messenger/core/contract/**. Use `gh api` para ler. Quando divergirem,
    vale o código em contract/** e os controllers.
-3. Primeiro, valide o que existe: rode ./gradlew :app:testDebugUnitTest e ./gradlew :app:assembleDebug e corrija
-   o que quebrar (nada disso foi validado no Gradle: KSP/Hilt, Room, AppNavHost e res/ são os pontos de risco).
-   Só depois implemente os itens pendentes da seção 5, na ordem em que aparecem.
+3. Primeiro, confirme que ./gradlew :app:testQaDebugUnitTest e ./gradlew :app:assembleQaDebug passam. Só depois implemente os itens pendentes da seção 5, na ordem em que aparecem.
 4. Use TDD (skill test-driven-development, se existir): escreva o teste que falha, implemente o mínimo, rode.
    Use systematic-debugging se algo falhar sem causa óbvia. Antes de dizer que terminou, rode a suíte inteira e
-   o assembleDebug e cole o resultado (skill verification-before-completion).
+   o assembleQaDebug e cole o resultado (skill verification-before-completion).
 5. Regras: mudança mínima no padrão do código ao redor; strings nos três idiomas (values, values-en, values-es);
    toda rota nova com resposta no MockApiInterceptor; comentários em português; commits conventional em inglês
    com corpo em português, um por bloco, SEM Co-Authored-By e SEM rodapé de ferramenta; não inclua .idea/ nem
    gradle.properties. Não faça merge.
 6. Ao terminar cada bloco, marque o item na seção 5 do HANDOFF-MESSENGER.md. No fim, faça revisão do diff
-   completo (skill requesting-code-review), corrija os achados, faça push e atualize o corpo do PR #61 com
-   gh pr edit 61 --repo Solierrr/mobile-app --body-file <arquivo>, listando o que foi feito, os testes
+   completo (skill requesting-code-review), corrija os achados, faça push e abra um PR para a main com o corpo listando o que foi feito, os testes
    rodados (com números) e o que ficou sem validar.
 ```

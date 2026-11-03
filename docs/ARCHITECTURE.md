@@ -84,4 +84,4 @@ A revisão analisada é `b6419552`, em 2026-10-30. Fontes em [Gradle](https://gi
 
 `RealtimeTokenRefresher` compartilha o `TokenAuthenticator` com o REST, inclusive a sincronização de refresh e a substituição condicional de tokens. `ChatRealtime.connection` expõe o `RealtimeState` ao chat e à lista.
 
-As alterações desta continuação ainda não tiveram validação completa do grafo Hilt/Room: a tentativa completa no Gradle falhou internamente no KSP. A compilação Kotlin QA, com o processador desativado por script temporário, passou. Detalhes e pendências estão em `HANDOFF-MESSENGER.md`. Avaliações e NPS foram mantidos fora desta continuação por solicitação do usuário.
+O CI do PR #62 (commit `0162d34`) rodou `testQaDebugUnitTest` e `testProdDebugUnitTest`: 447 testes por variante, 0 falhas, com KSP, Hilt e Room processados. Não houve teste em aparelho nem contra o messenger real. Pendências em `HANDOFF-MESSENGER.md`.
