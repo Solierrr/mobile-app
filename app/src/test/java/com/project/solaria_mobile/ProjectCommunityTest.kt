@@ -31,12 +31,14 @@ class ProjectCommunityTest {
     private class FakeCommunity : ProjectCommunityRepository {
         var snapshot = ProjectCommunity(projectId = "p1", canCreate = true)
         var failure: ErrorKind? = null
+        var mutationFailure: ApiResult.Failure? = null
+        var cached = false
         var gate: CompletableDeferred<Unit>? = null
         var createCalls = 0
         val groups = mutableListOf<String>()
         val invited = mutableListOf<Set<String>>()
         val added = mutableListOf<String>()
-        override suspend fun read(projectId: String) = ReadResult(failure?.let { ApiResult.Failure(it) } ?: ApiResult.Success(snapshot))
+        override suspend fun read(projectId: String) = ReadResult(failure?.let { ApiResult.Failure(it) } ?: ApiResult.Success(snapshot), cached = cached)
         override suspend fun create(projectId: String): ApiResult<Unit> {
             createCalls++
             gate?.await()
@@ -56,13 +58,36 @@ class ProjectCommunityTest {
         val archivedCalls = mutableListOf<Boolean>()
         val adminCalls = mutableListOf<Pair<String, Boolean>>()
         val removals = mutableListOf<Pair<String, Map<String, String>>>()
-        override suspend fun setArchived(communityId: String, archived: Boolean): ApiResult<Unit> { archivedCalls += archived; return ApiResult.Success(Unit) }
+        override suspend fun setArchived(communityId: String, archived: Boolean): ApiResult<Unit> { archivedCalls += archived; return mutationFailure ?: ApiResult.Success(Unit) }
         override suspend fun setAdmin(communityId: String, authId: String, admin: Boolean): ApiResult<Unit> { adminCalls += authId to admin; return ApiResult.Success(Unit) }
         override suspend fun removeMember(communityId: String, authId: String, successors: Map<String, String>): ApiResult<Unit> { removals += authId to successors; return ApiResult.Success(Unit) }
         override suspend fun mine(): ApiResult<List<com.project.solaria_mobile.feature.communication.domain.CommunitySummary>> = ApiResult.Success(emptyList())
     }
 
     private fun model(repository: FakeCommunity) = ProjectCommunityViewModel(SavedStateHandle(mapOf("id" to "p1")), repository)
+
+    @Test fun aCachedReadCannotUnlockAnUncertainCommunityMutation() = runTest {
+        val repository = FakeCommunity().apply { snapshot = ProjectCommunity("community", "p1", canManage = true, myRole = "OWNER") }
+        val model = model(repository)
+        advanceUntilIdle()
+        repository.mutationFailure = ApiResult.Failure(ErrorKind.SERVER, errorCode = "COMMUNITY_UPDATE_UNCERTAIN")
+        repository.failure = ErrorKind.CONNECTIVITY
+        model.setArchived(true)
+        advanceUntilIdle()
+        assertTrue((model.uiState.value as UiState.Content).data.needsVerification)
+        repository.failure = null
+        repository.cached = true
+        model.load()
+        advanceUntilIdle()
+        assertTrue((model.uiState.value as UiState.Content).data.needsVerification)
+        model.setArchived(true)
+        advanceUntilIdle()
+        assertEquals(1, repository.archivedCalls.size)
+        repository.cached = false
+        model.load()
+        advanceUntilIdle()
+        assertFalse((model.uiState.value as UiState.Content).data.needsVerification)
+    }
 
     @Test fun openingAndRefreshingNeverCreateACommunity() = runTest {
         val repository = FakeCommunity()

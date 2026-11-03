@@ -29,6 +29,8 @@ data class ConversationDto(
     val managerUserId: String? = null,
     /** Convidados que o servidor não admitiu, na resposta de `POST /participants`. */
     val rejectedParticipants: List<RejectedGroupParticipantDto> = emptyList(),
+    val communityId: String? = null,
+    val communityStatus: String? = null,
 )
 
 /** Última mensagem que o messenger já manda na lista, com o marcador de excluída. */
@@ -111,6 +113,12 @@ data class MediaUploadDto(val mediaId: String, val upload: MediaUploadTargetDto,
 @Serializable
 data class MediaUploadTargetDto(val url: String, val method: String = "PUT", val headers: Map<String, String> = emptyMap())
 
+@Serializable
+data class MediaItemDto(val messageId: String, val conversationId: String, val senderId: String? = null, val timestamp: String? = null, val attachment: AttachmentDto)
+
+@Serializable
+data class MediaPageDto(val items: List<MediaItemDto> = emptyList(), val nextCursor: String? = null)
+
 /** `environment` é opcional; o servidor assume o do próprio ambiente. */
 @Serializable
 data class NpsRequest(val conversationId: String, val score: Int)
@@ -126,6 +134,9 @@ data class SendMessageRequest(
 )
 
 interface MessengerApi {
+    @GET("messaging/communities/{id}")
+    suspend fun community(@Path("id") id: String): CommunityDto
+
     @GET("messaging/conversations/me")
     suspend fun conversations(@Query("archived") archived: Boolean = false): List<ConversationDto>
 
@@ -169,6 +180,9 @@ interface MessengerApi {
     @Streaming
     @GET("messaging/media/{mediaId}/content")
     suspend fun mediaContent(@Path("mediaId") mediaId: String): okhttp3.ResponseBody
+
+    @GET("messaging/media")
+    suspend fun availableMedia(@Query("conversationId") conversationId: String, @Query("limit") limit: Int = 30, @Query("cursor") cursor: String? = null): MediaPageDto
 
     /** Nota de 0 a 10 de uma sessão do assistente; 409 `DUPLICATE_RESOURCE` quando a pessoa já respondeu. */
     @POST("messaging/nps")

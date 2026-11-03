@@ -27,6 +27,7 @@ import com.project.solaria_mobile.feature.communication.data.ParticipantNames
 import com.project.solaria_mobile.feature.communication.data.RemoteCommunicationRepository
 import com.project.solaria_mobile.feature.communication.data.testOutbox
 import com.project.solaria_mobile.feature.communication.data.toAttachment
+import com.project.solaria_mobile.feature.communication.data.toRequestDto
 import com.project.solaria_mobile.feature.communication.domain.AvatarTone
 import com.project.solaria_mobile.feature.communication.domain.ChatMessage
 import com.project.solaria_mobile.feature.communication.domain.CommunicationRepository
@@ -81,6 +82,27 @@ class MessengerMediaRepositoryTest {
     private fun stubConversation() {
         coEvery { api.conversation("c1") } returns ConversationDto("c1", "GROUP", title = "Equipe")
         coEvery { api.mediaUpload(any()) } returns MediaUploadDto("media-1", MediaUploadTargetDto("https://bucket/x", "PUT", mapOf("Content-Type" to "image/png")), maxBytes = 10_000_000)
+    }
+
+    @Test fun imageDimensionsSurviveSendingAndReceiving() {
+        val source = MessageAttachment.Image("file:///photo.jpg", sizeBytes = 1024, width = 640, height = 480)
+        val dto = source.toRequestDto("media-1")
+        assertEquals(640, dto.width)
+        assertEquals(480, dto.height)
+        val received = dto.toAttachment() as MessageAttachment.Image
+        assertEquals(640, received.width)
+        assertEquals(480, received.height)
+    }
+
+    @Test fun availableMediaPreservesTheOpaqueCursor() = runTest {
+        coEvery { api.availableMedia("c1", 30, "page:2") } returns
+            com.project.solaria_mobile.feature.communication.data.MediaPageDto(
+                listOf(com.project.solaria_mobile.feature.communication.data.MediaItemDto("m1", "c1", attachment = AttachmentDto("IMAGE", mediaId = "photo"))),
+                "page:3",
+            )
+        val page = (repository().availableMedia("c1", 30, "page:2") as ApiResult.Success).data
+        assertEquals("page:3", page.nextCursor)
+        assertEquals("photo", (page.items.single().attachment as MessageAttachment.Image).mediaId)
     }
 
     @Test fun anImageIsUploadedBeforeTheMessageCitesItsMediaId() = runTest {

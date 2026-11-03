@@ -35,6 +35,21 @@ class TokenAuthenticator internal constructor(
 
     private val json: Json = ApiJson.instance
 
+    /** Renova o token recusado pelo STOMP com a mesma trava usada pelas requisições REST. */
+    @Synchronized
+    fun renewAccessToken(rejectedToken: String): String? {
+        val current = tokenStore.currentTokens() ?: return null
+        if (current.accessToken != rejectedToken) return current.accessToken
+        return when (val result = refresh(current.refreshToken)) {
+            is RefreshResult.Renewed -> {
+                val saved = runBlocking { tokenStore.replaceTokensIfCurrent(current, result.tokens) }
+                if (saved) result.tokens.accessToken else tokenStore.currentTokens()?.accessToken
+            }
+            RefreshResult.Rejected -> { runBlocking { tokenStore.replaceTokensIfCurrent(current, null) }; null }
+            RefreshResult.Unavailable -> null
+        }
+    }
+
     @Synchronized
     override fun authenticate(route: Route?, response: Response): Request? {
         if (response.request.url.encodedPath.endsWith(REFRESH_PATH) || responseCount(response) >= MAX_ATTEMPTS) return null

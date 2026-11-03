@@ -23,7 +23,7 @@ import kotlinx.coroutines.launch
 /** Aviso de grupo criado; [rejected] convites não foram admitidos pelo servidor. */
 data class GroupNotice(val rejected: Int)
 
-data class CommunityContent(val community: ProjectCommunity, val busy: Boolean = false, val error: ErrorKind? = null, val notice: GroupNotice? = null, val errorCode: String? = null)
+data class CommunityContent(val community: ProjectCommunity, val busy: Boolean = false, val error: ErrorKind? = null, val notice: GroupNotice? = null, val errorCode: String? = null, val needsVerification: Boolean = false)
 
 @HiltViewModel
 class ProjectCommunityViewModel @Inject constructor(
@@ -45,7 +45,8 @@ class ProjectCommunityViewModel @Inject constructor(
         loadJob = viewModelScope.launch {
             val read = repository.read(projectId)
             mutable.value = when (val result = read.result) {
-                is ApiResult.Success -> UiState.Content(CommunityContent(result.data, notice = previous?.data?.notice),
+                is ApiResult.Success -> UiState.Content(CommunityContent(result.data, notice = previous?.data?.notice,
+                    needsVerification = previous?.data?.needsVerification == true && read.cached),
                     syncedAt = read.syncedAt, cached = read.cached, refreshError = read.refreshError)
                 is ApiResult.Failure -> if (previous != null && result.kind.canRetainContent())
                     previous.copy(refreshing = false, refreshError = result.kind) else UiState.Error(result.kind)
@@ -106,10 +107,18 @@ class ProjectCommunityViewModel @Inject constructor(
 
     private fun operation(call: suspend (ProjectCommunity) -> ApiResult<*>) {
         val current = mutable.value as? UiState.Content ?: return
-        if (current.refreshing || current.data.busy) return
+        if (current.refreshing || current.data.busy || current.data.needsVerification) return
         mutable.value = current.copy(data = current.data.copy(busy = true, error = null, errorCode = null, notice = null))
         viewModelScope.launch {
             val result = call(current.data.community)
+            if (result is ApiResult.Failure && result.errorCode?.endsWith("_UNCERTAIN") == true) {
+                // Uma falha depois de gravar não autoriza repetir a mutação: primeiro relê a comunidade e os subgrupos.
+                val read = repository.read(projectId)
+                val checked = read.result as? ApiResult.Success
+                mutable.value = current.copy(data = current.data.copy(community = checked?.data ?: current.data.community,
+                    busy = false, error = result.kind, errorCode = result.errorCode, needsVerification = checked == null || read.cached))
+                return@launch
+            }
             val latest = mutable.value as? UiState.Content ?: return@launch
             mutable.value = latest.copy(data = latest.data.copy(busy = false,
                 error = (result as? ApiResult.Failure)?.kind, errorCode = (result as? ApiResult.Failure)?.errorCode,

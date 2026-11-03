@@ -30,7 +30,7 @@ object OutboxModule {
         network: NetworkMonitor,
         mockMode: MockModeStore,
     ): MessageOutbox {
-        val database = Room.databaseBuilder(context, OutboxDatabase::class.java, "message-outbox.db").addMigrations(OUTBOX_MIGRATION_1_2).build()
+        val database = Room.databaseBuilder(context, OutboxDatabase::class.java, "message-outbox.db").addMigrations(OUTBOX_MIGRATION_1_2, OUTBOX_MIGRATION_2_3).build()
         // No modo mock as respostas são simuladas no próprio app, então a fila é separada e não depende de rede.
         val account = OutboxAccount { if (mockMode.isEnabled()) "mock:${BuildConfig.ENVIRONMENT}" else identity.current() }
         val canSend = combine(network.isOnline, mockMode.enabled) { online, mock -> online || mock }

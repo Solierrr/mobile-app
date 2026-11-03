@@ -5,6 +5,7 @@ import com.project.solaria_mobile.core.common.ErrorKind
 import com.project.solaria_mobile.feature.communication.domain.ChatMessage
 import com.project.solaria_mobile.feature.communication.domain.CommunicationRepository
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flowOf
@@ -29,7 +30,7 @@ class InMemoryPendingMessageDao : PendingMessageDao {
     override suspend fun update(message: PendingMessage) { items.value = items.value.map { if (it.id == message.id) message else it } }
     override suspend fun delete(id: String) { items.value = items.value.filterNot { it.id == id } }
     override suspend fun resetInterrupted() {
-        items.value = items.value.map { if (it.state == PendingState.SENDING) it.copy(state = PendingState.PENDING) else it }
+        items.value = items.value.map { if (it.state == PendingState.SENDING) it.copy(state = PendingState.PENDING, uncertain = true) else it }
     }
     override suspend fun clear() { items.value = emptyList() }
 }
@@ -65,6 +66,55 @@ fun testOutbox(repository: CommunicationRepository, dao: PendingMessageDao = InM
 }
 
 class MessageOutboxTest {
+    @Test fun cancellationReturnsTheInFlightMessageToTheQueueAsUncertain() = runTest {
+        val dao = InMemoryPendingMessageDao()
+        val sending = kotlinx.coroutines.CompletableDeferred<Unit>()
+        val repository = object : CommunicationRepository by FakeCommunicationRepository() {
+            override suspend fun sendMessage(conversationId: String, text: String, clientMessageId: String?): ApiResult<ChatMessage> {
+                sending.complete(Unit)
+                kotlinx.coroutines.awaitCancellation()
+            }
+        }
+        val outbox = testOutbox(repository, dao)
+        outbox.enqueue("c1", "oi")
+        val job = kotlinx.coroutines.CoroutineScope(coroutineContext).launch { outbox.drain() }
+        sending.await()
+        job.cancel()
+        job.join()
+        assertEquals(PendingState.PENDING, dao.items.value.single().state)
+        assertTrue(dao.items.value.single().uncertain)
+    }
+
+    @Test fun repeatedUnauthorizedResponsesStopAfterThreeAttempts() = runTest {
+        val repository = ScriptedRepository().apply { repeat(4) { failures.add(ErrorKind.UNAUTHORIZED) } }
+        val dao = InMemoryPendingMessageDao()
+        val outbox = testOutbox(repository, dao)
+        outbox.enqueue("c1", "oi", "GROUP")
+        assertTrue(outbox.drain().retryLater)
+        assertTrue(outbox.drain().retryLater)
+        assertFalse(outbox.drain().retryLater)
+        assertEquals(PendingState.FAILED, dao.items.value.single().state)
+        assertEquals("GROUP", dao.items.value.single().conversationType)
+        assertEquals(3, dao.items.value.single().authAttempts)
+    }
+
+    @Test fun anUncertainDeliveryCanBeFoundBeyondTheMostRecentPage() = runTest {
+        val dao = InMemoryPendingMessageDao()
+        dao.insert(PendingMessage("client-id", "conta-a", "c1", "oi", 0, uncertain = true))
+        var sent = false
+        val repository = object : CommunicationRepository by FakeCommunicationRepository() {
+            override suspend fun messages(conversationId: String) = ApiResult.Success(listOf(ChatMessage("nova", false, "", id = "new", sequence = 100)))
+            override suspend fun olderMessages(conversationId: String, beforeSequence: Int) = ApiResult.Success(listOf(ChatMessage("oi", true, "", clientMessageId = "client-id", id = "delivered", sequence = 20)))
+            override suspend fun sendMessage(conversationId: String, text: String, clientMessageId: String?): ApiResult<ChatMessage> {
+                sent = true
+                return ApiResult.Success(ChatMessage(text, true, ""))
+            }
+        }
+        testOutbox(repository, dao).drain()
+        assertFalse(sent)
+        assertTrue(dao.items.value.isEmpty())
+    }
+
     @Test fun sendsQueuedMessagesInCreationOrder() = runTest {
         val repository = ScriptedRepository()
         val dao = InMemoryPendingMessageDao()

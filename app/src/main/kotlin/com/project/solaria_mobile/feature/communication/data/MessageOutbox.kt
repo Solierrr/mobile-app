@@ -18,6 +18,9 @@ import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.withContext
+import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -49,6 +52,8 @@ data class PendingMessage(
     val state: PendingState = PendingState.PENDING,
     val uncertain: Boolean = false,
     val failure: ErrorKind? = null,
+    @androidx.room.ColumnInfo(defaultValue = "NULL") val conversationType: String? = null,
+    @androidx.room.ColumnInfo(defaultValue = "0") val authAttempts: Int = 0,
 )
 
 @Dao
@@ -71,14 +76,14 @@ interface PendingMessageDao {
     @Query("DELETE FROM pending_message WHERE id = :id")
     suspend fun delete(id: String)
 
-    @Query("UPDATE pending_message SET state = 'PENDING' WHERE state = 'SENDING'")
+    @Query("UPDATE pending_message SET state = 'PENDING', uncertain = 1 WHERE state = 'SENDING'")
     suspend fun resetInterrupted()
 
     @Query("DELETE FROM pending_message")
     suspend fun clear()
 }
 
-@Database(entities = [PendingMessage::class], version = 2, exportSchema = false)
+@Database(entities = [PendingMessage::class], version = 3, exportSchema = false)
 abstract class OutboxDatabase : RoomDatabase() {
     abstract fun dao(): PendingMessageDao
 }
@@ -96,6 +101,14 @@ val OUTBOX_MIGRATION_1_2 = object : Migration(1, 2) {
         )
         db.execSQL("DROP TABLE pending_message")
         db.execSQL("ALTER TABLE pending_message_new RENAME TO pending_message")
+    }
+}
+
+/** Mantém a fila e acrescenta o tipo da conversa e o limite de recusas de credencial. */
+val OUTBOX_MIGRATION_2_3 = object : Migration(2, 3) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE pending_message ADD COLUMN conversationType TEXT DEFAULT NULL")
+        db.execSQL("ALTER TABLE pending_message ADD COLUMN authAttempts INTEGER NOT NULL DEFAULT 0")
     }
 }
 
@@ -134,20 +147,23 @@ class MessageOutbox(
     }
 
     /** Guarda a mensagem para envio. Devolve falso sem conta ativa, quando não há a quem atribuir a mensagem. */
-    suspend fun enqueue(conversationId: String, text: String): Boolean {
+    suspend fun enqueue(conversationId: String, text: String, conversationType: String? = null): Boolean {
         val owner = account.current() ?: return false
-        dao.insert(PendingMessage(UUID.randomUUID().toString(), owner, conversationId, text, clock()))
+        dao.insert(PendingMessage(UUID.randomUUID().toString(), owner, conversationId, text, clock(), conversationType = conversationType))
         trigger.tryEmit(Unit)
         return true
     }
 
     suspend fun retry(id: String) {
         val message = dao.get(id) ?: return
-        dao.update(message.copy(state = PendingState.PENDING, failure = null))
+        if (message.account != account.current()) return
+        dao.update(message.copy(state = PendingState.PENDING, failure = null, authAttempts = 0))
         trigger.tryEmit(Unit)
     }
 
-    suspend fun discard(id: String) = dao.delete(id)
+    suspend fun discard(id: String) {
+        if (dao.get(id)?.account == account.current()) dao.delete(id)
+    }
 
     override suspend fun clear() = dao.clear()
 
@@ -172,52 +188,98 @@ class MessageOutbox(
         for (queued in dao.pending(owner)) {
             if (account.current() != owner) return DrainResult(retryLater = false)
             val message = dao.get(queued.id)?.takeIf { it.state == PendingState.PENDING } ?: continue
-            dao.update(message.copy(state = PendingState.SENDING))
-            if (message.uncertain) {
-                when (alreadyDelivered(message)) {
-                    true -> {
+            // Se o processo morrer depois do POST, a próxima execução precisa conferir o histórico.
+            try {
+                dao.update(message.copy(state = PendingState.SENDING, uncertain = true))
+                if (message.uncertain) {
+                    when (val checked = alreadyDelivered(message)) {
+                        is ApiResult.Success -> if (checked.data) {
+                            dao.delete(message.id)
+                            mutableDelivered.emit(Delivered(message.conversationId, null))
+                            continue
+                        }
+                        is ApiResult.Failure -> {
+                            if (checked.kind == ErrorKind.UNAUTHORIZED) {
+                                if (recordAuthRejection(message)) return DrainResult(retryLater = true)
+                                continue
+                            }
+                            if (checked.kind in setOf(ErrorKind.FORBIDDEN, ErrorKind.NOT_FOUND)) {
+                                dao.update(message.copy(state = PendingState.FAILED, failure = checked.kind))
+                                continue
+                            }
+                            dao.update(message.copy(state = PendingState.PENDING, uncertain = true))
+                            return DrainResult(retryLater = true)
+                        }
+                    }
+                }
+                message.conversationType?.let { repository.rememberConversationType(message.conversationId, it) }
+                when (val result = repository.sendMessage(message.conversationId, message.text, message.id)) {
+                    is ApiResult.Success -> {
                         dao.delete(message.id)
-                        mutableDelivered.emit(Delivered(message.conversationId, null))
-                        continue
+                        mutableDelivered.emit(Delivered(message.conversationId, result.data))
                     }
-                    null -> {
-                        dao.update(message.copy(state = PendingState.PENDING))
-                        return DrainResult(retryLater = true)
+                    is ApiResult.Failure -> when (result.kind) {
+                        // A requisição pode ter sido gravada antes da falha: confere o histórico antes de reenviar.
+                        ErrorKind.CONNECTIVITY, ErrorKind.TIMEOUT, ErrorKind.SERVER, ErrorKind.SERIALIZATION, ErrorKind.UNKNOWN -> {
+                            dao.update(message.copy(state = PendingState.PENDING, uncertain = true))
+                            return DrainResult(retryLater = true)
+                        }
+                        // Recusada antes de gravar: tenta de novo depois, sem precisar conferir o histórico.
+                        ErrorKind.UNAUTHORIZED -> {
+                            if (recordAuthRejection(message)) return DrainResult(retryLater = true)
+                        }
+                        ErrorKind.RATE_LIMITED -> {
+                            dao.update(message.copy(state = PendingState.PENDING))
+                            return DrainResult(retryLater = true)
+                        }
+                        else -> dao.update(message.copy(state = PendingState.FAILED, failure = result.kind))
                     }
-                    false -> Unit
                 }
-            }
-            when (val result = repository.sendMessage(message.conversationId, message.text, message.id)) {
-                is ApiResult.Success -> {
-                    dao.delete(message.id)
-                    mutableDelivered.emit(Delivered(message.conversationId, result.data))
-                }
-                is ApiResult.Failure -> when (result.kind) {
-                    // A requisição pode ter sido gravada antes da falha: confere o histórico antes de reenviar.
-                    ErrorKind.CONNECTIVITY, ErrorKind.TIMEOUT, ErrorKind.SERVER, ErrorKind.SERIALIZATION, ErrorKind.UNKNOWN -> {
-                        dao.update(message.copy(state = PendingState.PENDING, uncertain = true))
-                        return DrainResult(retryLater = true)
+            } catch (cancelled: CancellationException) {
+                // A coleta é cancelada quando a rede cai: a mensagem precisa voltar à fila sem exigir reinício do processo.
+                withContext(NonCancellable) {
+                    dao.get(message.id)?.takeIf { it.state == PendingState.SENDING }?.let {
+                        dao.update(it.copy(state = PendingState.PENDING, uncertain = true))
                     }
-                    // Recusada antes de gravar: tenta de novo depois, sem precisar conferir o histórico.
-                    ErrorKind.UNAUTHORIZED, ErrorKind.RATE_LIMITED -> {
-                        dao.update(message.copy(state = PendingState.PENDING))
-                        return DrainResult(retryLater = true)
-                    }
-                    else -> dao.update(message.copy(state = PendingState.FAILED, failure = result.kind))
                 }
+                throw cancelled
             }
         }
         DrainResult(retryLater = false)
     }
 
-    /** Verdadeiro se o histórico já tem a mensagem com este identificador; nulo se o histórico não pôde ser lido. */
-    private suspend fun alreadyDelivered(message: PendingMessage): Boolean? {
-        val history = repository.messages(message.conversationId) as? ApiResult.Success ?: return null
-        return history.data.any { it.clientMessageId == message.id }
+    private suspend fun recordAuthRejection(message: PendingMessage): Boolean {
+        val attempts = message.authAttempts + 1
+        val retry = attempts < MAX_AUTH_ATTEMPTS
+        dao.update(message.copy(state = if (retry) PendingState.PENDING else PendingState.FAILED,
+            authAttempts = attempts, failure = ErrorKind.UNAUTHORIZED))
+        return retry
+    }
+
+    /** Verdadeiro se o histórico já tem a mensagem com este identificador; falha se o histórico não pôde ser lido. */
+    private suspend fun alreadyDelivered(message: PendingMessage): ApiResult<Boolean> {
+        var history = when (val result = repository.messages(message.conversationId)) {
+            is ApiResult.Failure -> return result
+            is ApiResult.Success -> result.data
+        }
+        var before = Int.MAX_VALUE
+        while (true) {
+            if (history.any { it.clientMessageId == message.id }) return ApiResult.Success(true)
+            // Relógios do aparelho e do servidor podem divergir: só o fim do histórico confirma ausência.
+            if (history.isEmpty()) return ApiResult.Success(false)
+            val oldest = history.filter { it.sequence > 0 }.minOfOrNull { it.sequence } ?: return ApiResult.Success(false)
+            if (oldest >= before) return ApiResult.Failure(ErrorKind.UNKNOWN)
+            before = oldest
+            history = when (val result = repository.olderMessages(message.conversationId, before)) {
+                is ApiResult.Failure -> return result
+                is ApiResult.Success -> result.data
+            }
+        }
     }
 
     private companion object {
         const val DELIVERED_BUFFER = 16
+        const val MAX_AUTH_ATTEMPTS = 3
         val RETRY_DELAYS_MILLIS = listOf(5_000L, 15_000L, 30_000L, 60_000L)
     }
 }

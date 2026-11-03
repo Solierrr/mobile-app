@@ -46,7 +46,7 @@ fun GroupDetailsRoute(onBack: () -> Unit, onLeft: () -> Unit, viewModel: GroupDe
 }
 
 @Composable
-private fun GroupDetailsScreen(ui: GroupDetailsUi, onBack: () -> Unit, viewModel: GroupDetailsViewModel) {
+private fun GroupDetailsScreen(ui: GroupDetailsUi, onBack: () -> Unit, viewModel: GroupDetailsViewModel, images: com.project.solaria_mobile.core.images.ImageLoaderViewModel = hiltViewModel()) {
     var picking by remember { mutableStateOf(false) }
     var selected by remember { mutableStateOf<GroupMember?>(null) }
     var removing by remember { mutableStateOf<GroupMember?>(null) }
@@ -65,8 +65,10 @@ private fun GroupDetailsScreen(ui: GroupDetailsUi, onBack: () -> Unit, viewModel
         ScreenTitle(ui.conversation.name, onBack)
         Text(stringResource(R.string.gp_n_participantes, ui.members.size), color = AppTheme.colors.onSurfaceMuted, style = MaterialTheme.typography.bodyMedium)
         failure?.let { Text(it.userMessage(), color = AppTheme.colors.danger, style = MaterialTheme.typography.bodyMedium) }
+        if (ui.needsVerification) com.project.solaria_mobile.core.designsystem.components.PrimaryButton(stringResource(R.string.ch_conferir_estado), viewModel::load, secondary = true)
         if (ui.rejected > 0) Text(stringResource(R.string.gp_rejeitados, ui.rejected), color = AppTheme.colors.onSurfaceMuted, style = MaterialTheme.typography.bodyMedium)
-        if (ui.canManage) ActionRow(stringResource(R.string.gp_adicionar), AppIcons.user_round_plus, { picking = true }, enabled = !ui.busy)
+        if (ui.rejectedDetails.isNotEmpty()) Text(ui.rejectedDetails.description(androidx.compose.ui.platform.LocalContext.current), color = AppTheme.colors.onSurfaceMuted, style = MaterialTheme.typography.bodyMedium)
+        if (ui.canManage) ActionRow(stringResource(R.string.gp_adicionar), AppIcons.user_round_plus, { picking = true }, enabled = !ui.busy && !ui.needsVerification)
         LazyColumn(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(Spacing.xxs), contentPadding = PaddingValues(bottom = Spacing.md)) {
             items(ui.members, key = { it.authId }) { member ->
                 ListRow(
@@ -74,12 +76,12 @@ private fun GroupDetailsScreen(ui: GroupDetailsUi, onBack: () -> Unit, viewModel
                     subtitle = when { member.manager -> managerLabel; member.self -> youLabel; else -> null },
                     // O gestor toca em outra pessoa para tirá-la ou passar a gestão; ninguém age sobre si por aqui (sair é o botão abaixo).
                     onClick = { if (ui.canManage && !member.self) selected = member },
-                    enabled = ui.canManage && !member.self,
-                    leading = { Avatar(initialsOf(member.name.orEmpty()), placeholderIcon = AppIcons.user_silhouette) },
+                    enabled = ui.canManage && !member.self && !ui.busy && !ui.needsVerification,
+                    leading = { Avatar(initialsOf(member.name.orEmpty()), imageUrl = member.avatar, loadImage = images::bytes, placeholderIcon = AppIcons.user_silhouette) },
                 )
             }
         }
-        ActionRow(stringResource(R.string.gp_sair), AppIcons.log_out, { if (ui.canManage && ui.successors.isNotEmpty()) choosing = true else leaving = true }, enabled = !ui.busy)
+        ActionRow(stringResource(R.string.gp_sair), AppIcons.log_out, { if (ui.canManage && ui.successors.isNotEmpty()) choosing = true else leaving = true }, enabled = !ui.busy && !ui.needsVerification)
     }
 
     if (picking) PeoplePickerSheet(

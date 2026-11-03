@@ -19,8 +19,6 @@ import com.project.solaria_mobile.feature.communication.data.ConversationDto
 import com.project.solaria_mobile.feature.communication.data.FakeCommunicationRepository
 import com.project.solaria_mobile.feature.communication.data.GroupConversationRequest
 import com.project.solaria_mobile.feature.communication.data.GroupCreationDto
-import com.project.solaria_mobile.feature.communication.data.MediaGateway
-import com.project.solaria_mobile.feature.communication.data.MediaUploadTarget
 import com.project.solaria_mobile.feature.communication.data.MessengerApi
 import com.project.solaria_mobile.feature.communication.data.ParticipantNames
 import com.project.solaria_mobile.feature.communication.data.ParticipantsRequest
@@ -42,7 +40,6 @@ import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
-import okhttp3.ResponseBody
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -77,14 +74,14 @@ class MessengerGroupsRepositoryTest {
         coEvery { api.createGroup(GroupConversationRequest("Equipe", setOf(ANA, BIA))) } returns GroupCreationDto(
             ConversationDto("g1", "GROUP", title = "Equipe"), rejectedParticipants = listOf(RejectedGroupParticipantDto(BIA, "USER_INACTIVE")),
         )
-        assertEquals(ApiResult.Success(GroupCreated("g1", 1)), repository(api).createGroup("  Equipe ", setOf(ANA, BIA)))
+        assertEquals(ApiResult.Success(GroupCreated("g1", 1, listOf(com.project.solaria_mobile.feature.communication.domain.RejectedParticipant(BIA, "USER_INACTIVE")))), repository(api).createGroup("  Equipe ", setOf(ANA, BIA)))
     }
 
     @Test fun addingParticipantsReturnsHowManyWereRefused() = runTest {
         val api = mockk<MessengerApi>()
         coEvery { api.addParticipants("g1", ParticipantsRequest(setOf(ANA))) } returns
             ConversationDto("g1", "GROUP", rejectedParticipants = listOf(RejectedGroupParticipantDto(ANA, "USER_NOT_FOUND")))
-        assertEquals(ApiResult.Success(1), repository(api).addParticipants("g1", setOf(ANA)))
+        assertEquals(ApiResult.Success(listOf(com.project.solaria_mobile.feature.communication.domain.RejectedParticipant(ANA, "USER_NOT_FOUND"))), repository(api).addParticipants("g1", setOf(ANA)))
     }
 
     @Test fun leavingAsManagerSendsTheSuccessorAndManagerTransferHasItsBody() = runTest {
@@ -132,7 +129,7 @@ class GroupDetailsViewModelTest {
             members = members - userId
             return ApiResult.Success(Unit)
         }
-        override suspend fun addParticipants(id: String, userIds: Set<String>): ApiResult<Int> { members = members + userIds; return ApiResult.Success(1) }
+        override suspend fun addParticipants(id: String, userIds: Set<String>): ApiResult<List<com.project.solaria_mobile.feature.communication.domain.RejectedParticipant>> { members = members + userIds; return ApiResult.Success(listOf(com.project.solaria_mobile.feature.communication.domain.RejectedParticipant(BIA, "USER_INACTIVE"))) }
         override suspend fun transferManager(id: String, successorId: String): ApiResult<Unit> { manager = successorId; return ApiResult.Success(Unit) }
     }
 

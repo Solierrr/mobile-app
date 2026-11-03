@@ -64,7 +64,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 /** Quem abre cada origem de anexo; vem das telas, porque o resultado do seletor precisa sobreviver ao fechamento da folha. */
-class ChatAttachmentSources(val gallery: () -> Unit, val camera: () -> Unit, val document: () -> Unit)
+class ChatAttachmentSources(val gallery: () -> Unit, val camera: () -> Unit, val document: () -> Unit, val audio: () -> Unit, val video: () -> Unit)
 
 /**
  * Seletores de foto (galeria e câmera) e de documento. A foto é conferida e copiada para o cache do app, para não depender
@@ -74,6 +74,19 @@ class ChatAttachmentSources(val gallery: () -> Unit, val camera: () -> Unit, val
 fun rememberChatAttachmentSources(onAttachment: (MessageAttachment) -> Unit, onInvalid: () -> Unit): ChatAttachmentSources {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+    var recording by remember { mutableStateOf(false) }
+    val microphone = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        if (granted) recording = true else onInvalid()
+    }
+    var videoUri by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf<String?>(null) }
+    val video = rememberLauncherForActivityResult(ActivityResultContracts.CaptureVideo()) { saved ->
+        val uri = videoUri?.let(Uri::parse)
+        videoUri = null
+        if (saved && uri != null) scope.launch {
+            val attachment = withContext(Dispatchers.IO) { readDocument(context, uri) }
+            if (attachment == null) { runCatching { context.contentResolver.delete(uri, null, null) }; onInvalid() } else onAttachment(attachment)
+        } else if (uri != null) runCatching { context.contentResolver.delete(uri, null, null) }
+    }
     fun photo(uri: Uri?) {
         if (uri == null) return
         scope.launch {
@@ -90,11 +103,23 @@ fun rememberChatAttachmentSources(onAttachment: (MessageAttachment) -> Unit, onI
             if (file == null) onInvalid() else onAttachment(file)
         }
     }
-    return remember(gallery, camera, document) {
+    if (recording) AudioRecordingSheet(onDismiss = { recording = false }, onAttachment = onAttachment, onInvalid = onInvalid)
+    return remember(gallery, camera, document, microphone, video) {
         ChatAttachmentSources(
             gallery = { gallery.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) },
             camera = camera,
             document = { document.launch(arrayOf("*/*")) },
+            audio = {
+                if (ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) recording = true
+                else microphone.launch(Manifest.permission.RECORD_AUDIO)
+            },
+            video = {
+                val directory = File(context.filesDir, "chat-media").apply { mkdirs() }
+                val file = File(directory, "video-${UUID.randomUUID()}.mp4")
+                val uri = androidx.core.content.FileProvider.getUriForFile(context, "${context.packageName}.files", file)
+                videoUri = uri.toString()
+                runCatching { video.launch(uri) }.onFailure { videoUri = null; file.delete(); onInvalid() }
+            },
         )
     }
 }
@@ -103,7 +128,13 @@ private fun copyPhoto(context: Context, uri: Uri): MessageAttachment.Image? {
     val (bytes, type) = readPickedImage(context, uri) ?: return null
     val directory = File(context.cacheDir, "chat-media").apply { mkdirs() }
     val file = File(directory, "${UUID.randomUUID()}.${if (type == "image/png") "png" else "jpg"}")
-    return runCatching { file.writeBytes(bytes); MessageAttachment.Image(Uri.fromFile(file).toString(), sizeBytes = bytes.size.toLong(), mimeType = type) }.getOrNull()
+    val bounds = android.graphics.BitmapFactory.Options().apply { inJustDecodeBounds = true }
+    android.graphics.BitmapFactory.decodeByteArray(bytes, 0, bytes.size, bounds)
+    return runCatching {
+        file.writeBytes(bytes)
+        MessageAttachment.Image(Uri.fromFile(file).toString(), sizeBytes = bytes.size.toLong(), mimeType = type,
+            width = bounds.outWidth.takeIf { it > 0 }, height = bounds.outHeight.takeIf { it > 0 })
+    }.getOrNull()
 }
 
 private fun readDocument(context: Context, uri: Uri): MessageAttachment.File? {
@@ -133,6 +164,8 @@ fun AttachmentSheet(sources: ChatAttachmentSources, onLocation: () -> Unit, onDi
             Text(stringResource(R.string.ch_anexar), color = AppTheme.colors.onSurface, style = MaterialTheme.typography.titleLarge)
             ActionRow(stringResource(R.string.ch_foto_galeria), AppIcons.images, { dismiss(); sources.gallery() }, compact = true)
             ActionRow(stringResource(R.string.ch_camera), AppIcons.camera, { dismiss(); sources.camera() }, compact = true)
+            ActionRow(stringResource(R.string.ch_gravar_audio), AppIcons.mic, { dismiss(); sources.audio() }, compact = true)
+            ActionRow(stringResource(R.string.ch_gravar_video), AppIcons.camera, { dismiss(); sources.video() }, compact = true)
             ActionRow(stringResource(R.string.ch_documento), AppIcons.folder, { dismiss(); sources.document() }, compact = true)
             ActionRow(stringResource(R.string.ch_localizacao), AppIcons.map_pin, { dismiss(); onLocation() }, compact = true)
         }

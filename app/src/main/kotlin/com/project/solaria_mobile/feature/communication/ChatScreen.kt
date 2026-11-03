@@ -2,6 +2,8 @@
 
 package com.project.solaria_mobile.feature.communication
 
+import com.project.solaria_mobile.feature.communication.domain.canModify
+
 import android.content.ClipData
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
@@ -208,7 +210,7 @@ fun ChatScreen(
                             is ChatListItem.Day -> Box(Modifier.padding(vertical = Spacing.sm)) { DaySeparator(item.date) }
                             ChatListItem.NewMessages -> Box(Modifier.padding(vertical = Spacing.sm)) { NewMessagesDivider() }
                             is ChatListItem.Entry -> Box(Modifier.padding(top = if (item.firstInGroup) Spacing.sm else 0.dp)) {
-                                ChatMessageItem(item, state.conversation.group, state.conversation.assistant, editing = item.message.id == state.editingId, enabled = !working, onEdit = actions.onEdit, onDelete = { confirmDelete = it })
+                                ChatMessageItem(item, state.conversation.group, state.conversation.assistant, editing = item.message.id == state.editingId, enabled = !working, onEdit = actions.onEdit, onDelete = { confirmDelete = it }, readOnly = state.conversation.readOnly || state.needsVerification)
                             }
                         }
                     }
@@ -237,11 +239,13 @@ fun ChatScreen(
         }
         if (tooLong) Text(stringResource(R.string.ch_max_length, MAX_MESSAGE_LENGTH), Modifier.padding(horizontal = Spacing.screen), color = AppTheme.colors.danger, style = MaterialTheme.typography.bodySmall)
         state.sendFailure?.let { failure ->
-            Text(failure.userMessage(), Modifier.padding(horizontal = Spacing.screen), color = AppTheme.colors.danger, style = MaterialTheme.typography.bodyMedium)
+            Text(com.project.solaria_mobile.core.common.ApiResult.Failure(failure, errorCode = state.sendErrorCode).userMessage(), Modifier.padding(horizontal = Spacing.screen), color = AppTheme.colors.danger, style = MaterialTheme.typography.bodyMedium)
         }
         if (invalidAttachment) Text(stringResource(R.string.ch_arquivo_invalido), Modifier.padding(horizontal = Spacing.screen), color = AppTheme.colors.danger, style = MaterialTheme.typography.bodyMedium)
         if (state.uploading) Text(stringResource(R.string.ch_enviando_anexo), Modifier.padding(horizontal = Spacing.screen), color = AppTheme.colors.onSurfaceMuted, style = MaterialTheme.typography.bodyMedium)
-        Row(
+        if (state.needsVerification) com.project.solaria_mobile.core.designsystem.components.PrimaryButton(stringResource(R.string.ch_conferir_estado), actions.onClearAction, secondary = true)
+        else if (state.conversation.readOnly) Text(stringResource(if (state.conversation.communityStatus == "ARCHIVED") R.string.ch_comunidade_arquivada else R.string.ch_comunidade_estado_indisponivel), Modifier.fillMaxWidth().padding(Spacing.screen), color = AppTheme.colors.onSurfaceMuted)
+        else Row(
             modifier = Modifier.fillMaxWidth().padding(horizontal = Spacing.screen).padding(top = Spacing.sm, bottom = Spacing.md),
             horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
             verticalAlignment = Alignment.CenterVertically,
@@ -306,6 +310,7 @@ fun ChatScreen(
 /** Sob o nome: quem está digitando, depois quantos estão online (grupo), e se está silenciada. Em conversa direta, quem está online aparece na bolinha do avatar. */
 @Composable
 private fun ChatStatusLine(state: ChatUiState) {
+    if (!state.conversation.assistant) RealtimeNotice(state.connection)
     val muted = state.muted == true
     val typingText = when {
         state.assistantThinking -> stringResource(R.string.as_pensando)
@@ -386,7 +391,7 @@ data class ChatActions(
  * sem menu, e a editada mostra a marca ao lado do horário.
  */
 @Composable
-private fun ChatMessageItem(entry: ChatListItem.Entry, group: Boolean, assistant: Boolean, editing: Boolean, enabled: Boolean, onEdit: (String) -> Unit, onDelete: (String) -> Unit) {
+private fun ChatMessageItem(entry: ChatListItem.Entry, group: Boolean, assistant: Boolean, editing: Boolean, enabled: Boolean, onEdit: (String) -> Unit, onDelete: (String) -> Unit, readOnly: Boolean = false) {
     val message = entry.message
     val clock = message.clockTime(androidx.compose.ui.platform.LocalConfiguration.current.locales[0])
     if (message.deleted) {
@@ -395,6 +400,10 @@ private fun ChatMessageItem(entry: ChatListItem.Entry, group: Boolean, assistant
     }
     var open by remember { mutableStateOf(false) }
     val clipboard = LocalClipboard.current
+    var now by remember { mutableStateOf(java.time.Instant.now()) }
+    LaunchedEffect(open) {
+        while (open) { now = java.time.Instant.now(); kotlinx.coroutines.delay(1_000) }
+    }
     val scope = rememberCoroutineScope()
     val time = listOfNotNull(clock.ifBlank { null }, stringResource(R.string.ch_editada).takeIf { message.edited }, stringResource(R.string.ch_editando).takeIf { editing }).joinToString(" · ")
     MessageRow(
@@ -406,10 +415,12 @@ private fun ChatMessageItem(entry: ChatListItem.Entry, group: Boolean, assistant
                     open = false
                     scope.launch { clipboard.setClipEntry(ClipEntry(ClipData.newPlainText("mensagem", message.text))) }
                 }, icon = AppIcons.copy)
-                if (message.mine && message.id.isNotBlank() && !assistant) {
+                if (message.canModify(now) && !assistant && !readOnly) {
                     if (message.attachment == null) AppMenuItem(stringResource(R.string.common_edit), { open = false; onEdit(message.id) }, icon = AppIcons.pencil)
                     AppMenuDivider()
                     AppMenuItem(stringResource(R.string.ch_excluir), { open = false; onDelete(message.id) }, destructive = true, icon = AppIcons.trash)
+                } else if (message.mine && !assistant && !readOnly) {
+                    Text(stringResource(R.string.ch_prazo_edicao), Modifier.padding(Spacing.sm), color = AppTheme.colors.onSurfaceMuted, style = MaterialTheme.typography.bodySmall)
                 }
             }
         },

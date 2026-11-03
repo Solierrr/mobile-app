@@ -66,7 +66,7 @@ O Room guarda cinco tabelas, descritas em [SQLITE.md](../database/SQLITE.md), e 
 
 Eventos e catch-up usam versões. O cursor só avança por catch-up. Mudança da época do servidor limpa mensagens e cursor e refaz bootstrap, preservando a fila nesse caminho.
 
-O worker da fila vive no escopo da aplicação, sem WorkManager, por isso o envio posterior depende de o processo estar ativo e conectado, sem garantia de entrega depois que o app é encerrado.
+O worker da fila vive no escopo da aplicação, sem WorkManager, por isso o envio posterior depende de o processo estar ativo e conectado. A base separada `OutboxDatabase` está na versão 3: migração 2→3 aditiva preserva mensagens e acrescenta tipo da conversa e contagem de recusas de credencial. Antes do POST, uma entrada fica marcada como incerta; após interrupção, a retomada consulta o histórico antes de reenviar. Não há garantia de execução com o processo encerrado nem de deduplicação no servidor.
 
 ## Observabilidade e versão
 
@@ -75,3 +75,13 @@ O diagnóstico e os estados de rede distinguem a sessão, o servidor e a conecti
 Gradle declara `versionName` 1.0 e `versionCode` 1, com sufixo no QA. A versão distribuída não foi inferida da tag antiga do checklist. <!-- PENDENTE: 3 -->
 
 A revisão analisada é `b6419552`, em 2026-10-30. Fontes em [Gradle](https://github.com/Solierrr/mobile-app/blob/main/app/build.gradle.kts), [navegação](https://github.com/Solierrr/mobile-app/blob/main/app/src/main/kotlin/com/project/solaria_mobile/presentation/navigation/AppNavHost.kt), [autenticação](https://github.com/Solierrr/mobile-app/blob/main/app/src/main/kotlin/com/project/solaria_mobile/feature/auth/data/RemoteAuthRepository.kt), [renovação](https://github.com/Solierrr/mobile-app/blob/main/app/src/main/kotlin/com/project/solaria_mobile/core/auth/TokenAuthenticator.kt) e [sincronização](https://github.com/Solierrr/mobile-app/blob/main/app/src/main/kotlin/com/project/solaria_mobile/feature/communication/data/MessageSync.kt).
+
+## Chat, mídia e gestão de comunidades
+
+`ParticipantNames` mantém um summary por `authId` normalizado, com nome e avatar. A lista usa nomes; os detalhes do grupo também usam as fotos. O compositor oferece gravação AAC com permissão de microfone, vídeo pela câmera do sistema, foto e documentos. Recursos de gravação/player são liberados ao sair da composição e pausados/finalizados ao ir ao fundo.
+
+`CommunityRoute` reutiliza `ProjectCommunitySection` e `ProjectCommunityViewModel` com o id do projeto, preservando as regras de papéis e a seleção de um sucessor para cada subgrupo. A abertura direta do chat confirma o status da comunidade; eventos `CONVERSATION_UPDATED` atualizam o modo de leitura sem sair do histórico.
+
+`RealtimeTokenRefresher` compartilha o `TokenAuthenticator` com o REST, inclusive a sincronização de refresh e a substituição condicional de tokens. `ChatRealtime.connection` expõe o `RealtimeState` ao chat e à lista.
+
+O CI do PR #62 (commit `0162d34`) rodou `testQaDebugUnitTest` e `testProdDebugUnitTest`: 447 testes por variante, 0 falhas, com KSP, Hilt e Room processados. Não houve teste em aparelho nem contra o messenger real. Pendências em `HANDOFF-MESSENGER.md`.

@@ -55,6 +55,8 @@ fun AppNavHost(
     onInboxOpened: () -> Unit = {},
     notificationId: String? = null,
     onNotificationHandled: () -> Unit = {},
+    notificationConversationId: String? = null,
+    onConversationNotificationHandled: () -> Unit = {},
 ) {
     fun open(destination: AppDestination) {
         navController.navigate(destination) {
@@ -97,6 +99,13 @@ fun AppNavHost(
         if (openInbox && authState.session == SessionState.SIGNED_IN && current != null && !current.hasRoute<AppDestination.Splash>()) {
             navController.navigate(AppDestination.Notifications) { launchSingleTop = true }
             onInboxOpened()
+        }
+    }
+    LaunchedEffect(notificationConversationId, current, authState.session) {
+        val id = notificationConversationId
+        if (id != null && authState.session == SessionState.SIGNED_IN && current != null && !current.hasRoute<AppDestination.Splash>()) {
+            navController.navigate(AppDestination.Chat(id)) { launchSingleTop = true }
+            onConversationNotificationHandled()
         }
     }
     // A splash nativa mostra a marca parada só até a splash Compose existir; a introdução animada roda na Compose, no mesmo ponto.
@@ -205,8 +214,9 @@ fun AppNavHost(
         }
         composable<AppDestination.MyRatings> { com.project.solaria_mobile.feature.rating.MyRatingsRoute(onBack = ::back) }
         composable<AppDestination.Communities> {
-            ProvidePageContainers { com.project.solaria_mobile.feature.communication.CommunitiesRoute(onBack = ::back, onOpenProject = { open(AppDestination.Project(it)) }) }
+            ProvidePageContainers { com.project.solaria_mobile.feature.communication.CommunitiesRoute(onBack = ::back, onOpenCommunity = { open(AppDestination.Community(it)) }) }
         }
+        composable<AppDestination.Community> { com.project.solaria_mobile.feature.communication.CommunityRoute(onBack = ::back, onNavigate = ::open) }
         composable<AppDestination.Chat> { ChatRoute(onBack = ::back, onOpenDetails = { open(AppDestination.GroupDetails(it)) }) }
         composable<AppDestination.GroupDetails> {
             com.project.solaria_mobile.feature.communication.GroupDetailsRoute(

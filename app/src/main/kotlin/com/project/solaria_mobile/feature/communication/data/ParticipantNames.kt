@@ -3,6 +3,7 @@ package com.project.solaria_mobile.feature.communication.data
 import com.project.solaria_mobile.core.common.ApiResult
 import com.project.solaria_mobile.core.network.ApiCallExecutor
 import com.project.solaria_mobile.feature.profile.data.ProfileApi
+import com.project.solaria_mobile.feature.profile.data.UserSummaryDto
 import java.util.concurrent.ConcurrentHashMap
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -18,20 +19,29 @@ import kotlinx.coroutines.sync.withPermit
  * resultado e é tentado de novo na próxima chamada, sem derrubar os demais.
  */
 @Singleton
-class ParticipantNames internal constructor(private val lookup: suspend (String) -> String?) {
+class ParticipantNames internal constructor(
+    private val summaryLookup: (suspend (String) -> UserSummaryDto?)? = null,
+    private val lookup: suspend (String) -> String?,
+) {
     @Inject constructor(api: ProfileApi, executor: ApiCallExecutor) : this({ authId ->
-        (executor.execute { api.summary(authId) } as? ApiResult.Success)?.data?.username?.takeIf(String::isNotBlank)
-    })
+        (executor.execute { api.summary(authId) } as? ApiResult.Success)?.data
+    }, { null })
 
-    private val cache = ConcurrentHashMap<String, String>()
+    private val cache = ConcurrentHashMap<String, UserSummaryDto>()
+    private val gate = Semaphore(CONCURRENCY)
 
     /** Nome por `authId` das pessoas que foram resolvidas. */
-    suspend fun resolve(authIds: Collection<String>): Map<String, String> = coroutineScope {
-        val gate = Semaphore(CONCURRENCY)
-        authIds.distinct().map { id ->
+    suspend fun resolve(authIds: Collection<String>): Map<String, String> = summaries(authIds).mapNotNull { (id, summary) ->
+        summary.username?.takeIf(String::isNotBlank)?.let { id to it }
+    }.toMap()
+
+    /** Nome e foto do mesmo summary; quem não tem foto continua com a silhueta. */
+    suspend fun summaries(authIds: Collection<String>): Map<String, UserSummaryDto> = coroutineScope {
+        authIds.map(String::lowercase).distinct().map { id ->
             async {
-                val name = cache[id] ?: gate.withPermit { lookup(id) }?.also { cache[id] = it }
-                name?.let { id to it }
+                val summary = cache[id] ?: gate.withPermit { summaryLookup?.invoke(id) ?: lookup(id)?.let { UserSummaryDto(username = it) } }
+                    ?.also { cache[id] = it }
+                summary?.let { id to it }
             }
         }.awaitAll().filterNotNull().toMap()
     }
