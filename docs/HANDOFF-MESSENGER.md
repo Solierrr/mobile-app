@@ -4,7 +4,9 @@ Este arquivo é autossuficiente. Quem o lê (pessoa ou IA, em outro computador) 
 
 - App: `Solierrr/mobile-app`, pacote `com.project.solaria_mobile` (Kotlin, Compose, Hilt, Retrofit com kotlinx.serialization, Krossbow STOMP, Room).
 - Servidor: `Solierrr/api-messenger`, `main` no commit `4b32199`.
-- Branch deste trabalho: `fix/messenger-community-and-names`, PR #61 para `main`. O PR acumula 3 commits de código (ver "O que já está feito").
+- O PR #61 foi integrado em `main` (`08ad3c3`). A continuação está em `feat/messenger-integration-completion`.
+- Escopo ajustado pelo solicitante em 2026-11-02: chat, mídia, grupos e comunidades. Avaliações e NPS ficam fora desta continuação.
+- O solicitante autorizou pular testes impedidos pelo ambiente. Não confundir testes escritos com testes executados.
 
 ## 1. Objetivo
 
@@ -42,7 +44,7 @@ Base: `BuildConfig.MESSENGER_BASE_URL`, prefixo `/messaging`. Autenticação: `A
 | Catch-up | `GET /updates?since&limit` | `{syncEpoch, cursor, hasMore, messages[changeVersion]}` | feito |
 | Mídia | `POST /media` `{conversationId, type, mimeType, sizeBytes}` | `{mediaId, upload{url, method, headers}, uploadExpiresAt, maxBytes}` | feito |
 | | `GET /media/{mediaId}/content` | 302 para link assinado (10 min); 410 `MEDIA_EXPIRED` após 7 dias | feito |
-| | `GET /media?conversationId&limit&cursor` | lista o que ainda vale baixar | **falta** |
+| | `GET /media?conversationId&limit&cursor` | lista o que ainda vale baixar | implementado no contrato e repositório; consumo no load continua opcional |
 | Comunidade | `GET /communities/project/{projectId}` | `status` ACTIVE ou ARCHIVED; `members[{userId, role}]` | feito |
 | | `GET /communities/me`, `GET /communities/{id}` | lista e leitura por id | `me` feito; por id não é usado |
 | | `POST /communities` | só o demandante do projeto; 409 se já existe | feito |
@@ -117,44 +119,63 @@ Cada item: arquivos, rotas, testes e critério de pronto.
 - Critério: build verde, testes verdes, fluxos acima funcionando.
 
 ### 5.1 Mídia: o que ficou de fora
-- [ ] **Gravador de áudio e vídeo**: hoje áudio e vídeo só saem como arquivo escolhido no seletor. Criar origem "Gravar áudio" em `ChatAttachments.kt` (`AttachmentSheet`), com permissão de microfone, produzindo `MessageAttachment.File` com mime `audio/*` e `sizeBytes` real. Mostrar player simples no `FileCard` (`ChatMessageViews.kt`).
-- [ ] `GET /media?conversationId&limit&cursor` para listar o que ainda vale baixar numa sessão nova (rota em `MessengerApi.kt`, método em `CommunicationRepository`, uso opcional no `ChatViewModel.load`).
-- [ ] Largura e altura da imagem (`width`/`height` no `AttachmentDto`) no envio, para o servidor guardar e a bolha reservar o espaço.
-- [ ] Teste: `AndroidMediaGateway` (upload sem `Authorization`, método e cabeçalhos do alvo) com `MockWebServer`.
+- [x] **Gravador de áudio e vídeo**: hoje áudio e vídeo só saem como arquivo escolhido no seletor. Criar origem "Gravar áudio" em `ChatAttachments.kt` (`AttachmentSheet`), com permissão de microfone, produzindo `MessageAttachment.File` com mime `audio/*` e `sizeBytes` real. Mostrar player simples no `FileCard` (`ChatMessageViews.kt`).
+- [x] `GET /media?conversationId&limit&cursor` para listar o que ainda vale baixar numa sessão nova (rota em `MessengerApi.kt`, método em `CommunicationRepository`, uso opcional no `ChatViewModel.load`).
+- [x] Largura e altura da imagem (`width`/`height` no `AttachmentDto`) no envio, para o servidor guardar e a bolha reservar o espaço.
+- [x] Teste: `AndroidMediaGateway` (upload sem `Authorization`, método e cabeçalhos do alvo) com `MockWebServer`.
 
 ### 5.2 Grupo avulso
-- [ ] Mostrar na tela o aviso de convidados recusados ao criar grupo (`NewGroup.Created.rejected` já existe; a lista abre direto o chat e descarta o número). Arquivo: `ConversationsScreen.kt`.
-- [ ] Mostrar o motivo (`reasonCode`: `USER_NOT_FOUND`, `USER_INACTIVE`, `NOT_COMMUNITY_MEMBER`) em vez de só a contagem.
-- [ ] Foto dos participantes (hoje só iniciais): usar `ParticipantNames` estendido para devolver também `avatar` do summary.
+- [x] Mostrar na tela o aviso de convidados recusados ao criar grupo (`NewGroup.Created.rejected` já existe; a lista abre direto o chat e descarta o número). Arquivo: `ConversationsScreen.kt`.
+- [x] Mostrar o motivo (`reasonCode`: `USER_NOT_FOUND`, `USER_INACTIVE`, `NOT_COMMUNITY_MEMBER`) em vez de só a contagem.
+- [x] Foto dos participantes (hoje só iniciais): usar `ParticipantNames` estendido para devolver também `avatar` do summary.
 
 ### 5.3 Comunidades
-- [ ] Tela de uma comunidade (hoje a gestão fica na seção do projeto). Opcional: `GET /communities/{id}`.
-- [ ] Comunidade arquivada é só leitura no chat do subgrupo: usar `communityStatus` da projeção da lista (`ConversationListItemResponseDTO`) para trocar o campo de texto por um aviso. Hoje o envio falha com erro genérico. Arquivos: `MessengerApi.kt` (campo `communityStatus` em `ConversationDto`), `CommunicationModels.kt`, `ChatScreen.kt`.
-- [ ] Remoção em lote de sucessores quando vários subgrupos: já existe um seletor por subgrupo; falta teste de UI.
+- [x] Tela de uma comunidade (hoje a gestão fica na seção do projeto). Opcional: `GET /communities/{id}`.
+- [x] Comunidade arquivada é só leitura no chat do subgrupo: usar `communityStatus` da projeção da lista (`ConversationListItemResponseDTO`) para trocar o campo de texto por um aviso. Hoje o envio falha com erro genérico. Arquivos: `MessengerApi.kt` (campo `communityStatus` em `ConversationDto`), `CommunicationModels.kt`, `ChatScreen.kt`.
+- [x] Remoção em lote de sucessores quando vários subgrupos: teste Compose escrito para exigir uma escolha em cada um dos dois subgrupos; execução no aparelho ainda pendente.
 
-### 5.4 Avaliações
+### 5.4 Avaliações (fora do escopo por orientação do solicitante)
 - [ ] UI para `PRODUTO`. O repositório e a API já aceitam `RatingType.PRODUTO`; falta uma tela de produto onde encaixar `ProfileRatingsSection` (o app ainda não tem tela de produto).
 - [ ] Mostrar todas as avaliações (hoje o perfil mostra a média e os 3 comentários mais recentes): tela "Todas as avaliações" com paginação local.
 - [ ] Mostrar o nome de quem avaliou nos comentários (resolver `evaluatorId` com `ParticipantNames`).
 
-### 5.5 NPS
+### 5.5 NPS (fora do escopo por orientação do solicitante)
 - [ ] Persistir "já respondi" entre execuções (hoje é um conjunto em memória, `NpsAnswers` em `ChatViewModel.kt`, e o 409 do servidor evita duplicar). Guardar em DataStore.
 - [ ] Decisão de produto: quando perguntar (hoje: ao sair de uma sessão que já teve resposta do assistente).
 
 ### 5.6 Outros casos de uso do messenger e lacunas do mobile
-- [ ] **Push abre a conversa** (`SolariaMessagingService`): o `NEW_MESSAGE` traz o id da conversa; confirmar com o api-notify se o payload tem `notificationId` (sem ele o app descarta o push).
-- [ ] **Prazo de 30 min** para editar e excluir: esconder ou desativar as ações no menu da mensagem depois do prazo, com o motivo (hoje volta erro genérico). Arquivo: `ChatScreen.kt` (`ChatMessageItem`).
-- [ ] **Indicador de conexão** ("Reconectando...", "Sem conexão em tempo real") a partir de `RealtimeState`, no chat e na lista.
-- [ ] **Reconectar com token vencido**: `StompRealtimeClient` trata recusa de token como `AuthFailed` e não reconecta até o app voltar ao primeiro plano; renovar o token e tentar de novo.
+- [x] **Push abre a conversa** (`SolariaMessagingService`): o `NEW_MESSAGE` traz o id da conversa; confirmar com o api-notify se o payload tem `notificationId` (sem ele o app descarta o push).
+- [x] **Prazo de 30 min** para editar e excluir: esconder ou desativar as ações no menu da mensagem depois do prazo, com o motivo (hoje volta erro genérico). Arquivo: `ChatScreen.kt` (`ChatMessageItem`).
+- [x] **Indicador de conexão** ("Reconectando...", "Sem conexão em tempo real") a partir de `RealtimeState`, no chat e na lista.
+- [x] **Reconectar com token vencido**: `StompRealtimeClient` trata recusa de token como `AuthFailed` e não reconecta até o app voltar ao primeiro plano; renovar o token e tentar de novo.
 - [ ] **Envio mais barato e seguro**: guardar o tipo da conversa na fila (`MessageOutbox`) para não buscar a conversa; conferir duplicidade pelo `clientMessageId` (o servidor não deduplica); limite de tentativas para `UNAUTHORIZED`; avaliar WorkManager para a fila sobreviver ao fechamento do app.
-- [ ] **Contador de não lidas** no atalho "Conversas" da Home (`ActionTile` não aceita selo).
-- [ ] `*_UNCERTAIN` (503): hoje só mostra o texto "confira antes de repetir"; falta consultar o estado antes de oferecer repetir.
+- [x] **Contador de não lidas** no atalho "Conversas" da Home (`ActionTile` não aceita selo).
+- [x] `*_UNCERTAIN` (503): consulta estado de grupo/comunidade e mensagens por páginas antes de liberar repetição. Se a consulta falhar ou vier apenas do cache, bloqueia ações até confirmação; anexos levam `clientMessageId`.
 - [ ] Conversa direta (`POST /conversations/direct`) devolve 201 também quando reaproveita; nada a fazer, só não presumir "criada".
 
 ### 5.7 Qualidade
 - [ ] Testes de UI (Compose) das telas novas; hoje só há testes de ViewModel e de repositório.
 - [ ] Revisar acessibilidade (descrições de conteúdo das estrelas e dos menus) e o tema escuro nas telas novas.
-- [ ] Atualizar `docs/ARCHITECTURE.md`, `docs/API.md` e `docs/STATUS.md` com o que mudou.
+- [x] Atualizar `docs/ARCHITECTURE.md`, `docs/API.md` e `docs/STATUS.md` com o que mudou.
+
+## Continuação em 2026-11-02
+
+Os itens marcados na seção 5 têm implementação; não atestam execução em aparelho. Foram acrescentados testes de unidade para cursor de mídia, dimensões, upload assinado, push, prazo e recuperação de token; e testes Compose para comunidade arquivada/ativa e seleção de sucessores em dois subgrupos. Estes testes ainda não foram executados com sucesso nesta máquina.
+
+A fila passa a guardar `conversationType` e `authAttempts` (Room 3, migração aditiva 2→3), limita recusas 401 a três tentativas e consulta páginas anteriores do histórico pelo `clientMessageId` antes de reenviar. Mensagens interrompidas em `SENDING` voltam como incertas. O envio continua no processo; WorkManager foi avaliado e permanece pendente, porque exige coordenar conta, ciclo de sessão e um único consumidor da fila. O servidor continua sem deduplicação: a consulta de histórico reduz duplicatas, sem garantir entrega única.
+
+Operações incertas de grupo e comunidade relêem o estado antes de liberar nova ação. Se a releitura falhar, a gestão fica bloqueada até conferir o estado. A criação de grupo atualiza a lista para a pessoa conferir antes de tentar criar de novo.
+
+Validação tentada:
+- `gradlew.bat` falha com `&` no caminho da pasta; a execução direta do JAR evita o wrapper.
+- `Unable to establish loopback connection` deixou de ocorrer com `-Djdk.net.unixdomain.tmpdir=C:\Windows\Temp`. O socket local usava o TEMP longo do sandbox.
+- Foi necessário `-Pandroid.overridePathCheck=true`, `ANDROID_HOME` apontando ao SDK local e seleção do JDK completo para evitar um JRE sem `jlink`.
+- O projeto tem flavors: usar `:app:testQaDebugUnitTest :app:assembleQaDebug :app:lintQaDebug`, não `testDebugUnitTest` (ambíguo).
+- A tentativa real de testes/build chegou ao KSP e falhou internamente: `Unexpected owner function: null` em `:app:kspQaDebugKotlin`. Não houve resultado de testes nem APK validado.
+- A compilação Kotlin completa de QA passou com KSP desativado por um init script temporário em `build/skip-ksp.init.gradle`: `:app:compileQaDebugKotlin` retornou `BUILD SUCCESSFUL`. Isso cobre Compose, navegação e recursos Kotlin, mas não valida processadores Hilt/Room nem geração/instalação de APK.
+- ADB não conseguiu iniciar seu daemon; fluxos em aparelho/emulador e QA real permanecem sem validação.
+
+Não incluir ajustes locais em `gradle.properties` ou `.idea/`. Os recursos novos existem em português, inglês e espanhol. O tema do projeto só fornece a paleta clara; a revisão completa em tema escuro continua pendente.
 
 ## 6. Workflow
 
