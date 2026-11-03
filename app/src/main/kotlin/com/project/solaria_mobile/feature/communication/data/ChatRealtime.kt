@@ -88,6 +88,7 @@ data class PresenceState(val known: Boolean = false, val online: Set<String> = e
 interface ChatRealtime {
     /** Verdadeiro enquanto a conexão está ativa; uma volta a verdadeiro depois de uma queda pede recuperar o que foi perdido. */
     val connected: Flow<Boolean>
+    val connection: Flow<RealtimeState> get() = connected.map { if (it) RealtimeState.Connected else RealtimeState.Disconnected }
     /** Eventos de mensagem e de conversa (atualizada ou removida), de todas as conversas da conta. Coletar pede a conexão. */
     val events: Flow<ChatEvent>
     /** Quem está online entre os contatos da conta; vale para qualquer conversa e continua entre as telas. */
@@ -172,6 +173,7 @@ class StompChatRealtime @Inject constructor(
     private var recoveryJob: Job? = null
 
     override val connected: Flow<Boolean> = client.state.map { it is RealtimeState.Connected }.distinctUntilChanged()
+    override val connection: Flow<RealtimeState> = client.state
     override val events: Flow<ChatEvent> = messageEvents.onStart { client.connect() }
     override val presence: Flow<PresenceState> = presenceState
     override val typingByConversation: Flow<Map<String, Set<String>>> = typingState
@@ -269,6 +271,7 @@ class SwitchingChatRealtime @Inject constructor(
     private fun current(): ChatRealtime = if (mockMode.isEnabled()) mock else stomp
 
     override val connected: Flow<Boolean> = mockMode.enabled.flatMapLatest { current().connected }
+    override val connection: Flow<RealtimeState> = mockMode.enabled.flatMapLatest { current().connection }
     override val events: Flow<ChatEvent> = mockMode.enabled.flatMapLatest { current().events }
     override val presence: Flow<PresenceState> = mockMode.enabled.flatMapLatest { current().presence }
     override val typingByConversation: Flow<Map<String, Set<String>>> = mockMode.enabled.flatMapLatest { current().typingByConversation }

@@ -63,11 +63,13 @@ fun ConversationsRoute(
     groups: NewGroupViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val context = androidx.compose.ui.platform.LocalContext.current
     val group by groups.state.collectAsStateWithLifecycle()
     var newGroup by remember { mutableStateOf(false) }
     // O grupo criado substitui a escolha: abre direto na conversa.
     androidx.compose.runtime.LaunchedEffect(group) {
-        (group as? NewGroup.Created)?.let { onOpenChat(it.conversationId); groups.consumed() }
+        (group as? NewGroup.Created)?.takeIf { it.rejected == 0 }?.let { onOpenChat(it.conversationId); groups.consumed() }
+        (group as? NewGroup.Failed)?.checkedConversations?.let(viewModel::showVerifiedConversations)
     }
     // Com o tempo real ligado a lista já reflete envio, edição, exclusão e arquivamento; ao voltar só lê de novo se ele estava fora.
     // A primeira abertura já carrega no ViewModel.
@@ -80,14 +82,24 @@ fun ConversationsRoute(
     UiStateHost(state, viewModel::load, onBack = onBack, header = { ScreenTitle(title, onBack = if (assistant) onBack else null) }, loading = { ListSkeleton(search = true) }) { content ->
         ConversationsScreen(
             content, viewModel::onQueryChange, onBack, onOpenChat, state as? UiState.Content, assistant, onNewSession, onOpenConnections, onStartConversation,
-            onNewGroup = { groups.consumed(); newGroup = true }, onOpenArchived = onOpenArchived, onOpenCommunities = onOpenCommunities,
+            onNewGroup = { if (group !is NewGroup.Working && (group as? NewGroup.Failed)?.needsVerification != true) { groups.consumed(); newGroup = true } }, onOpenArchived = onOpenArchived, onOpenCommunities = onOpenCommunities,
             groupFailure = (group as? NewGroup.Failed)?.failure,
+            groupNeedsVerification = (group as? NewGroup.Failed)?.needsVerification == true, onVerifyGroup = groups::verify,
         )
     }
     if (newGroup && !assistant) PeoplePickerSheet(
         title = stringResource(R.string.gp_novo_grupo), confirmLabel = stringResource(R.string.gp_criar_grupo), exclude = emptySet(),
         nameLabel = stringResource(R.string.gp_nome_do_grupo), onConfirm = { ids, name -> groups.create(name, ids) }, onDismiss = { newGroup = false },
     )
+    (group as? NewGroup.Created)?.takeIf { it.rejected > 0 }?.let { created ->
+        com.project.solaria_mobile.core.designsystem.components.AppDialog(
+            onDismissRequest = { groups.consumed(); onOpenChat(created.conversationId) },
+            title = stringResource(R.string.gp_rejeitados, created.rejected),
+            message = created.details.description(context),
+            confirmLabel = stringResource(R.string.gp_abrir_grupo),
+            onConfirm = { groups.consumed(); onOpenChat(created.conversationId) },
+        )
+    }
 }
 
 @Composable
@@ -105,6 +117,8 @@ fun ConversationsScreen(
     onOpenArchived: () -> Unit = {},
     onOpenCommunities: () -> Unit = {},
     groupFailure: com.project.solaria_mobile.core.common.ApiResult.Failure? = null,
+    groupNeedsVerification: Boolean = false,
+    onVerifyGroup: () -> Unit = {},
 ) {
     Column(
         modifier = Modifier.fillMaxSize().appBackground().padding(horizontal = Spacing.screen).padding(top = Spacing.lg),
@@ -115,6 +129,8 @@ fun ConversationsScreen(
             actions = if (assistant) null else { { ConversationsMenu(onNewGroup, onOpenArchived, onOpenCommunities) } },
         )
         groupFailure?.let { Text(it.userMessage(), color = AppTheme.colors.danger, style = androidx.compose.material3.MaterialTheme.typography.bodyMedium) }
+        if (groupNeedsVerification) PrimaryButton(stringResource(R.string.ch_conferir_estado), onVerifyGroup, secondary = true)
+        if (!assistant) RealtimeNotice(state.connection)
         if (assistant) com.project.solaria_mobile.core.designsystem.components.ActionRow(stringResource(R.string.as_nova_sessao), AppIcons.sparkles, onNewSession)
         else Row(Modifier.fillMaxWidth().height(androidx.compose.foundation.layout.IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(Spacing.md)) {
             // Não há botão para começar uma conversa nova: os dois atalhos ficam no topo da lista.

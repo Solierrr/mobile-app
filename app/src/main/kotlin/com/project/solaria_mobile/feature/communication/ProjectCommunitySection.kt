@@ -63,10 +63,11 @@ fun ProjectCommunitySection(onNavigate: (AppDestination) -> Unit, viewModel: Pro
     UiStateHost(state, viewModel::load, inline = true, loading = { ListSkeleton(rows = 3) }) { content ->
         LaunchedEffect(content.notice) { if (content.notice != null) { showForm = false; title = ""; selected = emptyList(); allMembers = true } }
         val community = content.community
-        val busy = content.busy || (state as? UiState.Content)?.refreshing == true
+        val busy = content.busy || content.needsVerification || (state as? UiState.Content)?.refreshing == true
         Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
             (state as? UiState.Content)?.let { ResourceStatus(it) }
             content.error?.let { error -> Text(ApiResult.Failure(error, errorCode = content.errorCode).userMessage(), color = AppTheme.colors.danger, style = MaterialTheme.typography.bodyMedium) }
+            if (content.needsVerification) PrimaryButton(stringResource(R.string.ch_conferir_estado), viewModel::load, secondary = true)
             content.notice?.let { notice -> Text(if (notice.rejected > 0) stringResource(R.string.pc_grupo_criado_rejeitados, notice.rejected) else stringResource(R.string.pc_grupo_criado), color = AppTheme.colors.onSurfaceMuted, style = MaterialTheme.typography.bodyMedium) }
             if (community.id == null) {
                 // Quem não pode ativar a comunidade lê isso na própria descrição, em vez de num aviso solto abaixo.
@@ -167,7 +168,7 @@ private fun MemberRow(person: CommunityPerson, community: ProjectCommunity, busy
  * participantes que ficam; só então o botão confirma.
  */
 @Composable
-private fun RemoveMemberSheet(person: CommunityPerson, community: ProjectCommunity, onDismiss: () -> Unit, onConfirm: (Map<String, String>) -> Unit) {
+internal fun RemoveMemberSheet(person: CommunityPerson, community: ProjectCommunity, onDismiss: () -> Unit, onConfirm: (Map<String, String>) -> Unit) {
     val groups = community.groupsNeedingSuccessor(person.authId)
     var chosen by remember { mutableStateOf(emptyMap<String, String>()) }
     val names = community.people.associate { it.authId.lowercase() to it.name }

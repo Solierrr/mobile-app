@@ -17,7 +17,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 
 /** [name] é nulo enquanto o api-core não devolveu o nome daquela pessoa. */
-data class GroupMember(val authId: String, val name: String?, val manager: Boolean, val self: Boolean)
+data class GroupMember(val authId: String, val name: String?, val manager: Boolean, val self: Boolean, val avatar: String? = null)
 
 data class GroupDetailsUi(
     val conversation: Conversation,
@@ -30,6 +30,8 @@ data class GroupDetailsUi(
     val rejected: Int = 0,
     /** A conta saiu do grupo: a tela fecha. */
     val left: Boolean = false,
+    val rejectedDetails: List<com.project.solaria_mobile.feature.communication.domain.RejectedParticipant> = emptyList(),
+    val needsVerification: Boolean = false,
 ) {
     /** Quem pode assumir a gestão: qualquer participante que não seja a própria conta. */
     val successors: List<GroupMember> get() = members.filterNot { it.self }
@@ -53,7 +55,7 @@ class GroupDetailsViewModel @Inject constructor(
             // Uma operação em andamento e o aviso da última ficam por cima do que a leitura trouxe.
             val previous = (mutable.value as? UiState.Content)?.data
             mutable.load { repository.conversation(id).map(::details) }
-            if (previous != null) update { it.copy(failure = previous.failure, rejected = previous.rejected) }
+            if (previous != null) update { it.copy(failure = previous.failure, rejected = previous.rejected, rejectedDetails = previous.rejectedDetails) }
         }
     }
 
@@ -69,15 +71,24 @@ class GroupDetailsViewModel @Inject constructor(
 
     fun transfer(successorId: String) = operation { repository.transferManager(id, successorId) }
 
-    fun clearFailure() = update { it.copy(failure = null, rejected = 0) }
+    fun clearFailure() = update { it.copy(failure = null, rejected = 0, rejectedDetails = emptyList()) }
 
     private fun operation(leaving: Boolean = false, call: suspend () -> ApiResult<*>) {
         val current = (mutable.value as? UiState.Content)?.data ?: return
-        if (current.busy) return
-        update { it.copy(busy = true, failure = null, rejected = 0) }
+        if (current.busy || current.needsVerification) return
+        update { it.copy(busy = true, failure = null, rejected = 0, rejectedDetails = emptyList()) }
         viewModelScope.launch {
             val result = call()
-            update { it.copy(busy = false, failure = result as? ApiResult.Failure, rejected = (result as? ApiResult.Success)?.data as? Int ?: 0, left = leaving && result is ApiResult.Success) }
+            if (result is ApiResult.Failure && result.errorCode?.endsWith("_UNCERTAIN") == true) {
+                val checked = repository.conversation(id)
+                if (checked is ApiResult.Success) {
+                    val state = mutable.value as? UiState.Content ?: return@launch
+                    mutable.value = state.copy(data = details(checked.data).copy(failure = result))
+                } else update { it.copy(busy = false, failure = result, needsVerification = true) }
+                return@launch
+            }
+            val rejected = ((result as? ApiResult.Success)?.data as? List<*>)?.filterIsInstance<com.project.solaria_mobile.feature.communication.domain.RejectedParticipant>().orEmpty()
+            update { it.copy(busy = false, failure = result as? ApiResult.Failure, rejected = rejected.size, rejectedDetails = rejected, left = leaving && result is ApiResult.Success) }
             if (result is ApiResult.Success && !leaving) load()
         }
     }
@@ -89,7 +100,7 @@ class GroupDetailsViewModel @Inject constructor(
 
     private fun details(conversation: Conversation): GroupDetailsUi {
         val names = conversation.participantNames.mapKeys { it.key.lowercase() }
-        val members = conversation.participants.map { GroupMember(it, names[it], it == conversation.managerId, it == me) }
+        val members = conversation.participants.map { GroupMember(it, names[it], it == conversation.managerId, it == me, conversation.participantAvatars[it]) }
             .sortedWith(compareByDescending<GroupMember> { it.manager }.thenByDescending { it.self }.thenBy { it.name.orEmpty().lowercase() })
         return GroupDetailsUi(conversation, members, canManage = me != null && conversation.managerId == me)
     }

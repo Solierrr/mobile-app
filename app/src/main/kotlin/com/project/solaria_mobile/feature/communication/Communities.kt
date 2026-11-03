@@ -38,7 +38,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 
-/** As comunidades de que a conta participa, de todos os projetos; a gestão de cada uma fica na página do projeto. */
+/** As comunidades de que a conta participa, de todos os projetos. */
 @HiltViewModel
 class CommunitiesViewModel @Inject constructor(private val repository: ProjectCommunityRepository) : ViewModel() {
     private val mutable = MutableStateFlow<UiState<List<CommunitySummary>>>(UiState.Loading)
@@ -52,7 +52,7 @@ class CommunitiesViewModel @Inject constructor(private val repository: ProjectCo
 }
 
 @Composable
-fun CommunitiesRoute(onBack: () -> Unit, onOpenProject: (String) -> Unit, viewModel: CommunitiesViewModel = hiltViewModel()) {
+fun CommunitiesRoute(onBack: () -> Unit, onOpenCommunity: (String) -> Unit, viewModel: CommunitiesViewModel = hiltViewModel()) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     UiStateHost(state, viewModel::load, onBack = onBack, header = { ScreenTitle(stringResource(R.string.cm_comunidades), onBack) }, loading = { ListSkeleton() }) { communities ->
         Column(Modifier.fillMaxSize().appBackground().padding(horizontal = Spacing.screen).padding(top = Spacing.lg), verticalArrangement = Arrangement.spacedBy(Spacing.md)) {
@@ -67,11 +67,22 @@ fun CommunitiesRoute(onBack: () -> Unit, onOpenProject: (String) -> Unit, viewMo
                     ListRow(
                         title = community.projectName.ifBlank { stringResource(R.string.cm_projeto) },
                         subtitle = stringResource(R.string.pc_n_integrantes, community.members),
-                        onClick = { onOpenProject(community.projectId) },
+                        onClick = { onOpenCommunity(community.projectId) },
                         trailing = if (community.archived) { { StatusBadge(stringResource(R.string.cm_arquivada)) } } else null,
                     )
                 }
             }
+        }
+    }
+}
+
+/** Gestão da comunidade fora da página do projeto, reutilizando as mesmas permissões e ações. O id da rota é o do projeto. */
+@Composable
+fun CommunityRoute(onBack: () -> Unit, onNavigate: (com.project.solaria_mobile.presentation.navigation.AppDestination) -> Unit) {
+    Column(Modifier.fillMaxSize().appBackground().padding(horizontal = Spacing.screen).padding(top = Spacing.lg), verticalArrangement = Arrangement.spacedBy(Spacing.md)) {
+        ScreenTitle(stringResource(R.string.cm_comunidade), onBack)
+        LazyColumn(contentPadding = PaddingValues(bottom = Spacing.screenBottom)) {
+            item { ProjectCommunitySection(onNavigate = onNavigate) }
         }
     }
 }

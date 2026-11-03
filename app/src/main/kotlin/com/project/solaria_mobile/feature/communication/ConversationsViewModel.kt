@@ -28,6 +28,7 @@ data class ConversationsUiState(
     val online: Set<String> = emptySet(),
     /** Conversas em que alguém está digitando agora. */
     val typing: Set<String> = emptySet(),
+    val connection: com.project.solaria_mobile.core.network.realtime.RealtimeState = com.project.solaria_mobile.core.network.realtime.RealtimeState.Disconnected,
 )
 
 /** Lista de conversas; [assistant] escolhe entre as conversas com pessoas e as sessões do assistente. */
@@ -42,8 +43,9 @@ open class ConversationListViewModel(
     private val myId = repository.currentUserId()?.lowercase()
     private var connected = false
 
-    val uiState: StateFlow<UiState<ConversationsUiState>> = combine(source, query, geoSessions, realtime.presence, realtime.typingByConversation) { loaded, text, geo, presence, typing ->
-        loaded.map { items ->
+    private val connectedSource = combine(source, realtime.connection) { loaded, connection -> loaded.map { it to connection } }
+    val uiState: StateFlow<UiState<ConversationsUiState>> = combine(connectedSource, query, geoSessions, realtime.presence, realtime.typingByConversation) { loaded, text, geo, presence, typing ->
+        loaded.map { (items, connection) ->
             val conversations = (items.filter { it.assistant == assistant } + if (assistant) geo else emptyList()).filter {
                 it.name.contains(text, ignoreCase = true) || it.preview.contains(text, ignoreCase = true)
             }
@@ -52,6 +54,7 @@ open class ConversationListViewModel(
                 // Conversa direta: a outra pessoa é o participante que não é a própria conta.
                 online = if (!presence.known) emptySet() else conversations.filter { c -> !c.group && !c.assistant && c.participants.any { it != myId && it in presence.online } }.map { it.id }.toSet(),
                 typing = conversations.filter { !typing[it.id].isNullOrEmpty() }.map { it.id }.toSet(),
+                connection = connection,
             )
         }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), UiState.Loading)
@@ -98,6 +101,9 @@ open class ConversationListViewModel(
     }
 
     fun onQueryChange(value: String) { query.value = value }
+
+    /** Resultado confirmado da consulta após uma criação incerta: a lista aparece antes de liberar outra criação. */
+    internal fun showVerifiedConversations(items: List<Conversation>) { source.value = UiState.Content(items) }
 
     /** Ao voltar para a lista só lê de novo se o tempo real estava fora; com ele ligado a lista já está em dia. */
     fun onResume() { if (!connected) load() }
