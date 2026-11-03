@@ -1,13 +1,22 @@
 package com.project.solaria_mobile
 
-import androidx.compose.ui.test.*
+import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsEnabled
+import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.test.platform.app.InstrumentationRegistry
 import com.project.solaria_mobile.core.designsystem.theme.AppTheme
 import com.project.solaria_mobile.feature.communication.ChatScreen
 import com.project.solaria_mobile.feature.communication.ChatUiState
 import com.project.solaria_mobile.feature.communication.RemoveMemberSheet
-import com.project.solaria_mobile.feature.communication.domain.*
+import com.project.solaria_mobile.feature.communication.domain.AvatarTone
+import com.project.solaria_mobile.feature.communication.domain.CommunityGroup
+import com.project.solaria_mobile.feature.communication.domain.CommunityPerson
+import com.project.solaria_mobile.feature.communication.domain.Conversation
+import com.project.solaria_mobile.feature.communication.domain.ProjectCommunity
 import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test

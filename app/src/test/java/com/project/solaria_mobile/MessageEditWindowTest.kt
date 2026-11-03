@@ -4,7 +4,8 @@ import com.project.solaria_mobile.feature.communication.domain.ChatMessage
 import com.project.solaria_mobile.feature.communication.domain.canModify
 import java.time.Instant
 import java.time.OffsetDateTime
-import org.junit.Assert.*
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class MessageEditWindowTest {

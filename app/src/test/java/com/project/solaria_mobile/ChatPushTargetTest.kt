@@ -1,7 +1,8 @@
 package com.project.solaria_mobile
 
 import com.project.solaria_mobile.feature.communication.data.chatPushTarget
-import org.junit.Assert.*
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Test
 
 class ChatPushTargetTest {

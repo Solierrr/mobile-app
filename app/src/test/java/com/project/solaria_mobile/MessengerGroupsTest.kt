@@ -19,8 +19,6 @@ import com.project.solaria_mobile.feature.communication.data.ConversationDto
 import com.project.solaria_mobile.feature.communication.data.FakeCommunicationRepository
 import com.project.solaria_mobile.feature.communication.data.GroupConversationRequest
 import com.project.solaria_mobile.feature.communication.data.GroupCreationDto
-import com.project.solaria_mobile.feature.communication.data.MediaGateway
-import com.project.solaria_mobile.feature.communication.data.MediaUploadTarget
 import com.project.solaria_mobile.feature.communication.data.MessengerApi
 import com.project.solaria_mobile.feature.communication.data.ParticipantNames
 import com.project.solaria_mobile.feature.communication.data.ParticipantsRequest
@@ -42,7 +40,6 @@ import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
-import okhttp3.ResponseBody
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull

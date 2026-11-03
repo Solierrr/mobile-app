@@ -5,11 +5,16 @@ import com.project.solaria_mobile.core.common.ErrorKind
 import com.project.solaria_mobile.feature.communication.NewGroup
 import com.project.solaria_mobile.feature.communication.NewGroupViewModel
 import com.project.solaria_mobile.feature.communication.data.FakeCommunicationRepository
-import com.project.solaria_mobile.feature.communication.domain.*
+import com.project.solaria_mobile.feature.communication.domain.AvatarTone
+import com.project.solaria_mobile.feature.communication.domain.CommunicationRepository
+import com.project.solaria_mobile.feature.communication.domain.Conversation
+import com.project.solaria_mobile.feature.communication.domain.GroupCreated
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
-import org.junit.Assert.*
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 

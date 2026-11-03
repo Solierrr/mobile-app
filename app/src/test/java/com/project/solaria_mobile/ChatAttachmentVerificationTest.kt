@@ -2,14 +2,24 @@ package com.project.solaria_mobile
 
 import androidx.lifecycle.SavedStateHandle
 import app.cash.turbine.test
-import com.project.solaria_mobile.core.common.*
+import com.project.solaria_mobile.core.common.ApiResult
+import com.project.solaria_mobile.core.common.ErrorKind
+import com.project.solaria_mobile.core.common.UiState
 import com.project.solaria_mobile.feature.communication.ChatViewModel
-import com.project.solaria_mobile.feature.communication.data.*
-import com.project.solaria_mobile.feature.communication.domain.*
+import com.project.solaria_mobile.feature.communication.data.FakeCommunicationRepository
+import com.project.solaria_mobile.feature.communication.data.testOutbox
+import com.project.solaria_mobile.feature.communication.domain.AvatarTone
+import com.project.solaria_mobile.feature.communication.domain.ChatMessage
+import com.project.solaria_mobile.feature.communication.domain.CommunicationRepository
+import com.project.solaria_mobile.feature.communication.domain.Conversation
+import com.project.solaria_mobile.feature.communication.domain.MessageAttachment
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
-import org.junit.Assert.*
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 
