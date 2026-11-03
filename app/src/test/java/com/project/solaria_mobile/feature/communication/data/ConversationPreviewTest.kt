@@ -17,6 +17,7 @@ class ConversationPreviewTest {
     private class PreviewApi : MessengerApi {
         val limits = mutableListOf<Int>()
         var listed = listOf(ConversationDto("c1", title = "Ana"), ConversationDto("c2", title = "Equipe"), ConversationDto("c3", title = "Sem rede"))
+        override suspend fun community(id: String): CommunityDto = error("O teste de prévias não consulta comunidades")
         override suspend fun conversations(archived: Boolean) = listed
         override suspend fun conversation(id: String) = ConversationDto(id)
         override suspend fun messages(conversationId: String, limit: Int, sinceSequence: Int?, beforeSequence: Int?): List<MessageDto> {
@@ -34,6 +35,7 @@ class ConversationPreviewTest {
         override suspend fun removeParticipant(id: String, userId: String, successorUserId: String?) = TODO()
         override suspend fun mediaUpload(body: MediaUploadRequest): MediaUploadDto = TODO()
         override suspend fun mediaContent(mediaId: String): okhttp3.ResponseBody = TODO()
+        override suspend fun availableMedia(conversationId: String, limit: Int, cursor: String?): MediaPageDto = error("O teste de prévias não lista mídias")
         override suspend fun nps(body: NpsRequest): kotlinx.serialization.json.JsonElement = TODO()
         override suspend fun direct(body: DirectConversationRequest) = ConversationDto("direct")
         override suspend fun send(body: SendMessageRequest) = MessageDto("m", body.conversationId, content = body.content)
