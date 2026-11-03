@@ -19,11 +19,13 @@ interface CommunicationRepository {
 
     suspend fun sendMessage(conversationId: String, text: String, clientMessageId: String? = null): ApiResult<ChatMessage>
 
-    /** Envio com anexo; só existe no modo de demonstração enquanto o messenger não tem contrato para isso. */
+    /** Repõe o tipo conhecido da conversa ao retomar uma mensagem persistida, sem uma consulta extra ao servidor. */
+    fun rememberConversationType(conversationId: String, conversationType: String) = Unit
+
     /** Abre (ou reaproveita) a conversa direta com a pessoa de identificador de login [recipientAuthId] e devolve o id da conversa. */
     suspend fun startDirectConversation(recipientAuthId: String): ApiResult<String> = ApiResult.Failure(ErrorKind.NOT_SUPPORTED)
 
-    suspend fun sendAttachment(conversationId: String, attachment: MessageAttachment, caption: String = ""): ApiResult<ChatMessage> = ApiResult.Failure(ErrorKind.NOT_SUPPORTED)
+    suspend fun sendAttachment(conversationId: String, attachment: MessageAttachment, caption: String = "", clientMessageId: String? = null): ApiResult<ChatMessage> = ApiResult.Failure(ErrorKind.NOT_SUPPORTED)
     suspend fun editMessage(id: String, text: String): ApiResult<ChatMessage> = ApiResult.Failure(ErrorKind.NOT_SUPPORTED)
     suspend fun deleteMessage(id: String): ApiResult<ChatMessage> = ApiResult.Failure(ErrorKind.NOT_SUPPORTED)
 
@@ -33,8 +35,8 @@ interface CommunicationRepository {
     /** Grupo avulso, fora de qualquer comunidade; [GroupCreated.rejectedParticipants] conta os convidados recusados. */
     suspend fun createGroup(title: String, participantIds: Set<String>): ApiResult<GroupCreated> = ApiResult.Failure(ErrorKind.NOT_SUPPORTED)
 
-    /** Devolve quantos convidados o servidor recusou. */
-    suspend fun addParticipants(id: String, userIds: Set<String>): ApiResult<Int> = ApiResult.Failure(ErrorKind.NOT_SUPPORTED)
+    /** Preserva o motivo de cada convite recusado para a tela explicar a admissão parcial. */
+    suspend fun addParticipants(id: String, userIds: Set<String>): ApiResult<List<RejectedParticipant>> = ApiResult.Failure(ErrorKind.NOT_SUPPORTED)
 
     /** Remove [userId] ou, se for a própria conta, sai do grupo. O gestor que sai com outros no grupo indica [successorId]. */
     suspend fun removeParticipant(id: String, userId: String, successorId: String? = null): ApiResult<Unit> = ApiResult.Failure(ErrorKind.NOT_SUPPORTED)
@@ -49,6 +51,9 @@ interface CommunicationRepository {
 
     /** Baixa a mídia do servidor para o aparelho e devolve o URI do arquivo; `MEDIA_EXPIRED` quando passou dos 7 dias. */
     suspend fun downloadMedia(mediaId: String, name: String?): ApiResult<String> = ApiResult.Failure(ErrorKind.NOT_SUPPORTED)
+
+    /** Mídias ainda disponíveis, da mais recente para a mais antiga. */
+    suspend fun availableMedia(conversationId: String, limit: Int = 30, cursor: String? = null): ApiResult<AvailableMediaPage> = ApiResult.Failure(ErrorKind.NOT_SUPPORTED)
 
     /** Sem valores, só lê o estado atual. `lastReadSequence` marca como lido até essa mensagem. */
     suspend fun conversationState(id: String, muted: Boolean? = null, archived: Boolean? = null, lastReadSequence: Int? = null): ApiResult<ConversationState> =

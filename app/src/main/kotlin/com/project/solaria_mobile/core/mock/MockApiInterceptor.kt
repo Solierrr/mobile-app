@@ -146,6 +146,8 @@ class MockApiInterceptor @Inject constructor(
             }
             segments == listOf("messaging", "communities", "me") && method == "GET" ->
                 success(ListSerializer(CommunityDto.serializer()), data.communitiesOf().map { data.communityForActor(it, actor) })
+            segments.size == 3 && segments.take(2) == listOf("messaging", "communities") && method == "GET" ->
+                data.communitiesOf().firstOrNull { it.id == segments[2] }?.let { success(CommunityDto.serializer(), data.communityForActor(it, actor)) } ?: notFound()
             segments.size == 3 && segments.take(2) == listOf("messaging", "communities") && method == "PATCH" -> {
                 val body = decode<CommunityStatusRequest>(request.body?.let(::bodyText).orEmpty())
                 data.setCommunityStatus(segments[2], body.status)?.let { success(CommunityDto.serializer(), data.communityForActor(it, actor)) } ?: notFound()
@@ -341,6 +343,18 @@ class MockApiInterceptor @Inject constructor(
             }
             segments.size == 5 && segments.take(2) == listOf("messaging", "conversations") && segments[3] == "participants" && method == "DELETE" ->
                 data.removeParticipant(segments[2], segments[4], request.url.queryParameter("successorUserId"), actor).let { (code, text) -> respond(chain, code, text) }
+            segments == listOf("messaging", "media") && method == "GET" -> {
+                val id = request.url.queryParameter("conversationId")
+                val limit = (request.url.queryParameter("limit")?.toIntOrNull() ?: 30).coerceIn(1, 100)
+                val offset = request.url.queryParameter("cursor")?.toIntOrNull()?.coerceAtLeast(0) ?: 0
+                val available = data.conversationIds().filter { id == null || it == id }.flatMap { conversationId ->
+                    data.messages(conversationId).filter { !it.deleted && it.attachment?.mediaId != null }.map { message ->
+                        com.project.solaria_mobile.feature.communication.data.MediaItemDto(message.id, conversationId, message.senderId, message.timestamp, message.attachment!!)
+                    }
+                }.sortedByDescending { it.timestamp }
+                success(com.project.solaria_mobile.feature.communication.data.MediaPageDto.serializer(),
+                    com.project.solaria_mobile.feature.communication.data.MediaPageDto(available.drop(offset).take(limit), (offset + limit).takeIf { it < available.size }?.toString()))
+            }
             segments == listOf("messaging", "media") && method == "POST" -> {
                 val body = decode<MediaUploadRequest>(request.body?.let(::bodyText).orEmpty())
                 success(MediaUploadDto.serializer(), data.mediaUpload(body))
@@ -614,7 +628,11 @@ class MockApiData internal constructor(private val profileStore: MockProfileStor
     @Synchronized fun communitiesOf(): List<CommunityDto> = communityStore.values.toList()
 
     @Synchronized fun setCommunityStatus(id: String, status: String): CommunityDto? =
-        communityStore[id]?.copy(status = status)?.also { communityStore[id] = it }
+        communityStore[id]?.copy(status = status)?.also {
+            communityStore[id] = it
+            conversationList.replaceAll { conversation -> if (conversation.communityId == id) conversation.copy(communityStatus = status) else conversation }
+            communityGroupStore[id].orEmpty().forEach { group -> conversationListener?.invoke(group.id) }
+        }
 
     /** Tira o integrante da comunidade; 409 se ele gere um subgrupo com gente e nenhum sucessor foi indicado. */
     @Synchronized fun removeCommunityMember(id: String, userId: String, removal: CommunityRemovalRequest): Pair<Int, String> {
@@ -640,7 +658,7 @@ class MockApiData internal constructor(private val profileStore: MockProfileStor
         val groupId = "qa-group-${java.util.UUID.randomUUID()}"
         val group = CommunityGroupDto(groupId, title.trim(), participants, selfId)
         communityGroupStore.getOrPut(id) { mutableListOf() }.add(group)
-        val conversation = ConversationDto(groupId, "GROUP", title.trim(), OffsetDateTime.now().toString())
+        val conversation = ConversationDto(groupId, "GROUP", title.trim(), OffsetDateTime.now().toString(), participantIds = participants.toList(), managerUserId = selfId, communityId = id, communityStatus = community.status)
         conversationList.add(conversation)
         conversationMessages[groupId] = mutableListOf()
         return GroupCreationDto(conversation)

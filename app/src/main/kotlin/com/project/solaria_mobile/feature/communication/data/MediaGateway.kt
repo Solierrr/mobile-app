@@ -48,7 +48,7 @@ class AndroidMediaGateway @Inject constructor(@ApplicationContext private val co
         if (target.url.startsWith(MOCK_UPLOAD_PREFIX)) return true
         return withContext(Dispatchers.IO) {
             val body = object : RequestBody() {
-                override fun contentType() = (target.headers["Content-Type"] ?: mimeType).toMediaTypeOrNull()
+                override fun contentType() = (target.headers.entries.firstOrNull { it.key.equals("Content-Type", ignoreCase = true) }?.value ?: mimeType).toMediaTypeOrNull()
                 override fun contentLength() = sizeBytes
                 override fun writeTo(sink: BufferedSink) {
                     val input = context.contentResolver.openInputStream(Uri.parse(uri)) ?: throw IOException("arquivo indisponível")

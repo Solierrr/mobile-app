@@ -18,7 +18,13 @@ data class Conversation(val id: String, val initials: String, val name: String, 
     /** Gestor do grupo, em minúsculas; só ele adiciona e remove participantes. Nulo em conversa que não é grupo. */
     val managerId: String? = null,
     /** Nome de quem participa, por `authId`, quando foi possível resolver; usado nos remetentes de grupo e em "digitando". */
-    val participantNames: Map<String, String> = emptyMap())
+    val participantNames: Map<String, String> = emptyMap(),
+    val participantAvatars: Map<String, String> = emptyMap(),
+    val communityId: String? = null,
+    val communityStatus: String? = null,
+) {
+    val readOnly: Boolean get() = communityStatus == "ARCHIVED" || (communityId != null && communityStatus != "ACTIVE")
+}
 
 /**
  * `clientMessageId` é o identificador que o app gerou ao enviar, devolvido pelo messenger no histórico. Mensagem excluída
@@ -44,11 +50,15 @@ data class ChatMessage(
  */
 sealed interface MessageAttachment {
     /** [url] é o arquivo no aparelho; vazio enquanto só há [mediaId] a baixar. [sizeBytes] e [mimeType] valem para o envio. */
-    data class Image(val url: String, val mediaId: String? = null, val sizeBytes: Long = 0, val mimeType: String = "image/jpeg", val expiresAt: java.time.Instant? = null) : MessageAttachment
+    data class Image(val url: String, val mediaId: String? = null, val sizeBytes: Long = 0, val mimeType: String = "image/jpeg", val expiresAt: java.time.Instant? = null, val width: Int? = null, val height: Int? = null) : MessageAttachment
     /** Documento, áudio ou vídeo: o tipo do envio sai do [mimeType]. */
     data class File(val name: String, val sizeBytes: Long, val mimeType: String, val url: String, val mediaId: String? = null, val expiresAt: java.time.Instant? = null) : MessageAttachment
     data class Location(val latitude: Double, val longitude: Double, val label: String = "") : MessageAttachment
 }
+
+/** Página de anexos que o servidor ainda entrega; o cursor é opaco e deve voltar sem alterações. */
+data class AvailableMedia(val messageId: String, val conversationId: String, val attachment: MessageAttachment)
+data class AvailableMediaPage(val items: List<AvailableMedia>, val nextCursor: String?)
 
 /** Estado pessoal da conversa: silenciar e arquivar valem só para a própria conta. */
 data class ConversationState(val muted: Boolean, val archived: Boolean)

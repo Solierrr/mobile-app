@@ -35,6 +35,11 @@ class RemoteCommunicationRepository @Inject constructor(
     /** Tipo de mensagem de cada conversa já vista, para o envio não precisar buscar a conversa antes. */
     private val messageTypes = ConcurrentHashMap<String, String>()
 
+    override fun rememberConversationType(conversationId: String, conversationType: String) {
+        if (conversationType in setOf("DIRECT", "GROUP", "CHAT_BOT"))
+            messageTypes[conversationId] = when (conversationType) { "GROUP" -> "USER_TO_GROUP"; "CHAT_BOT" -> "USER_TO_CHATBOT"; else -> "USER_TO_USER" }
+    }
+
     override suspend fun conversations(): ApiResult<List<Conversation>> {
         val me = currentUserId()
         return when (val result = executor.execute { api.conversations() }) {
@@ -76,7 +81,13 @@ class RemoteCommunicationRepository @Inject constructor(
             is ApiResult.Success -> {
                 val dto = result.data
                 messageTypes[dto.id] = dto.messageType()
-                ApiResult.Success(dto.toConversation(me, names.resolve(dto.participantIds.filter { it != me })))
+                val summaries = names.summaries(dto.participantIds)
+                // A leitura por id não traz communityStatus; confirma na comunidade ao abrir o chat diretamente.
+                val status = dto.communityStatus ?: if (dto.communityId != null)
+                    (executor.execute { api.community(dto.communityId) } as? ApiResult.Success)?.data?.status else null
+                ApiResult.Success(dto.copy(communityStatus = status).toConversation(me,
+                    summaries.filterKeys { !it.equals(me, ignoreCase = true) }.mapNotNull { (id, summary) -> summary.username?.let { id to it } }.toMap())
+                    .copy(participantAvatars = summaries.mapNotNull { (id, summary) -> summary.avatar?.let { id to it } }.toMap()))
             }
         }
     }
@@ -111,7 +122,7 @@ class RemoteCommunicationRepository @Inject constructor(
     override suspend fun startDirectConversation(recipientAuthId: String): ApiResult<String> =
         executor.execute { api.direct(DirectConversationRequest(recipientAuthId)) }.map { it.id }
 
-    override suspend fun sendAttachment(conversationId: String, attachment: MessageAttachment, caption: String): ApiResult<ChatMessage> {
+    override suspend fun sendAttachment(conversationId: String, attachment: MessageAttachment, caption: String, clientMessageId: String?): ApiResult<ChatMessage> {
         val me = currentUserId()
         val type = when (val result = messageType(conversationId)) {
             is ApiResult.Failure -> return result
@@ -128,7 +139,7 @@ class RemoteCommunicationRepository @Inject constructor(
                 is ApiResult.Success -> attachment.toRequestDto(sent.data)
             }
         }
-        val request = SendMessageRequest(conversationId, type, caption, attachment = dto)
+        val request = SendMessageRequest(conversationId, type, caption, clientMessageId = clientMessageId, attachment = dto)
         return executor.execute { api.send(request) }.map { it.toMessage(me).keepingLocalFile(attachment) }
     }
 
@@ -150,6 +161,13 @@ class RemoteCommunicationRepository @Inject constructor(
             is ApiResult.Success -> media.save(mediaId, name, result.data)?.let { ApiResult.Success(it) } ?: ApiResult.Failure(ErrorKind.UNKNOWN)
         }
 
+    override suspend fun availableMedia(conversationId: String, limit: Int, cursor: String?): ApiResult<com.project.solaria_mobile.feature.communication.domain.AvailableMediaPage> =
+        executor.execute { api.availableMedia(conversationId, limit, cursor) }.map { page ->
+            com.project.solaria_mobile.feature.communication.domain.AvailableMediaPage(
+                page.items.mapNotNull { item -> item.attachment.toAttachment()?.let { com.project.solaria_mobile.feature.communication.domain.AvailableMedia(item.messageId, item.conversationId, it) } }, page.nextCursor,
+            )
+        }
+
     override suspend fun archivedConversations(): ApiResult<List<Conversation>> {
         val me = currentUserId()
         return when (val result = executor.execute { api.conversations(archived = true) }) {
@@ -163,10 +181,10 @@ class RemoteCommunicationRepository @Inject constructor(
 
     override suspend fun createGroup(title: String, participantIds: Set<String>): ApiResult<GroupCreated> =
         executor.execute { api.createGroup(GroupConversationRequest(title.trim(), participantIds)) }
-            .map { GroupCreated(it.conversation.id, it.rejectedParticipants.size) }
+            .map { GroupCreated(it.conversation.id, it.rejectedParticipants.size, it.rejectedParticipants.map { rejected -> com.project.solaria_mobile.feature.communication.domain.RejectedParticipant(rejected.userId, rejected.reasonCode) }) }
 
-    override suspend fun addParticipants(id: String, userIds: Set<String>): ApiResult<Int> =
-        executor.execute { api.addParticipants(id, ParticipantsRequest(userIds)) }.map { it.rejectedParticipants.size }
+    override suspend fun addParticipants(id: String, userIds: Set<String>): ApiResult<List<com.project.solaria_mobile.feature.communication.domain.RejectedParticipant>> =
+        executor.execute { api.addParticipants(id, ParticipantsRequest(userIds)) }.map { dto -> dto.rejectedParticipants.map { com.project.solaria_mobile.feature.communication.domain.RejectedParticipant(it.userId, it.reasonCode) } }
 
     override suspend fun removeParticipant(id: String, userId: String, successorId: String?): ApiResult<Unit> =
         executor.execute { api.removeParticipant(id, userId, successorId) }
@@ -235,7 +253,7 @@ internal fun ConversationDto.toListConversation(currentUserId: String?, names: M
 
 /** Na conversa direta, a outra pessoa: quem participa e não sou eu. */
 internal fun ConversationDto.otherParticipant(me: String?): String? =
-    if (conversationType == "DIRECT") participantIds.firstOrNull { it != me } else null
+    if (conversationType == "DIRECT") participantIds.firstOrNull { !it.equals(me, ignoreCase = true) }?.lowercase() else null
 
 /** [names] são os nomes já resolvidos por `authId`; sem o nome do outro participante, a conversa direta fica como "Conversa". */
 internal fun ConversationDto.toConversation(me: String? = null, names: Map<String, String> = emptyMap()): Conversation {
@@ -255,7 +273,9 @@ internal fun ConversationDto.toConversation(me: String? = null, names: Map<Strin
         managerId = managerUserId?.lowercase(),
         participants = participantIds.map(String::lowercase).toSet(),
         activityAt = lastInteractionAt,
-        participantNames = names.filterKeys { it in participantIds },
+        participantNames = names.filterKeys { nameId -> participantIds.any { it.equals(nameId, ignoreCase = true) } },
+        communityId = communityId,
+        communityStatus = communityStatus,
     )
 }
 
@@ -280,7 +300,7 @@ internal fun AttachmentDto.toAttachment(): MessageAttachment? {
     val reference = mediaId ?: url
     val expires = expiresAt?.let { runCatching { java.time.Instant.parse(it) }.getOrNull() }
     return when (type) {
-        "IMAGE" -> reference?.let { MessageAttachment.Image(url.orEmpty(), mediaId, sizeBytes ?: 0L, mimeType ?: "image/jpeg", expires) }
+        "IMAGE" -> reference?.let { MessageAttachment.Image(url.orEmpty(), mediaId, sizeBytes ?: 0L, mimeType ?: "image/jpeg", expires, width, height) }
         "FILE", "AUDIO", "VIDEO" -> reference?.let { MessageAttachment.File(name.orEmpty(), sizeBytes ?: 0L, mimeType.orEmpty(), url.orEmpty(), mediaId, expires) }
         "LOCATION" -> if (latitude != null && longitude != null) MessageAttachment.Location(latitude, longitude, label.orEmpty()) else null
         else -> null
@@ -289,7 +309,7 @@ internal fun AttachmentDto.toAttachment(): MessageAttachment? {
 
 /** O anexo como o `POST /messages` o espera: o arquivo é citado por [mediaId], nunca pelo caminho no aparelho. */
 internal fun MessageAttachment.toRequestDto(mediaId: String?): AttachmentDto = when (this) {
-    is MessageAttachment.Image -> AttachmentDto("IMAGE", mediaId = mediaId, mimeType = mimeType, sizeBytes = sizeBytes)
+    is MessageAttachment.Image -> AttachmentDto("IMAGE", mediaId = mediaId, mimeType = mimeType, sizeBytes = sizeBytes, width = width, height = height)
     is MessageAttachment.File -> AttachmentDto(mediaKind(), mediaId = mediaId, mimeType = mimeType, sizeBytes = sizeBytes, name = name)
     is MessageAttachment.Location -> AttachmentDto("LOCATION", latitude = latitude, longitude = longitude, label = label)
 }

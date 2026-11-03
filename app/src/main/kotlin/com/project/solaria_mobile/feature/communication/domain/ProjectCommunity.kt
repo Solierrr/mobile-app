@@ -33,7 +33,8 @@ data class ProjectCommunity(
 /** Uma comunidade da lista "minhas comunidades": o projeto a que pertence, o estado e o papel da conta. */
 data class CommunitySummary(val id: String, val projectId: String, val projectName: String, val archived: Boolean, val members: Int, val myRole: String?)
 
-data class GroupCreated(val conversationId: String, val rejectedParticipants: Int)
+data class RejectedParticipant(val userId: String?, val reasonCode: String?)
+data class GroupCreated(val conversationId: String, val rejectedParticipants: Int, val rejected: List<RejectedParticipant> = emptyList())
 
 interface ProjectCommunityRepository {
     suspend fun read(projectId: String): ReadResult<ProjectCommunity>

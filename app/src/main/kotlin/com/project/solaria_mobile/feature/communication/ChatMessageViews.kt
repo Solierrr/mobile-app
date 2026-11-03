@@ -229,16 +229,18 @@ fun MessageText(text: String, modifier: Modifier = Modifier, mine: Boolean = fal
 @Composable
 private fun ChatImage(image: MessageAttachment.Image, loader: ImageLoaderViewModel = hiltViewModel()) {
     val url = image.url
+    val height = if ((image.width ?: 0) > 0 && (image.height ?: 0) > 0)
+        (MEDIA_WIDTH * (image.height!!.toFloat() / image.width!!)).coerceIn(80.dp, MEDIA_WIDTH * 2) else MEDIA_HEIGHT
     // Ainda só no servidor: o espaço da foto mostra o andamento, o aviso de indisponível ou o convite a baixar.
     if (url.isBlank()) {
-        MediaPlaceholder(image.mediaId, null, image.expiresAt, Modifier.size(MEDIA_WIDTH, MEDIA_HEIGHT))
+        MediaPlaceholder(image.mediaId, null, image.expiresAt, Modifier.size(MEDIA_WIDTH, height))
         return
     }
     RemoteImage(
         key = url,
         load = { key -> if (key.startsWith("file:")) withContext(Dispatchers.IO) { runCatching { File(Uri.parse(key).path.orEmpty()).readBytes() }.getOrNull() } else loader.bytes(key) },
         description = stringResource(R.string.ch_imagem_enviada),
-        modifier = Modifier.size(MEDIA_WIDTH, MEDIA_HEIGHT).clip(RoundedCornerShape(Radius.medium)),
+        modifier = Modifier.size(MEDIA_WIDTH, height).clip(RoundedCornerShape(Radius.medium)),
         contentScale = ContentScale.Crop,
     )
 }
@@ -264,6 +266,10 @@ private fun MediaPlaceholder(mediaId: String?, name: String?, expiresAt: java.ti
 
 @Composable
 private fun FileCard(file: MessageAttachment.File) {
+    if (file.mimeType.startsWith("audio/") && file.url.isNotBlank()) {
+        AudioFileCard(file)
+        return
+    }
     val context = LocalContext.current
     val media = LocalMediaUi.current
     val size = android.text.format.Formatter.formatShortFileSize(context, file.sizeBytes)
