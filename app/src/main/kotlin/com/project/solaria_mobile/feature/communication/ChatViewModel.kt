@@ -326,7 +326,7 @@ class ChatViewModel @Inject constructor(
 
     /** Envia uma foto, um documento ou uma localização: o arquivo sobe para o bucket e a mensagem cita o `mediaId`. */
     fun sendAttachment(attachment: MessageAttachment) {
-        if ((content.value as? UiState.Content)?.data?.conversation?.readOnly != false || controls.value.needsVerification || isAssistant() || live.value.uploading || controls.value.action is ChatAction.Working) return
+        if (!canWrite() || isAssistant() || live.value.uploading || controls.value.action is ChatAction.Working) return
         sendFailure.value = null
         controls.update { it.copy(sendErrorCode = null) }
         val clientId = java.util.UUID.randomUUID().toString()
@@ -471,7 +471,7 @@ class ChatViewModel @Inject constructor(
 
     /** Guarda a mensagem na fila do aparelho e limpa o campo; a fila envia assim que houver conexão. Em edição, salva a mensagem. */
     fun send() {
-        if ((content.value as? UiState.Content)?.data?.conversation?.readOnly != false || controls.value.needsVerification) return
+        if (!canWrite()) return
         stopTyping()
         val text = draft.value.trim()
         if (text.isBlank() || draftLimitExceeded.value || text.length > MAX_MESSAGE_LENGTH) return
@@ -491,7 +491,7 @@ class ChatViewModel @Inject constructor(
     /** Leva o texto da própria mensagem para o campo; o rascunho em andamento volta ao cancelar. */
     fun startEdit(id: String) {
         val message = currentMessages().firstOrNull { it.id == id && it.mine && !it.deleted } ?: return
-        if ((content.value as? UiState.Content)?.data?.conversation?.readOnly == true || controls.value.needsVerification || (message.sentAt != null && !message.canModify())) return
+        if (!canWrite() || (message.sentAt != null && !message.canModify())) return
         if (controls.value.editingId == null) savedStateHandle["draftBeforeEdit"] = draft.value
         savedStateHandle["editing"] = id
         savedStateHandle["draft"] = message.text
@@ -507,7 +507,7 @@ class ChatViewModel @Inject constructor(
     fun deleteMessage(id: String) {
         if (controls.value.action is ChatAction.Working) return
         val message = currentMessages().firstOrNull { it.id == id && it.mine && !it.deleted } ?: return
-        if ((content.value as? UiState.Content)?.data?.conversation?.readOnly == true || controls.value.needsVerification || (message.sentAt != null && !message.canModify())) return
+        if (!canWrite() || (message.sentAt != null && !message.canModify())) return
         run(ChatOperation.DELETE, id) {
             when (val result = repository.deleteMessage(id)) {
                 // Só some da conversa o que o servidor confirmou como excluído.
@@ -627,6 +627,10 @@ class ChatViewModel @Inject constructor(
             controls.value = controls.value.copy(action = failure?.let { ChatAction.Failed(operation, it.kind, it.errorCode) }, needsVerification = !verified || hasPendingVerification())
         }
     }
+
+    /** Só escreve na conversa carregada, fora do modo de leitura (comunidade arquivada) e sem operação incerta por conferir. */
+    private fun canWrite(): Boolean =
+        (content.value as? UiState.Content)?.data?.conversation?.readOnly == false && !controls.value.needsVerification
 
     private fun hasPendingVerification(): Boolean = savedStateHandle.get<String>("pendingAttachmentId") != null ||
         savedStateHandle.get<String>("pendingMutationMessageId") != null

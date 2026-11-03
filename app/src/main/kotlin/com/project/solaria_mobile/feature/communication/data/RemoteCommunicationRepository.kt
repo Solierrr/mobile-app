@@ -36,8 +36,7 @@ class RemoteCommunicationRepository @Inject constructor(
     private val messageTypes = ConcurrentHashMap<String, String>()
 
     override fun rememberConversationType(conversationId: String, conversationType: String) {
-        if (conversationType in setOf("DIRECT", "GROUP", "CHAT_BOT"))
-            messageTypes[conversationId] = when (conversationType) { "GROUP" -> "USER_TO_GROUP"; "CHAT_BOT" -> "USER_TO_CHATBOT"; else -> "USER_TO_USER" }
+        if (conversationType in setOf("DIRECT", "GROUP", "CHAT_BOT")) messageTypes[conversationId] = messageTypeOf(conversationType)
     }
 
     override suspend fun conversations(): ApiResult<List<Conversation>> {
@@ -238,7 +237,9 @@ private fun previewText(content: String, deleted: Boolean, senderId: String?, cu
     return if (currentUserId != null && senderId == currentUserId) "Você: $text" else text
 }
 
-private fun ConversationDto.messageType(): String = when (conversationType) {
+private fun ConversationDto.messageType(): String = messageTypeOf(conversationType)
+
+private fun messageTypeOf(conversationType: String?): String = when (conversationType) {
     "GROUP" -> "USER_TO_GROUP"
     "CHAT_BOT" -> "USER_TO_CHATBOT"
     else -> "USER_TO_USER"
