@@ -7,6 +7,7 @@ import androidx.lifecycle.viewModelScope
 import com.project.solaria_mobile.core.common.ApiResult
 import com.project.solaria_mobile.core.common.ErrorKind
 import com.project.solaria_mobile.core.common.UiState
+import com.project.solaria_mobile.feature.communication.domain.canModify
 import com.project.solaria_mobile.feature.communication.domain.ChatMessage
 import com.project.solaria_mobile.feature.communication.domain.CommunicationRepository
 import com.project.solaria_mobile.feature.communication.domain.Conversation
@@ -51,7 +52,7 @@ enum class ChatOperation { EDIT, DELETE, MUTE, UNMUTE, ARCHIVE }
 
 sealed interface ChatAction {
     data class Working(val operation: ChatOperation) : ChatAction
-    data class Failed(val operation: ChatOperation, val kind: ErrorKind) : ChatAction
+    data class Failed(val operation: ChatOperation, val kind: ErrorKind, val errorCode: String? = null) : ChatAction
 }
 
 data class ChatUiState(
@@ -79,7 +80,7 @@ data class ChatUiState(
     /** Em conversa direta, se o outro participante está online; nulo quando não se sabe ou é grupo. */
     val online: Boolean? = null,
     val onlineCount: Int = 0,
-    /** Anexos (foto, documento, localização) só existem no modo de demonstração, até o messenger ter contrato para isso. */
+    /** Anexos disponíveis para conversas humanas; o assistente só recebe texto. */
     val attachmentsEnabled: Boolean = false,
     /** O assistente está elaborando a resposta de uma mensagem enviada nesta sessão. */
     val assistantThinking: Boolean = false,
@@ -90,6 +91,9 @@ data class ChatUiState(
     val uploading: Boolean = false,
     /** Sessão do assistente que já teve resposta e ainda não foi avaliada: ao sair, pede a nota (NPS). */
     val npsPending: Boolean = false,
+    val needsVerification: Boolean = false,
+    val sendErrorCode: String? = null,
+    val connection: com.project.solaria_mobile.core.network.realtime.RealtimeState = com.project.solaria_mobile.core.network.realtime.RealtimeState.Disconnected,
 )
 
 internal const val MAX_MESSAGE_LENGTH = 8_000
@@ -120,6 +124,7 @@ private data class MediaProgress(val files: Map<String, String> = emptyMap(), va
 private data class LivePresence(
     val typing: Set<String> = emptySet(), val presence: PresenceState = PresenceState(), val loadingOlder: Boolean = false, val thinking: Boolean = false,
     val media: MediaProgress = MediaProgress(), val uploading: Boolean = false,
+    val connection: com.project.solaria_mobile.core.network.realtime.RealtimeState = com.project.solaria_mobile.core.network.realtime.RealtimeState.Disconnected,
 )
 
 private data class ChatControls(
@@ -128,6 +133,8 @@ private data class ChatControls(
     val muted: Boolean?,
     val archived: Boolean,
     val removed: Boolean = false,
+    val needsVerification: Boolean = false,
+    val sendErrorCode: String? = null,
 )
 
 @HiltViewModel
@@ -160,7 +167,7 @@ class ChatViewModel @Inject constructor(
     private val sendFailure = MutableStateFlow<ErrorKind?>(null)
     private val draftLimitExceeded = MutableStateFlow(false)
     private val content = MutableStateFlow<UiState<ChatContent>>(UiState.Loading)
-    private val controls = MutableStateFlow(ChatControls(savedStateHandle["editing"], null, null, false))
+    private val controls = MutableStateFlow(ChatControls(savedStateHandle["editing"], null, null, false, needsVerification = hasPendingVerification()))
 
     private val outgoing = outbox.observe(conversationId)
         .map { queued -> queued.map { OutgoingMessage(it.id, it.text, it.failure.takeIf { _ -> it.state == PendingState.FAILED }) } }
@@ -199,6 +206,9 @@ class ChatViewModel @Inject constructor(
                         assistantThinking = presence.thinking,
                         mediaLoading = presence.media.loading, mediaUnavailable = presence.media.unavailable, uploading = presence.uploading,
                         npsPending = loaded.data.conversation.assistant && remoteId != null && messages.any { !it.mine } && remote() !in NpsAnswers,
+                        connection = presence.connection,
+                        needsVerification = control.needsVerification,
+                        sendErrorCode = control.sendErrorCode,
                     ),
                 )
             }
@@ -210,6 +220,7 @@ class ChatViewModel @Inject constructor(
 
     init {
         load()
+        viewModelScope.launch { realtime.connection.collect { connection -> live.update { it.copy(connection = connection) } } }
         // Foto recebida baixa sozinha (as mais recentes); documento, áudio e vídeo esperam o toque.
         viewModelScope.launch {
             content.collect { state ->
@@ -260,8 +271,11 @@ class ChatViewModel @Inject constructor(
             // O mesmo PATCH marca como lido até a última mensagem carregada e devolve o estado pessoal; se falhar, o menu não oferece silenciar.
             val lastRead = (messages as? ApiResult.Success)?.data?.maxOfOrNull { it.sequence }?.takeIf { it > 0 }
             (repository.conversationState(remote(), lastReadSequence = lastRead) as? ApiResult.Success)?.data?.let { state ->
-                controls.value = controls.value.copy(muted = state.muted)
+                controls.value = controls.value.copy(muted = state.muted,
+                    needsVerification = controls.value.needsVerification && (conversation !is ApiResult.Success || messages !is ApiResult.Success || hasPendingVerification()))
             }
+            if (savedStateHandle.get<String>("pendingMutationMessageId") != null) verifyMessageMutation()
+            if (savedStateHandle.get<String>("pendingAttachmentId") != null) verifyAttachment()
         }
     }
 
@@ -312,18 +326,29 @@ class ChatViewModel @Inject constructor(
 
     /** Envia uma foto, um documento ou uma localização: o arquivo sobe para o bucket e a mensagem cita o `mediaId`. */
     fun sendAttachment(attachment: MessageAttachment) {
+        if ((content.value as? UiState.Content)?.data?.conversation?.readOnly != false || controls.value.needsVerification || isAssistant() || live.value.uploading || controls.value.action is ChatAction.Working) return
         sendFailure.value = null
+        controls.update { it.copy(sendErrorCode = null) }
+        val clientId = java.util.UUID.randomUUID().toString()
+        savedStateHandle["pendingAttachmentId"] = clientId
         live.update { it.copy(uploading = true) }
         viewModelScope.launch {
-            when (val result = repository.sendAttachment(remote(), attachment)) {
+            when (val result = repository.sendAttachment(remote(), attachment, clientMessageId = clientId)) {
                 is ApiResult.Success -> {
+                    savedStateHandle.remove<String>("pendingAttachmentId")
                     // Quem enviou já tem o arquivo: o eco do servidor, que só traz o `mediaId`, não precisa baixá-lo de volta.
                     val sent = result.data.attachment
                     val local = (sent as? MessageAttachment.Image)?.let { it.mediaId to it.url } ?: (sent as? MessageAttachment.File)?.let { it.mediaId to it.url }
                     if (local?.first != null && local.second.isNotBlank()) live.update { it.copy(media = it.media.copy(files = it.media.files + (local.first!! to local.second))) }
                     appendMessage(result.data)
                 }
-                is ApiResult.Failure -> sendFailure.value = result.kind
+                is ApiResult.Failure -> {
+                    sendFailure.value = result.kind
+                    controls.update { it.copy(sendErrorCode = result.errorCode) }
+                    val uncertain = result.errorCode?.endsWith("_UNCERTAIN") == true || result.kind in setOf(
+                        ErrorKind.CONNECTIVITY, ErrorKind.TIMEOUT, ErrorKind.SERVER, ErrorKind.SERIALIZATION, ErrorKind.UNKNOWN)
+                    if (uncertain) verifyAttachment() else savedStateHandle.remove<String>("pendingAttachmentId")
+                }
             }
             live.update { it.copy(uploading = false) }
         }
@@ -374,6 +399,16 @@ class ChatViewModel @Inject constructor(
 
     private fun onEvent(event: ChatEvent) {
         when (event) {
+            is ChatEvent.ConversationUpdated -> {
+                val current = content.value as? UiState.Content ?: return
+                val old = current.data.conversation
+                val dto = event.conversation
+                content.value = current.copy(data = current.data.copy(conversation = old.copy(
+                    communityStatus = dto.communityStatus ?: old.communityStatus,
+                    managerId = dto.managerUserId?.lowercase(), participants = dto.participantIds.map(String::lowercase).toSet(),
+                )))
+                if (dto.communityStatus == "ARCHIVED") { stopTyping(); cancelEdit() }
+            }
             // Numa sessão do assistente a resposta vem no retorno do turno; o evento só duplicaria a mensagem.
             is ChatEvent.MessageCreated, is ChatEvent.MessageChanged -> if (!isAssistant()) onMessageEvent(event)
             is ChatEvent.MessageRecovered -> if (!isAssistant()) onRecovered(event.message)
@@ -436,6 +471,7 @@ class ChatViewModel @Inject constructor(
 
     /** Guarda a mensagem na fila do aparelho e limpa o campo; a fila envia assim que houver conexão. Em edição, salva a mensagem. */
     fun send() {
+        if ((content.value as? UiState.Content)?.data?.conversation?.readOnly != false || controls.value.needsVerification) return
         stopTyping()
         val text = draft.value.trim()
         if (text.isBlank() || draftLimitExceeded.value || text.length > MAX_MESSAGE_LENGTH) return
@@ -444,7 +480,8 @@ class ChatViewModel @Inject constructor(
         savedStateHandle["draft"] = ""
         if (isAssistant()) { askAssistant(text); return }
         viewModelScope.launch {
-            if (!outbox.enqueue(conversationId, text)) {
+            val conversation = (content.value as? UiState.Content)?.data?.conversation ?: return@launch
+            if (!outbox.enqueue(conversationId, text, if (conversation.group) "GROUP" else "DIRECT")) {
                 savedStateHandle["draft"] = text
                 sendFailure.value = ErrorKind.UNAUTHORIZED
             }
@@ -454,6 +491,7 @@ class ChatViewModel @Inject constructor(
     /** Leva o texto da própria mensagem para o campo; o rascunho em andamento volta ao cancelar. */
     fun startEdit(id: String) {
         val message = currentMessages().firstOrNull { it.id == id && it.mine && !it.deleted } ?: return
+        if ((content.value as? UiState.Content)?.data?.conversation?.readOnly == true || controls.value.needsVerification || (message.sentAt != null && !message.canModify())) return
         if (controls.value.editingId == null) savedStateHandle["draftBeforeEdit"] = draft.value
         savedStateHandle["editing"] = id
         savedStateHandle["draft"] = message.text
@@ -468,12 +506,13 @@ class ChatViewModel @Inject constructor(
 
     fun deleteMessage(id: String) {
         if (controls.value.action is ChatAction.Working) return
-        if (currentMessages().none { it.id == id && it.mine && !it.deleted }) return
-        run(ChatOperation.DELETE) {
+        val message = currentMessages().firstOrNull { it.id == id && it.mine && !it.deleted } ?: return
+        if ((content.value as? UiState.Content)?.data?.conversation?.readOnly == true || controls.value.needsVerification || (message.sentAt != null && !message.canModify())) return
+        run(ChatOperation.DELETE, id) {
             when (val result = repository.deleteMessage(id)) {
                 // Só some da conversa o que o servidor confirmou como excluído.
                 is ApiResult.Success -> { replaceMessage(result.data); if (controls.value.editingId == id) cancelEdit(); null }
-                is ApiResult.Failure -> result.kind
+                is ApiResult.Failure -> result
             }
         }
     }
@@ -482,7 +521,7 @@ class ChatViewModel @Inject constructor(
         run(if (muted) ChatOperation.MUTE else ChatOperation.UNMUTE) {
             when (val result = repository.conversationState(remote(), muted = muted)) {
                 is ApiResult.Success -> { controls.value = controls.value.copy(muted = result.data.muted); null }
-                is ApiResult.Failure -> result.kind
+                is ApiResult.Failure -> result
             }
         }
     }
@@ -492,12 +531,13 @@ class ChatViewModel @Inject constructor(
         run(ChatOperation.ARCHIVE) {
             when (val result = repository.conversationState(remote(), archived = true)) {
                 is ApiResult.Success -> { controls.value = controls.value.copy(archived = result.data.archived); null }
-                is ApiResult.Failure -> result.kind
+                is ApiResult.Failure -> result
             }
         }
     }
 
     fun clearAction() {
+        if (controls.value.needsVerification) { load(); return }
         if (controls.value.action is ChatAction.Failed) controls.value = controls.value.copy(action = null)
     }
 
@@ -550,9 +590,9 @@ class ChatViewModel @Inject constructor(
     private fun saveEdit(id: String, text: String) {
         if (controls.value.action is ChatAction.Working) return
         val original = currentMessages().firstOrNull { it.id == id }
-        if (original == null || original.deleted) { cancelEdit(); return }
+        if (original == null || original.deleted || (original.sentAt != null && !original.canModify())) { cancelEdit(); return }
         if (original.text == text) { cancelEdit(); return }
-        run(ChatOperation.EDIT) {
+        run(ChatOperation.EDIT, id) {
             when (val result = repository.editMessage(id, text)) {
                 is ApiResult.Success -> {
                     replaceMessage(result.data)
@@ -561,17 +601,79 @@ class ChatViewModel @Inject constructor(
                     null
                 }
                 // O texto editado continua no campo para nova tentativa.
-                is ApiResult.Failure -> result.kind
+                is ApiResult.Failure -> result
             }
         }
     }
 
-    private fun run(operation: ChatOperation, block: suspend () -> ErrorKind?) {
-        if (controls.value.action is ChatAction.Working) return
+    private fun run(operation: ChatOperation, messageId: String? = null, block: suspend () -> ApiResult.Failure?) {
+        if (controls.value.action is ChatAction.Working || controls.value.needsVerification || live.value.uploading) return
         controls.value = controls.value.copy(action = ChatAction.Working(operation))
         viewModelScope.launch {
             val failure = block()
-            controls.value = controls.value.copy(action = failure?.let { ChatAction.Failed(operation, it) })
+            var verified = true
+            if (failure?.errorCode?.endsWith("_UNCERTAIN") == true) {
+                verified = when (operation) {
+                    ChatOperation.EDIT, ChatOperation.DELETE -> {
+                        savedStateHandle["pendingMutationMessageId"] = messageId
+                        verifyMessageMutation()
+                    }
+                    else -> when (val checked = repository.conversationState(remote())) {
+                        is ApiResult.Failure -> false
+                        is ApiResult.Success -> { controls.value = controls.value.copy(muted = checked.data.muted, archived = checked.data.archived); true }
+                    }
+                }
+            }
+            controls.value = controls.value.copy(action = failure?.let { ChatAction.Failed(operation, it.kind, it.errorCode) }, needsVerification = !verified || hasPendingVerification())
+        }
+    }
+
+    private fun hasPendingVerification(): Boolean = savedStateHandle.get<String>("pendingAttachmentId") != null ||
+        savedStateHandle.get<String>("pendingMutationMessageId") != null
+
+    private suspend fun verifyMessageMutation(): Boolean {
+        val id = savedStateHandle.get<String>("pendingMutationMessageId") ?: return false
+        controls.update { it.copy(needsVerification = true) }
+        val checked = findMessage { it.id == id }
+        val message = (checked as? ApiResult.Success)?.data
+        if (message == null) return false
+        replaceOrAppend(message)
+        savedStateHandle.remove<String>("pendingMutationMessageId")
+        controls.update { it.copy(needsVerification = hasPendingVerification()) }
+        return true
+    }
+
+    /** Consulta páginas até encontrar a mensagem ou esgotar o histórico; não presume que o alvo está na página mais recente. */
+    private suspend fun findMessage(matches: (ChatMessage) -> Boolean): ApiResult<ChatMessage?> {
+        var result = repository.messages(remote())
+        var before = Int.MAX_VALUE
+        while (true) {
+            when (val page = result) {
+                is ApiResult.Failure -> return page
+                is ApiResult.Success -> {
+                    page.data.firstOrNull(matches)?.let { return ApiResult.Success(it) }
+                    if (page.data.isEmpty()) return ApiResult.Success(null)
+                    val oldest = page.data.filter { it.sequence > 0 }.minOfOrNull { it.sequence }
+                        ?: return ApiResult.Failure(ErrorKind.SERIALIZATION)
+                    if (oldest >= before) return ApiResult.Failure(ErrorKind.SERIALIZATION)
+                    before = oldest
+                    result = repository.olderMessages(remote(), before)
+                }
+            }
+        }
+    }
+
+    /** Um anexo incerto não é reenviado automaticamente; o mesmo id do cliente permite reconhecer a entrega no histórico. */
+    private suspend fun verifyAttachment() {
+        val id = savedStateHandle.get<String>("pendingAttachmentId") ?: return
+        controls.update { it.copy(needsVerification = true) }
+        when (val checked = findMessage { it.clientMessageId == id }) {
+            is ApiResult.Failure -> controls.update { it.copy(needsVerification = true) }
+            is ApiResult.Success -> {
+                checked.data?.let { replaceOrAppend(it); sendFailure.value = null }
+                savedStateHandle.remove<String>("pendingAttachmentId")
+                controls.update { it.copy(needsVerification = hasPendingVerification()) }
+            }
         }
     }
 
@@ -622,7 +724,7 @@ internal fun ChatAction.message(resources: android.content.res.Resources): Strin
         ChatOperation.UNMUTE -> resources.getString(R.string.cm_reativando_notificacoes)
         ChatOperation.ARCHIVE -> resources.getString(R.string.cm_arquivando_conversa)
     }
-    is ChatAction.Failed -> when (kind) {
+    is ChatAction.Failed -> com.project.solaria_mobile.core.designsystem.components.errorCodeMessage(errorCode)?.let(resources::getString) ?: when (kind) {
         ErrorKind.FORBIDDEN -> resources.getString(R.string.cm_voce_nao_tem_permissao_para)
         ErrorKind.NOT_FOUND -> resources.getString(R.string.cm_a_mensagem_ou_conversa_nao)
         ErrorKind.CONNECTIVITY -> resources.getString(R.string.cm_sem_conexao_nada_foi_alterado)

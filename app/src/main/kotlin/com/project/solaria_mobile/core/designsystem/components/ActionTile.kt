@@ -15,16 +15,21 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
+import androidx.compose.foundation.layout.Row
+import androidx.compose.ui.Alignment
 import com.project.solaria_mobile.core.designsystem.theme.AppTheme
 import com.project.solaria_mobile.core.designsystem.theme.Radius
 import com.project.solaria_mobile.core.designsystem.theme.Sizing
 import com.project.solaria_mobile.core.designsystem.theme.Spacing
 
 @Composable
-fun ActionTile(title: String, @DrawableRes icon: Int, onClick: () -> Unit, modifier: Modifier = Modifier) {
+fun ActionTile(title: String, @DrawableRes icon: Int, onClick: () -> Unit, modifier: Modifier = Modifier, badge: String? = null) {
     Surface(onClick = onClick, modifier = modifier, shape = RoundedCornerShape(Radius.medium), color = AppTheme.colors.inputFill) {
         Column(Modifier.fillMaxWidth().defaultMinSize(minHeight = Sizing.tile).padding(Spacing.md), verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-            Icon(painterResource(icon), null, Modifier.size(Sizing.icon), tint = AppTheme.colors.onSurface)
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                Icon(painterResource(icon), null, Modifier.size(Sizing.icon), tint = AppTheme.colors.onSurface)
+                if (badge != null) StatusBadge(badge)
+            }
             Text(title, style = MaterialTheme.typography.bodyLarge, color = AppTheme.colors.onSurface)
         }
     }

@@ -49,6 +49,7 @@ class StompRealtimeClient @Inject constructor(
     private val endpoint: RealtimeEndpoint,
     private val credentials: CredentialProvider,
     private val scope: CoroutineScope,
+    private val tokenRefresher: RealtimeTokenRefresher = RealtimeTokenRefresher { null },
 ) : RealtimeClient {
 
     private val _state = MutableStateFlow<RealtimeState>(RealtimeState.Disconnected)
@@ -101,6 +102,7 @@ class StompRealtimeClient @Inject constructor(
         }
 
         var attempt = 0
+        var refreshed = false
         while (currentCoroutineContext().isActive) {
             val url = endpoint.url()
             if (url == null) {
@@ -120,6 +122,11 @@ class StompRealtimeClient @Inject constructor(
             } catch (e: CancellationException) {
                 throw e
             } catch (e: StompAuthException) {
+                if (e.reason == AuthFailure.TOKEN_REJECTED && !refreshed) {
+                    refreshed = true
+                    val renewed = tokenRefresher.refresh(token)
+                    if (!renewed.isNullOrBlank() && renewed != token) { attempt++; continue }
+                }
                 publish(RealtimeState.AuthFailed(e.reason))
                 return
             } catch (e: Exception) {
@@ -136,6 +143,8 @@ class StompRealtimeClient @Inject constructor(
             attempt = 0
             link.value = opened
             publish(RealtimeState.Connected)
+            // O CONNECT foi aceito: uma expiração futura pertence a uma sessão autenticada nova.
+            refreshed = false
 
             val authFailure = try {
                 opened.awaitLoss()
@@ -145,11 +154,17 @@ class StompRealtimeClient @Inject constructor(
             }
 
             if (authFailure != null) {
+                if (authFailure == AuthFailure.TOKEN_REJECTED && !refreshed) {
+                    refreshed = true
+                    val renewed = tokenRefresher.refresh(token)
+                    if (!renewed.isNullOrBlank() && renewed != token) { attempt++; continue }
+                }
                 publish(RealtimeState.AuthFailed(authFailure))
                 return
             }
 
             attempt = 1
+            refreshed = false
             publish(RealtimeState.Reconnecting(attempt))
             delay(backoffMillis(attempt))
         }

@@ -38,6 +38,7 @@ class MainActivity : ComponentActivity() {
     @Inject lateinit var pushRegistration: com.project.solaria_mobile.feature.communication.data.PushRegistration
     private val openInbox = androidx.compose.runtime.mutableStateOf(false)
     private val notificationId = androidx.compose.runtime.mutableStateOf<String?>(null)
+    private val notificationConversationId = androidx.compose.runtime.mutableStateOf<String?>(null)
     private var splashSettled = false
 
     override fun attachBaseContext(newBase: android.content.Context) {
@@ -52,6 +53,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         openInbox.value = savedInstanceState?.getBoolean("openInbox") == true
         notificationId.value = savedInstanceState?.getString("notificationId")
+        notificationConversationId.value = savedInstanceState?.getString("notificationConversationId")
         enableEdgeToEdge(
             statusBarStyle = SystemBarStyle.light(android.graphics.Color.TRANSPARENT, android.graphics.Color.TRANSPARENT),
             navigationBarStyle = SystemBarStyle.light(android.graphics.Color.TRANSPARENT, android.graphics.Color.TRANSPARENT),
@@ -69,7 +71,8 @@ class MainActivity : ComponentActivity() {
                         containerColor = androidx.compose.material3.MaterialTheme.colorScheme.background,
                     ) { innerPadding ->
                         OfflineStatus(Modifier.padding(innerPadding).consumeWindowInsets(innerPadding)) {
-                            AppNavHost(authViewModel = authViewModel, modifier = Modifier.weight(1f), onSplashSettled = { splashSettled = true }, openInbox = openInbox.value, onInboxOpened = { openInbox.value = false }, notificationId = notificationId.value, onNotificationHandled = { notificationId.value = null })
+                            AppNavHost(authViewModel = authViewModel, modifier = Modifier.weight(1f), onSplashSettled = { splashSettled = true }, openInbox = openInbox.value, onInboxOpened = { openInbox.value = false }, notificationId = notificationId.value, onNotificationHandled = { notificationId.value = null },
+                                notificationConversationId = notificationConversationId.value, onConversationNotificationHandled = { notificationConversationId.value = null; notificationId.value = null })
                         }
                     }
                 }
@@ -94,16 +97,19 @@ class MainActivity : ComponentActivity() {
     override fun onSaveInstanceState(outState: Bundle) {
         outState.putBoolean("openInbox", openInbox.value)
         outState.putString("notificationId", notificationId.value)
+        outState.putString("notificationConversationId", notificationConversationId.value)
         super.onSaveInstanceState(outState)
     }
 
     private fun handleNotification(intent: Intent?) {
         val key = com.project.solaria_mobile.feature.communication.data.SolariaMessagingService.OPEN_INBOX
         if (intent?.getBooleanExtra(key, false) == true) {
-            openInbox.value = true
+            notificationConversationId.value = intent.getStringExtra(com.project.solaria_mobile.feature.communication.data.SolariaMessagingService.OPEN_CONVERSATION)?.takeIf { it.matches(Regex("[A-Za-z0-9_-]{1,128}")) }
+            openInbox.value = notificationConversationId.value == null
             notificationId.value = intent.getStringExtra("notificationId")?.takeIf { it.matches(Regex("[A-Za-z0-9_-]{1,128}")) }
             intent.removeExtra(key)
             intent.removeExtra("notificationId")
+            intent.removeExtra(com.project.solaria_mobile.feature.communication.data.SolariaMessagingService.OPEN_CONVERSATION)
         }
     }
 

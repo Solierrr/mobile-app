@@ -73,10 +73,14 @@ fun HomeRoute(
     viewModel: HomeViewModel = hiltViewModel(),
     images: ImageLoaderViewModel = hiltViewModel(),
     counter: com.project.solaria_mobile.feature.communication.NotificationCounterViewModel = hiltViewModel(),
+    conversations: com.project.solaria_mobile.feature.communication.ConversationsViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     androidx.lifecycle.compose.LifecycleEventEffect(androidx.lifecycle.Lifecycle.Event.ON_RESUME) { viewModel.load() }
     val unread by counter.unread.collectAsStateWithLifecycle()
+    val chats by conversations.uiState.collectAsStateWithLifecycle()
+    androidx.lifecycle.compose.LifecycleEventEffect(androidx.lifecycle.Lifecycle.Event.ON_RESUME) { conversations.onResume() }
+    val unreadMessages = (chats as? com.project.solaria_mobile.core.common.UiState.Content)?.data?.conversations.orEmpty().sumOf { it.unread.toLong() }.coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
     val owner = androidx.lifecycle.compose.LocalLifecycleOwner.current
     androidx.compose.runtime.LaunchedEffect(owner, counter) {
         owner.lifecycle.repeatOnLifecycle(androidx.lifecycle.Lifecycle.State.RESUMED) {
@@ -87,7 +91,7 @@ fun HomeRoute(
     val bannerModel: HomeBannerViewModel = hiltViewModel()
     val banner by bannerModel.banner.collectAsStateWithLifecycle()
     UiStateHost(state, viewModel::load, modifier, loading = { HomeSkeleton(modifier, banner) }) { content ->
-        HomeScreen(content, viewModel::onCallsQueryChange, onOpenPage, modifier, images::bytes, unread, banner, bannerModel::select, bannerModel::setCustom)
+        HomeScreen(content, viewModel::onCallsQueryChange, onOpenPage, modifier, images::bytes, unread, banner, bannerModel::select, bannerModel::setCustom, unreadMessages)
     }
 }
 
@@ -102,6 +106,7 @@ fun HomeScreen(
     banner: HomeBanner = HomeBanner.Default,
     onBannerSelect: (BannerPreset) -> Unit = {},
     onBannerImage: (ByteArray) -> Unit = {},
+    unreadMessages: Int = 0,
 ) {
     var callsOpen by remember { mutableStateOf(false) }
     var bannerOpen by remember { mutableStateOf(false) }
@@ -148,7 +153,7 @@ fun HomeScreen(
             ) {
             // Sem compromissos hoje e sem projetos, "Hoje" e "Projetos recentes" só repetiriam frases vazias: no lugar entra a grade de atalhos.
             val fresh = (state.today as? TodayAgenda.Ready)?.events?.isEmpty() == true && state.recentProjects.isEmpty()
-            if (fresh) StartGrid(onOpenPage) else TodaySection(state.today, onOpenPage)
+            if (fresh) StartGrid(onOpenPage, unreadMessages) else TodaySection(state.today, onOpenPage)
             if (state.pendingInvitations > 0) {
                 ActionRow(
                     if (state.pendingInvitations == 1) stringResource(R.string.hm_1_convite_de_projeto) else "${state.pendingInvitations} convites de projeto",
@@ -252,7 +257,7 @@ private fun HomeSkeleton(modifier: Modifier = Modifier, banner: HomeBanner = Hom
 
 /** Grade de atalhos para quem ainda não tem compromisso nem projeto; os mesmos cartões cinza da tela do projeto. */
 @Composable
-private fun StartGrid(onOpenPage: (AppDestination) -> Unit) {
+private fun StartGrid(onOpenPage: (AppDestination) -> Unit, unreadMessages: Int) {
     Column(verticalArrangement = Arrangement.spacedBy(Spacing.md)) {
         SectionHeading(stringResource(R.string.hm_o_que_fazer))
         Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(Spacing.md)) {
@@ -261,7 +266,8 @@ private fun StartGrid(onOpenPage: (AppDestination) -> Unit) {
         }
         Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(Spacing.md)) {
             ActionTile(stringResource(R.string.pf_conexoes), AppIcons.users, { onOpenPage(AppDestination.Connections) }, Modifier.weight(1f).fillMaxHeight())
-            ActionTile(stringResource(R.string.pd_conversas), AppIcons.message_circle, { onOpenPage(AppDestination.Chats) }, Modifier.weight(1f).fillMaxHeight())
+            ActionTile(stringResource(R.string.pd_conversas), AppIcons.message_circle, { onOpenPage(AppDestination.Chats) }, Modifier.weight(1f).fillMaxHeight(),
+                badge = unreadMessages.takeIf { it > 0 }?.let { if (it > 99) "99+" else it.toString() })
         }
     }
 }
