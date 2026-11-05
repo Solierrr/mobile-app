@@ -128,6 +128,9 @@ class ScheduleOptionsViewModel @Inject constructor(
         if (mutable.value.google == GoogleLink.CONNECTED) viewModelScope.launch { loadBusy() }
     }
 
+    /** Busca de novo os horários ocupados do mês atual; usado pelo botão de atualizar da agenda. */
+    fun reloadBusy() = showMonth(month ?: LocalDate.now())
+
     private suspend fun loadBusy() {
         val technician = mutable.value.technicianId ?: return
         val start = (month ?: LocalDate.now().withDayOfMonth(1))

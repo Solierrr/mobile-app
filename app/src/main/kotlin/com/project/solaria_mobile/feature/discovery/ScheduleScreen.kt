@@ -99,7 +99,7 @@ fun ScheduleRoute(
     }
     UiStateHost(state, viewModel::load, onBack = onBack, header = { ScreenTitle(stringResource(R.string.pd_agenda), onBack) }, loading = { ScheduleSkeleton() }) { content ->
         LaunchedEffect(content.selectedDate.withDayOfMonth(1)) { options.showMonth(content.selectedDate) }
-        ScheduleScreen(content, onBack, { optionsOpen = true }, viewModel::selectDay, viewModel::previousMonth, viewModel::nextMonth, viewModel::selectToday, onOpenProject, viewModel::load, state as? UiState.Content, optionState)
+        ScheduleScreen(content, onBack, { optionsOpen = true }, viewModel::selectDay, viewModel::previousMonth, viewModel::nextMonth, viewModel::selectToday, onOpenProject, { viewModel.load(); options.reloadBusy() }, state as? UiState.Content, optionState)
     }
     if (optionsOpen) BottomSheet(onDismiss = { optionsOpen = false }) {
         ScheduleOptionsSheet(optionState, onJourney = { journeyOpen = true }, onGoogle = { googleOpen = true }, onSettings = onOpenSettings)
