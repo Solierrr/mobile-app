@@ -74,7 +74,7 @@ android {
             buildConfigField("String", "MESSENGER_BASE_URL", "\"https://messenger.solarianetwork.site/\"")
             buildConfigField("String", "AI_ASSISTANT_BASE_URL", "\"https://assistant.solarianetwork.site/\"")
             buildConfigField("String", "NOTIFY_BASE_URL", "\"https://notify.solarianetwork.site/\"")
-            buildConfigField("String", "GOOGLE_REGISTRY_BASE_URL", "\"\"")
+            buildConfigField("String", "GOOGLE_REGISTRY_BASE_URL", "\"https://registry.solarianetwork.site/\"")
             buildConfigField("String", "WEB_BASE_URL", "\"${webBase(name)}\"")
         }
     }
