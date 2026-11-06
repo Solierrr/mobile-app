@@ -1116,18 +1116,9 @@ class MockApiData internal constructor(private val profileStore: MockProfileStor
         return message
     }
 
-    fun geocode(address: String): AddressListDto {
-        val offset = (address.hashCode() and 0x3ff) / 100000.0
-        val query = address.trim()
-        // Como o geocoder real, devolve mais de um candidato: o primeiro é o que casa melhor.
-        return AddressListDto(
-            listOf(
-                AddressDto("$query, São Paulo - SP, Brasil", -23.5505 + offset, -46.6333 + offset),
-                AddressDto("$query, Guarulhos - SP, Brasil", -23.4543 + offset, -46.5333 + offset),
-                AddressDto("$query, Santo André - SP, Brasil", -23.6639 + offset, -46.5383 + offset),
-            ),
-        )
-    }
+    fun geocode(address: String): AddressListDto =
+        // Coordenadas da cidade do endereço (e não sempre São Paulo), como o geocodificador real
+        AddressListDto(MockGeocoder.candidates(address).map { (label, latitude, longitude) -> AddressDto(label, latitude, longitude) })
 
     fun mockTokens(): TokenResponse = TokenResponse(MOCK_ACCESS_TOKEN, "qa-mock-refresh-token")
 
