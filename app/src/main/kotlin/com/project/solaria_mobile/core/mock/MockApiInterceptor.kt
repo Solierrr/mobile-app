@@ -90,6 +90,7 @@ class MockApiInterceptor @Inject constructor(
     private val tokens: TokenStore,
     private val data: MockApiData,
     private val images: MockImageCatalog,
+    private val deviceGeocoder: DeviceGeocoder,
 ) : Interceptor {
     init {
         data.emptyAccount.value = mockMode.isEmptyAccount()
@@ -401,7 +402,9 @@ class MockApiInterceptor @Inject constructor(
 
             segments == listOf("v1", "address", "geocode") -> {
                 val body = decode<GeocodeBody>(request.body?.let(::bodyText).orEmpty())
-                success(AddressListDto.serializer(), data.geocode(body.address))
+                // Geocodificação real do aparelho; sem resultado, cai no geocodificador de demonstração (por cidade)
+                val live = deviceGeocoder.locate(body.address)
+                success(AddressListDto.serializer(), if (live.isNotEmpty()) AddressListDto(live) else data.geocode(body.address))
             }
             segments == listOf("health") -> empty()
 
