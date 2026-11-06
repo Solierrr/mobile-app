@@ -16,12 +16,28 @@ class RemotePlaceRepository @Inject constructor(
 ) : PlaceRepository {
     private val enabled = BuildConfig.GOOGLE_REGISTRY_BASE_URL.isNotBlank()
 
+    private companion object {
+        const val MAX_RESULTS = 5
+    }
+
     override suspend fun geocode(address: String): ApiResult<GeoPoint> {
         if (!enabled) return ApiResult.Failure(ErrorKind.FORBIDDEN)
         return when (val result = executor.execute { api.geocode(GeocodeBody(address)) }) {
             is ApiResult.Failure -> result
             is ApiResult.Success -> result.data.results.firstOrNull()
                 ?.let { ApiResult.Success(GeoPoint(it.formattedAddress, it.latitude, it.longitude)) }
+                ?: ApiResult.Failure(ErrorKind.NOT_FOUND)
+        }
+    }
+
+    override suspend fun search(query: String): ApiResult<List<GeoPoint>> {
+        if (!enabled) return ApiResult.Failure(ErrorKind.FORBIDDEN)
+        return when (val result = executor.execute { api.geocode(GeocodeBody(query)) }) {
+            is ApiResult.Failure -> result
+            is ApiResult.Success -> result.data.results.take(MAX_RESULTS)
+                .map { GeoPoint(it.formattedAddress, it.latitude, it.longitude) }
+                .takeIf { it.isNotEmpty() }
+                ?.let { ApiResult.Success(it) }
                 ?: ApiResult.Failure(ErrorKind.NOT_FOUND)
         }
     }

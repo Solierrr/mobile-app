@@ -30,6 +30,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
+import com.project.solaria_mobile.feature.communication.data.testOutbox
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class FeatureViewModelTest {
@@ -62,13 +63,17 @@ class FeatureViewModelTest {
     }
 
     @Test fun sendingMessageUpdatesRepositoryAndClearsDraft() = runTest {
-        val viewModel = ChatViewModel(handleOf("c1"), FakeCommunicationRepository())
+        val repository = FakeCommunicationRepository()
+        val outbox = testOutbox(repository)
+        val viewModel = ChatViewModel(handleOf("c1"), repository, outbox)
         viewModel.uiState.test {
             assertEquals("Ricardo Dostoiévski", awaitContent().conversation.name)
             viewModel.onDraftChange("Nova mensagem")
             advanceUntilIdle()
             assertEquals("Nova mensagem", latestContent().draft)
             viewModel.send()
+            advanceUntilIdle()
+            outbox.drain()
             advanceUntilIdle()
             val state = latestContent()
             assertEquals("", state.draft)
@@ -78,7 +83,8 @@ class FeatureViewModelTest {
     }
 
     @Test fun unknownConversationShowsNotFound() = runTest {
-        val viewModel = ChatViewModel(handleOf("missing"), FakeCommunicationRepository())
+        val repository = FakeCommunicationRepository()
+        val viewModel = ChatViewModel(handleOf("missing"), repository, testOutbox(repository))
         viewModel.uiState.test {
             advanceUntilIdle()
             assertEquals(UiState.Error(ErrorKind.NOT_FOUND), expectMostRecentItem())
@@ -86,21 +92,26 @@ class FeatureViewModelTest {
         }
     }
 
-    @Test fun failedMessageSendKeepsDraftAndExposesFeedback() = runTest {
+    @Test fun messageSentWithoutConnectionStaysQueuedOnTheDevice() = runTest {
         val repository = object : com.project.solaria_mobile.feature.communication.domain.CommunicationRepository by FakeCommunicationRepository() {
-            override suspend fun sendMessage(conversationId: String, text: String): ApiResult<com.project.solaria_mobile.feature.communication.domain.ChatMessage> = ApiResult.Failure(ErrorKind.CONNECTIVITY)
+            override suspend fun sendMessage(conversationId: String, text: String, clientMessageId: String?): ApiResult<com.project.solaria_mobile.feature.communication.domain.ChatMessage> = ApiResult.Failure(ErrorKind.CONNECTIVITY)
         }
-        val viewModel = ChatViewModel(handleOf("c1"), repository)
+        val outbox = testOutbox(repository)
+        val viewModel = ChatViewModel(handleOf("c1"), repository, outbox)
         viewModel.uiState.test {
             awaitContent()
-            viewModel.onDraftChange("Não perder este rascunho")
+            viewModel.onDraftChange("Não perder esta mensagem")
             advanceUntilIdle()
             viewModel.send()
             advanceUntilIdle()
+            outbox.drain()
+            advanceUntilIdle()
             val state = latestContent()
-            assertEquals("Não perder este rascunho", state.draft)
-            assertEquals(ErrorKind.CONNECTIVITY, state.sendFailure)
-            assertTrue(!state.sending)
+            assertEquals("", state.draft)
+            assertEquals(listOf("Não perder esta mensagem"), state.outgoing.map { it.text })
+            assertEquals(null, state.outgoing.single().failure)
+            assertEquals(null, state.sendFailure)
+            assertTrue(state.messages.none { it.text == "Não perder esta mensagem" })
             cancelAndIgnoreRemainingEvents()
         }
     }
@@ -225,7 +236,7 @@ class FeatureViewModelTest {
     }
 
     @Test fun projectMapLoadsAccessibleProjectsWithoutInventedCoordinates() = runTest {
-        val viewModel = MapViewModel(androidx.lifecycle.SavedStateHandle(), FakeProjectRepository())
+        val viewModel = MapViewModel(androidx.lifecycle.SavedStateHandle(), FakeProjectRepository(), io.mockk.mockk { io.mockk.every { observe() } returns kotlinx.coroutines.flow.flowOf(emptySet()) })
         advanceUntilIdle()
         val content = (viewModel.uiState.value as UiState.Content).data
         assertEquals(4, content.projects.size)

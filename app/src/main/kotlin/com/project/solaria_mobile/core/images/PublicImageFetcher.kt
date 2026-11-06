@@ -15,24 +15,29 @@ import okhttp3.Request
  * o `Authorization` da sessão nunca é enviado a hosts de terceiros.
  */
 @Singleton
-class PublicImageFetcher @Inject constructor(private val disk: com.project.solaria_mobile.core.offline.ImageDiskCache) {
+class PublicImageFetcher @Inject constructor(
+    private val disk: com.project.solaria_mobile.core.offline.ImageDiskCache,
+    private val demoImages: com.project.solaria_mobile.core.mock.MockImageCatalog,
+) {
     private val client = OkHttpClient.Builder()
         .connectTimeout(15, TimeUnit.SECONDS)
         .readTimeout(30, TimeUnit.SECONDS)
         .build()
 
     suspend fun bytes(url: String): ByteArray? {
+        if (url.startsWith(com.project.solaria_mobile.core.mock.MockImageCatalog.URL_PREFIX)) {
+            return withContext(Dispatchers.IO) { demoImages.asset(url.removePrefix(com.project.solaria_mobile.core.mock.MockImageCatalog.URL_PREFIX))?.bytes }
+        }
         if (!url.startsWith("https://")) return null
         val request = disk.request()
-        withContext(Dispatchers.IO) { disk.get(url, request) }?.let { return it }
+        withContext(Dispatchers.IO) { disk.get(url, request)?.takeIf(::isDecodableImage) }?.let { return it }
         val loaded = withContext(Dispatchers.IO) {
-            runCatching {
-                client.newCall(Request.Builder().url(url).build()).execute().use { response ->
-                    if (response.isSuccessful) response.body.bytes() else null
-                }
-            }.getOrNull()
+            client.newCall(Request.Builder().url(url).build()).execute().use { response ->
+                if (!response.isSuccessful) throw java.io.IOException("Imagem indisponível")
+                response.body.bytes().also { if (!isDecodableImage(it)) throw java.io.IOException("Imagem inválida") }
+            }
         }
-        if (loaded != null) withContext(Dispatchers.IO) { disk.put(url, loaded, request) }
+        withContext(Dispatchers.IO) { disk.put(url, loaded, request) }
         return loaded
     }
 

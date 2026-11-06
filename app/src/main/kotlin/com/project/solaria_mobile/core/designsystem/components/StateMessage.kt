@@ -1,5 +1,7 @@
 package com.project.solaria_mobile.core.designsystem.components
 
+import com.project.solaria_mobile.R
+import androidx.compose.ui.res.stringResource
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.ui.semantics.heading
@@ -24,18 +26,21 @@ import com.project.solaria_mobile.core.designsystem.theme.Spacing
 
 internal data class ErrorPresentation(val title: String, val description: String, val canRetry: Boolean = true)
 
-internal fun ErrorKind.presentation(): ErrorPresentation = when (this) {
-    ErrorKind.CONNECTIVITY -> ErrorPresentation("Você está sem conexão", "Verifique sua internet e tente novamente. As informações já salvas continuam disponíveis no aplicativo.")
-    ErrorKind.TIMEOUT -> ErrorPresentation("A resposta está demorando", "Não conseguimos carregar estas informações a tempo. Tente novamente em instantes.")
-    ErrorKind.UNAUTHORIZED -> ErrorPresentation("Precisamos verificar seu acesso", "Sua sessão não pôde ser validada. Volte e verifique sua conta. Se necessário, entre novamente.", false)
-    ErrorKind.FORBIDDEN -> ErrorPresentation("Este conteúdo é restrito", "Sua conta não tem permissão para acessar estas informações.", false)
-    ErrorKind.NOT_FOUND -> ErrorPresentation("Não encontramos este conteúdo", "Ele pode ter sido removido ou não estar mais disponível para sua conta.", false)
-    ErrorKind.CONFLICT -> ErrorPresentation("As informações mudaram", "Atualize os dados antes de tentar salvar novamente.")
-    ErrorKind.VALIDATION -> ErrorPresentation("Revise as informações", "Alguns dados precisam ser corrigidos antes de continuar.", false)
-    ErrorKind.RATE_LIMITED -> ErrorPresentation("Vamos esperar um instante", "Foram feitas muitas tentativas. Aguarde um pouco antes de tentar novamente.")
-    ErrorKind.NOT_SUPPORTED -> ErrorPresentation("Este recurso está em preparação", "Esta função ainda não está integrada ao aplicativo. Você pode continuar usando os recursos já disponíveis.", false)
-    ErrorKind.SERVER, ErrorKind.SERIALIZATION, ErrorKind.UNKNOWN -> ErrorPresentation("Não foi possível carregar", "Tivemos um problema ao buscar estas informações. Tente novamente em instantes.")
+internal fun ErrorKind.presentation(resources: android.content.res.Resources): ErrorPresentation = when (this) {
+    ErrorKind.CONNECTIVITY -> ErrorPresentation(resources.getString(R.string.error_connectivity_title), resources.getString(R.string.error_connectivity_text))
+    ErrorKind.TIMEOUT -> ErrorPresentation(resources.getString(R.string.error_timeout_title), resources.getString(R.string.error_timeout_text))
+    ErrorKind.UNAUTHORIZED -> ErrorPresentation(resources.getString(R.string.error_unauthorized_title), resources.getString(R.string.error_unauthorized_text), false)
+    ErrorKind.FORBIDDEN -> ErrorPresentation(resources.getString(R.string.error_forbidden_title), resources.getString(R.string.error_forbidden_text), false)
+    ErrorKind.NOT_FOUND -> ErrorPresentation(resources.getString(R.string.error_not_found_title), resources.getString(R.string.error_not_found_text), false)
+    ErrorKind.CONFLICT -> ErrorPresentation(resources.getString(R.string.error_conflict_title), resources.getString(R.string.error_conflict_text))
+    ErrorKind.VALIDATION -> ErrorPresentation(resources.getString(R.string.error_validation_title), resources.getString(R.string.error_validation_text), false)
+    ErrorKind.RATE_LIMITED -> ErrorPresentation(resources.getString(R.string.error_rate_limited_title), resources.getString(R.string.error_rate_limited_text))
+    ErrorKind.NOT_SUPPORTED -> ErrorPresentation(resources.getString(R.string.error_not_supported_title), resources.getString(R.string.error_not_supported_text), false)
+    ErrorKind.SERVER, ErrorKind.SERIALIZATION, ErrorKind.UNKNOWN -> ErrorPresentation(resources.getString(R.string.error_server_title), resources.getString(R.string.error_server_text))
 }
+
+@Composable
+internal fun ErrorKind.presentation(): ErrorPresentation = presentation(androidx.compose.ui.platform.LocalContext.current.resources)
 
 @Composable
 fun StateMessage(
@@ -46,6 +51,8 @@ fun StateMessage(
     actionLabel: String? = null,
     onAction: (() -> Unit)? = null,
     onBack: (() -> Unit)? = null,
+    secondaryActionLabel: String? = null,
+    onSecondaryAction: (() -> Unit)? = null,
 ) {
     Box(modifier.fillMaxSize().padding(Spacing.screen), contentAlignment = Alignment.Center) {
         Column(Modifier.widthIn(max = 360.dp).verticalScroll(rememberScrollState()), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(Spacing.xl)) {
@@ -56,7 +63,8 @@ fun StateMessage(
             }
             Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
                 if (actionLabel != null && onAction != null) PrimaryButton(actionLabel, onAction)
-                if (onBack != null) PrimaryButton("Voltar", onBack, secondary = onAction != null)
+                if (secondaryActionLabel != null && onSecondaryAction != null) PrimaryButton(secondaryActionLabel, onSecondaryAction, secondary = true)
+                if (onBack != null) PrimaryButton(stringResource(R.string.common_back), onBack, secondary = onAction != null)
             }
         }
     }

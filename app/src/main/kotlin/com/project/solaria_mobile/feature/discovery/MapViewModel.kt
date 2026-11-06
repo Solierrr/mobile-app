@@ -1,5 +1,7 @@
 package com.project.solaria_mobile.feature.discovery
 
+import com.project.solaria_mobile.R
+import com.project.solaria_mobile.core.designsystem.components.ToastKind
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -13,19 +15,32 @@ import com.project.solaria_mobile.feature.project.domain.ProjectRepository
 import com.project.solaria_mobile.feature.project.domain.ProjectSummary
 import com.project.solaria_mobile.feature.project.domain.hasCoordinates
 import com.project.solaria_mobile.presentation.navigation.AppDestination
+import com.project.solaria_mobile.feature.discovery.data.SavedMapLocations
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.launch
+
+/** Aviso do mapa para a tela mostrar como cartão. */
+data class MapMessage(@androidx.annotation.StringRes val text: Int, val kind: ToastKind)
 
 data class MapUiState(val projects: List<ProjectSummary> = emptyList(), val selectedId: String? = null,
     val resolving: Boolean = false, val locationError: ErrorKind? = null)
 
 @HiltViewModel
-class MapViewModel @Inject constructor(savedStateHandle: SavedStateHandle, private val repository: ProjectRepository) : ViewModel() {
+class MapViewModel @Inject constructor(savedStateHandle: SavedStateHandle, private val repository: ProjectRepository,
+    private val savedLocations: SavedMapLocations) : ViewModel() {
+    val savedIds = savedLocations.observe().stateIn(viewModelScope, SharingStarted.Eagerly, emptySet())
+    private val messages = MutableSharedFlow<MapMessage>()
+    val feedback = messages.asSharedFlow()
+    private var saving = false
     private val initialId = runCatching { savedStateHandle.toRoute<AppDestination.Map>().projectId }.getOrNull()
     private val mutableState = MutableStateFlow<UiState<MapUiState>>(UiState.Loading)
     val uiState: StateFlow<UiState<MapUiState>> = mutableState
@@ -50,6 +65,22 @@ class MapViewModel @Inject constructor(savedStateHandle: SavedStateHandle, priva
     fun select(id: String?) {
         val current = mutableState.value as? UiState.Content ?: return
         mutableState.value = current.copy(data = current.data.copy(selectedId = id, locationError = null))
+    }
+    fun toggleSaved(id: String) {
+        if (saving || (mutableState.value as? UiState.Content)?.data?.projects?.none { it.id == id } != false) return
+        saving = true
+        viewModelScope.launch {
+            try {
+                val added = savedLocations.toggle(id)
+                messages.emit(MapMessage(if (added) R.string.ms_local_salvo else R.string.ms_local_removido, ToastKind.Success))
+            } catch (exception: kotlinx.coroutines.CancellationException) {
+                throw exception
+            } catch (_: java.io.IOException) {
+                messages.emit(MapMessage(R.string.ms_nao_foi_possivel_salvar_o_local, ToastKind.Error))
+            } catch (_: IllegalStateException) {
+                messages.emit(MapMessage(R.string.ms_verifique_sua_sessao, ToastKind.Error))
+            } finally { saving = false }
+        }
     }
     fun resolveLocations() {
         if (resolving?.isActive == true) return

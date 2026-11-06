@@ -1,6 +1,7 @@
 package com.project.solaria_mobile.di
 
 import com.project.solaria_mobile.core.auth.TokenAuthenticator
+import com.project.solaria_mobile.core.mock.MockApiInterceptor
 import com.project.solaria_mobile.core.network.ApiJson
 import com.project.solaria_mobile.core.network.AuthHeaderInterceptor
 import dagger.Module
@@ -38,6 +39,7 @@ object NetworkModule {
     @Singleton
     fun provideOkHttpClient(
         authHeaderInterceptor: AuthHeaderInterceptor,
+        mockApiInterceptor: MockApiInterceptor,
         tokenAuthenticator: TokenAuthenticator,
     ): OkHttpClient =
         OkHttpClient.Builder()
@@ -45,6 +47,7 @@ object NetworkModule {
             .readTimeout(READ_TIMEOUT)
             .writeTimeout(WRITE_TIMEOUT)
             .addInterceptor(authHeaderInterceptor)
+            .addInterceptor(mockApiInterceptor)
             .authenticator(tokenAuthenticator)
             .build()
 }

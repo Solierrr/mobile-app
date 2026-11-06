@@ -2,6 +2,8 @@
 
 package com.project.solaria_mobile.feature.communication
 
+import com.project.solaria_mobile.R
+import androidx.compose.ui.res.stringResource
 import com.project.solaria_mobile.feature.communication.domain.ServiceCall
 import com.project.solaria_mobile.core.common.ErrorKind
 import com.project.solaria_mobile.core.designsystem.components.BottomSheet
@@ -19,7 +21,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import com.project.solaria_mobile.core.designsystem.icons.AppIcons
-import com.project.solaria_mobile.core.designsystem.components.ScreenTitle
 import com.project.solaria_mobile.core.designsystem.components.SearchField
 import com.project.solaria_mobile.core.designsystem.components.SectionHeading
 import com.project.solaria_mobile.core.designsystem.theme.Spacing
@@ -33,25 +34,26 @@ fun CallsBottomSheet(
     onOpenCall: (String) -> Unit,
     onOpenAll: () -> Unit,
     failure: ErrorKind? = null,
+    loading: Boolean = false,
 ) {
     BottomSheet(onDismiss = onDismiss) {
         Column(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = Spacing.screen).padding(top = Spacing.xxl, bottom = Spacing.screenBottom),
+            modifier = Modifier.fillMaxWidth().padding(horizontal = Spacing.screen).padding(top = Spacing.sm, bottom = Spacing.screenBottom),
             verticalArrangement = Arrangement.spacedBy(Spacing.md),
         ) {
-            ScreenTitle("Chamados", onBack = onDismiss)
-            if (failure != null) {
+            if (loading) com.project.solaria_mobile.core.designsystem.components.ListSkeleton(rows = 3, circle = false)
+            else if (failure != null) {
                 val message = failure.presentation()
                 StateNotice(message.title, message.description, icon = AppIcons.phone,
-                    actions = if (message.canRetry) { { PrimaryButton("Ver todos os chamados", onOpenAll, compact = true) } } else null)
+                    actions = if (message.canRetry) { { PrimaryButton(stringResource(R.string.cb_ver_todos_os_chamados), onOpenAll, compact = true) } } else null)
             } else {
-                SearchField("Buscar chamado", query, onQueryChange)
-                SectionHeading("Recentes", faded = true, action = "Ver todos", navigation = true, onAction = onOpenAll)
+                SearchField(stringResource(R.string.cl_buscar_chamado), query, onQueryChange)
+                SectionHeading(stringResource(R.string.cl_recentes), faded = true, action = stringResource(R.string.hm_ver_todos), navigation = true, onAction = onOpenAll)
                 if (calls.isEmpty()) StateNotice(
-                    if (query.isBlank()) "Nenhum chamado ainda" else "Nenhum chamado encontrado",
-                    if (query.isBlank()) "Seus chamados aparecerão aqui." else "Tente outro termo ou limpe a busca.",
+                    if (query.isBlank()) stringResource(R.string.cb_nenhum_chamado_ainda) else stringResource(R.string.cb_nenhum_chamado_encontrado),
+                    if (query.isBlank()) stringResource(R.string.cb_seus_chamados_aparecerao_aqui) else stringResource(R.string.settings_no_results_description),
                     icon = AppIcons.phone,
-                    actions = if (query.isNotBlank()) { { PrimaryButton("Limpar busca", { onQueryChange("") }, secondary = true, compact = true) } } else null,
+                    actions = if (query.isNotBlank()) { { PrimaryButton(stringResource(R.string.settings_clear_search), { onQueryChange("") }, secondary = true, compact = true) } } else null,
                 )
             }
             calls.forEach { call ->

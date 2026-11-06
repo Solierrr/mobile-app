@@ -3,6 +3,7 @@ package com.project.solaria_mobile.core.offline
 import com.project.solaria_mobile.core.common.ApiResult
 import com.project.solaria_mobile.core.common.ErrorKind
 import com.project.solaria_mobile.core.common.ReadResult
+import com.project.solaria_mobile.core.mock.MockModeStore
 import com.project.solaria_mobile.core.network.ApiCallExecutor
 import com.project.solaria_mobile.core.network.ApiJson
 import com.project.solaria_mobile.core.network.NetworkMonitor
@@ -10,10 +11,12 @@ import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.flow.channelFlow
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.last
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -27,10 +30,11 @@ class OfflineReader(
     private val executor: ApiCallExecutor,
     private val identity: CacheScope,
     private val clock: () -> Long,
+    private val mockMode: MockModeStore? = null,
 ) {
     @Inject
-    constructor(store: CacheStore, network: NetworkMonitor, executor: ApiCallExecutor, identity: CacheIdentity) :
-        this(store, network, executor, identity, System::currentTimeMillis)
+    constructor(store: CacheStore, network: NetworkMonitor, executor: ApiCallExecutor, identity: CacheIdentity, mockMode: MockModeStore) :
+        this(store, network, executor, identity, System::currentTimeMillis, mockMode)
 
     private val writeLock = Mutex()
     @Volatile private var generation = 0L
@@ -38,8 +42,9 @@ class OfflineReader(
     private val revisions = java.util.concurrent.ConcurrentHashMap<String, java.util.concurrent.atomic.AtomicLong>()
 
     fun <T> observe(cacheKey: String, serializer: KSerializer<T>, call: suspend () -> T): Flow<ReadResult<T>> = channelFlow {
-        network.isOnline.distinctUntilChanged().collectLatest { online ->
-            updates(cacheKey, serializer, online, call).collect { send(it) }
+        combine(network.isOnline, mockMode?.enabled ?: flowOf(false)) { online, _ -> online to (mockMode?.isEnabled() == true) }
+            .distinctUntilChanged().collectLatest { (online, mock) ->
+                updates(cacheKey, serializer, online, mock, call).collect { send(it) }
         }
     }
 
@@ -47,33 +52,38 @@ class OfflineReader(
         readResult(cacheKey, serializer, call).result
 
     suspend fun <T> readResult(cacheKey: String, serializer: KSerializer<T>, call: suspend () -> T): ReadResult<T> =
-        updates(cacheKey, serializer, network.isOnline.first(), call).last()
+        updates(cacheKey, serializer, network.isOnline.first(), mockMode?.isEnabled() == true, call).last()
 
-        suspend fun <T> cached(cacheKey: String, serializer: KSerializer<T>): ReadResult<T>? {
+    suspend fun <T> cached(cacheKey: String, serializer: KSerializer<T>): ReadResult<T>? {
         val scope = identity.current() ?: return null
+        val mock = mockMode?.isEnabled() == true
         val version = generation
-        val entry = store.get("$scope:$cacheKey") ?: return null
+        val entry = store.get(scopedKey(scope, cacheKey, mock)) ?: return null
         val data = runCatching { ApiJson.instance.decodeFromString(serializer, entry.json) }.getOrNull() ?: return null
-        if (scope != identity.current() || version != generation) return null
+        if (scope != identity.current() || version != generation || mock != (mockMode?.isEnabled() == true)) return null
         return ReadResult(ApiResult.Success(data), entry.syncedAt, cached = true)
     }
 
-    private fun <T> updates(cacheKey: String, serializer: KSerializer<T>, online: Boolean, call: suspend () -> T): Flow<ReadResult<T>> = flow {
+    private fun <T> updates(cacheKey: String, serializer: KSerializer<T>, online: Boolean, mock: Boolean, call: suspend () -> T): Flow<ReadResult<T>> = flow {
         val scope = identity.current()
         if (scope == null) {
             emit(ReadResult(ApiResult.Failure(ErrorKind.UNAUTHORIZED)))
             return@flow
         }
         val version = generation
-        val key = "$scope:$cacheKey"
+        val key = scopedKey(scope, cacheKey, mock)
         val revision = revisions.getOrPut(key) { java.util.concurrent.atomic.AtomicLong() }
         val requestRevision = revision.get()
         val entry = store.get(key)
         val cached = entry?.let { runCatching { ApiJson.instance.decodeFromString(serializer, it.json) }.getOrNull() }
-        if (cached != null && identity.current() == scope && version == generation) {
-            emit(ReadResult(ApiResult.Success(cached), entry.syncedAt, cached = true, refreshing = online))
+        if (mock != (mockMode?.isEnabled() == true)) {
+            emit(ReadResult(ApiResult.Failure(ErrorKind.CONFLICT)))
+            return@flow
         }
-        if (!online) {
+        if (cached != null && identity.current() == scope && version == generation) {
+            emit(ReadResult(ApiResult.Success(cached), entry.syncedAt, cached = true, refreshing = online || mock))
+        }
+        if (!online && !mock) {
             if (cached == null) emit(ReadResult(ApiResult.Failure(ErrorKind.CONNECTIVITY)))
             return@flow
         }
@@ -91,7 +101,7 @@ class OfflineReader(
                     ?: ApiResult.Failure(ErrorKind.TIMEOUT)
                 if (response is ApiResult.Success) {
                     writeLock.withLock {
-                        if (identity.current() == scope && version == generation && requestRevision == revision.get()) {
+                        if (identity.current() == scope && version == generation && requestRevision == revision.get() && mock == (mockMode?.isEnabled() == true)) {
                             syncedAt = clock()
                             store.put(key, ApiJson.instance.encodeToString(serializer, response.data), syncedAt!!)
                         }
@@ -101,6 +111,10 @@ class OfflineReader(
             }
         }
         if (identity.current() != scope || version != generation) return@flow
+        if (mock != (mockMode?.isEnabled() == true)) {
+            emit(ReadResult(ApiResult.Failure(ErrorKind.CONFLICT)))
+            return@flow
+        }
         if (requestRevision != revision.get()) {
             emit(ReadResult(ApiResult.Failure(ErrorKind.CONFLICT)))
             return@flow
@@ -122,16 +136,18 @@ class OfflineReader(
     suspend fun invalidatePrefix(prefix: String) {
         val scope = identity.current() ?: return
         writeLock.withLock {
-            revisions.filterKeys { it.startsWith("$scope:$prefix") }.values.forEach { it.incrementAndGet() }
-            store.removePrefix("$scope:$prefix")
+            val cachePrefix = scopedKey(scope, prefix)
+            revisions.filterKeys { it.startsWith(cachePrefix) }.values.forEach { it.incrementAndGet() }
+            store.removePrefix(cachePrefix)
         }
     }
 
     suspend fun invalidate(cacheKey: String) {
         val scope = identity.current() ?: return
         writeLock.withLock {
-            revisions["$scope:$cacheKey"]?.incrementAndGet()
-            store.remove("$scope:$cacheKey")
+            val key = scopedKey(scope, cacheKey)
+            revisions[key]?.incrementAndGet()
+            store.remove(key)
         }
     }
 
@@ -145,4 +161,7 @@ class OfflineReader(
     private companion object {
         const val NETWORK_LIMIT_MILLIS = 60_000L
     }
+
+    private fun scopedKey(scope: String, key: String, mock: Boolean = mockMode?.isEnabled() == true): String =
+        if (mock) "$scope:mock:$key" else "$scope:$key"
 }

@@ -1,5 +1,7 @@
 package com.project.solaria_mobile.core.offline
 
+import com.project.solaria_mobile.R
+import androidx.compose.ui.res.stringResource
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -39,7 +41,7 @@ fun OfflineStatus(modifier: Modifier = Modifier, viewModel: OfflineViewModel = h
     CompositionLocalProvider(LocalOffline provides offline) {
         Column(modifier) {
             if (offline) Box(Modifier.fillMaxWidth().background(AppTheme.colors.inputFill).padding(horizontal = Spacing.md, vertical = Spacing.xs)) {
-                Text("Sem internet. Conteúdo já sincronizado continua disponível.", style = MaterialTheme.typography.bodySmall, color = AppTheme.colors.onSurface)
+                Text(stringResource(R.string.ob_sem_internet_conteudo_ja_sincronizado), style = MaterialTheme.typography.bodySmall, color = AppTheme.colors.onSurface)
             }
             content()
         }

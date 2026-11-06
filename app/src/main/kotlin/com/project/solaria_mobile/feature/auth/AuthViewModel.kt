@@ -1,9 +1,11 @@
 package com.project.solaria_mobile.feature.auth
 
 import androidx.lifecycle.ViewModel
+import com.project.solaria_mobile.BuildConfig
 import androidx.lifecycle.viewModelScope
 import com.project.solaria_mobile.core.common.ApiResult
 import com.project.solaria_mobile.core.common.ErrorKind
+import com.project.solaria_mobile.core.mock.MockModeStore
 import com.project.solaria_mobile.feature.auth.domain.AuthRepository
 import com.project.solaria_mobile.feature.auth.domain.SessionState
 import com.project.solaria_mobile.feature.auth.domain.LoginDestination
@@ -26,7 +28,16 @@ sealed interface AuthEffect {
 }
 
 @HiltViewModel
-class AuthViewModel @Inject constructor(private val repository: AuthRepository) : ViewModel() {
+class AuthViewModel internal constructor(
+    private val repository: AuthRepository,
+    /** Sem sessão, abre o login sozinho; o QA espera o botão Entrar, para a tela de entrada poder ser vista. */
+    private val autoLogin: Boolean,
+    /** Liga o modo mock; só o QA oferece, porque a chave fica nas Configurações, atrás do login. */
+    private val enableMockMode: suspend () -> Unit = {},
+) : ViewModel() {
+    @Inject constructor(repository: AuthRepository, mockMode: MockModeStore) :
+        this(repository, BuildConfig.ENVIRONMENT != "qa", { mockMode.setEnabled(true) })
+
     private val mutableState = MutableStateFlow(AuthUiState(repository.session.value))
     val uiState: StateFlow<AuthUiState> = mutableState
 
@@ -40,7 +51,7 @@ class AuthViewModel @Inject constructor(private val repository: AuthRepository) 
             repository.session.collect { session ->
                 mutableState.value = mutableState.value.copy(session = session, busy = false)
                 if (session == SessionState.SIGNED_OUT) {
-                    if (!loginStarted) startLogin()
+                    if (!loginStarted && autoLogin) startLogin()
                 } else {
                     loginStarted = false
                 }
@@ -62,6 +73,15 @@ class AuthViewModel @Inject constructor(private val repository: AuthRepository) 
                 }
                 is ApiResult.Failure -> mutableState.value = mutableState.value.copy(busy = false, error = result.kind)
             }
+        }
+    }
+
+    /** Sem a credencial de QA do aparelho o login real não tem saída; o modo mock entra com a sessão de demonstração. */
+    fun startLoginInMockMode() {
+        if (mutableState.value.busy) return
+        viewModelScope.launch {
+            enableMockMode()
+            startLogin()
         }
     }
 

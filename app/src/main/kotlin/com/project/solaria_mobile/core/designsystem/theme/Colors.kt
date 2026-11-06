@@ -7,6 +7,12 @@ import androidx.compose.ui.graphics.Color
 @Immutable
 data class AppColors(
     val primary: Color,
+    val action: Color,
+    /** Laranja da marca para texto e ícones pequenos sobre fundo claro (contraste de texto). */
+    val brandStrong: Color,
+    /** Fundo suave de destaque da marca. */
+    val brandContainer: Color,
+    val success: Color,
     val primaryContainer: Color,
     val secondary: Color,
     val info: Color,
@@ -29,11 +35,15 @@ data class AppColors(
 )
 
 val LightAppColors = AppColors(
-    primary = Color(0xFF202124),
-    primaryContainer = Color(0xFFF0F0F2),
-    secondary = Color(0xFFFF821C),
+    primary = Brand.base,
+    action = Brand.base,
+    brandStrong = Brand.strong,
+    brandContainer = Brand.container,
+    success = Color(0xFF217A50),
+    primaryContainer = Brand.container,
+    secondary = Brand.highlight,
     info = Color(0xFF45ADEB),
-    danger = Color(0xFFFF3F73),
+    danger = Color(0xFFB42318),
     background = Color(0xFFFFFFFF),
     surface = Color(0xFFFFFFFF),
     onAccent = Color(0xFFFFFFFF),

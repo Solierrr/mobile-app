@@ -107,8 +107,9 @@ class ContextualStateTest {
     }
 
     @Test fun homeSheetKeepsUnsupportedCallsDistinctFromEmptyCalls() = runTest {
-        val repository = object : com.project.solaria_mobile.feature.communication.domain.CommunicationRepository by FakeCommunicationRepository() {
+        val repository = object : com.project.solaria_mobile.feature.communication.domain.ServiceCallRepository by FakeCommunicationRepository() {
             override suspend fun calls() = ApiResult.Failure(ErrorKind.NOT_SUPPORTED)
+            override fun observeCalls() = com.project.solaria_mobile.core.common.readOnce { calls() }
         }
         val model = com.project.solaria_mobile.feature.home.HomeViewModel(FakeProjectRepository(), repository, FakeProfileRepository())
         model.uiState.test {

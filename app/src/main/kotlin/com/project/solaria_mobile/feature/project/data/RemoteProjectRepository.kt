@@ -18,6 +18,8 @@ import java.time.OffsetDateTime
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.serialization.builtins.ListSerializer
+import com.project.solaria_mobile.feature.project.domain.ProjectStatusOption
+import com.project.solaria_mobile.feature.project.domain.ProjectInvitation
 
 @Singleton
 class RemoteProjectRepository @Inject constructor(
@@ -34,6 +36,22 @@ class RemoteProjectRepository @Inject constructor(
 
     override suspend fun project(id: String): ApiResult<ProjectSummary> =
         reader.read("project:$id", ProjectCacheSerializer) { api.project(id) }.map { it.toSummary() }
+
+    override suspend fun changeStatus(id: String, status: ProjectStatusOption): ApiResult<ProjectSummary> =
+        executor.execute { api.changeStatus(id, ProjectStatusRequest(status.api)) }.map { it.toSummary() }
+
+    override suspend fun archive(id: String): ApiResult<Unit> = executor.execute { api.archive(id) }
+
+    override suspend fun myInvitations(): ApiResult<List<ProjectInvitation>> =
+        executor.execute { api.myInvitations() }.map { items -> items.map { it.toInvitation() }.filter { it.pending } }
+
+    override suspend fun respondInvitation(id: String, accept: Boolean): ApiResult<Unit> =
+        executor.execute { api.respondInvitation(id, accept) }.map { }
+
+    override suspend fun draft(id: String): ApiResult<NewProjectDraft> = executor.execute { api.project(id) }.map { it.toDraft() }
+
+    override suspend fun update(id: String, draft: NewProjectDraft): ApiResult<String> =
+        executor.execute { api.update(id, draft.toRequest()) }.map { it.id }
 
     override suspend fun create(draft: NewProjectDraft): ApiResult<String> =
         if (!network.isOnline.first()) ApiResult.Failure(com.project.solaria_mobile.core.common.ErrorKind.CONNECTIVITY)
@@ -89,4 +107,17 @@ internal fun ProjectDto.toSummary(): ProjectSummary = ProjectSummary(
     address = listOfNotNull(location?.street, location?.number, location?.neighborhood, location?.city, location?.state, location?.zipCode)
         .filter { it.isNotBlank() }.joinToString(", "),
     createdAtMillis = createdAt?.let { runCatching { OffsetDateTime.parse(it).toInstant().toEpochMilli() }.getOrNull() } ?: 0,
+)
+
+/** Dados atuais do projeto no formato do formulário, para editar a partir do que está no servidor. */
+internal fun ProjectDto.toDraft(): NewProjectDraft = NewProjectDraft(
+    name = name,
+    description = description.orEmpty(),
+    state = location?.state.orEmpty(),
+    city = location?.city.orEmpty(),
+    neighborhood = location?.neighborhood.orEmpty(),
+    zip = location?.zipCode.orEmpty(),
+    street = location?.street.orEmpty(),
+    number = location?.number.orEmpty(),
+    complement = location?.complement.orEmpty(),
 )

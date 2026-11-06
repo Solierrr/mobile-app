@@ -1,6 +1,8 @@
 package com.project.solaria_mobile
 
 import app.cash.turbine.test
+import io.mockk.every
+import io.mockk.mockk
 import com.project.solaria_mobile.core.common.ApiResult
 import com.project.solaria_mobile.core.common.ErrorKind
 import com.project.solaria_mobile.core.common.UiState
@@ -14,6 +16,7 @@ import com.project.solaria_mobile.core.offline.CacheStore
 import com.project.solaria_mobile.core.offline.OfflineReader
 import java.io.IOException
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.builtins.serializer
@@ -27,7 +30,6 @@ import com.project.solaria_mobile.feature.project.data.ProjectDto
 import com.project.solaria_mobile.feature.project.data.RemoteProjectRepository
 import kotlinx.serialization.builtins.ListSerializer
 import io.mockk.coEvery
-import io.mockk.mockk
 import retrofit2.HttpException
 import retrofit2.Response
 
@@ -47,6 +49,44 @@ class OfflineReaderTest {
         var account: String? = "qa:alice"
         val reader = OfflineReader(store, object : NetworkMonitor { override val isOnline = connected }, ApiCallExecutor(ApiErrorParser(com.project.solaria_mobile.core.network.ApiJson.instance)), CacheScope { account }, { 200L })
         suspend fun seed() { store.put("qa:alice:projects", "\"saved\"", 100L) }
+    }
+
+    @Test fun switchingMockDuringAReadDoesNotWriteItsPayloadIntoRealCache() = runTest {
+        val f = Fixture()
+        f.seed()
+        val mockEnabled = MutableStateFlow(false)
+        val mode = mockk<com.project.solaria_mobile.core.mock.MockModeStore> {
+            every { isEnabled() } answers { mockEnabled.value }
+            every { enabled } returns mockEnabled
+        }
+        val reader = OfflineReader(f.store, object : NetworkMonitor { override val isOnline = f.connected },
+            ApiCallExecutor(ApiErrorParser(com.project.solaria_mobile.core.network.ApiJson.instance)), CacheScope { f.account }, { 300L }, mode)
+        val started = CompletableDeferred<Unit>()
+        val response = CompletableDeferred<String>()
+        val read = async { reader.readResult("projects", String.serializer()) { started.complete(Unit); response.await() } }
+        started.await()
+        mockEnabled.value = true
+        response.complete("mock from interceptor")
+        assertEquals(ApiResult.Failure(ErrorKind.CONFLICT), read.await().result)
+        assertEquals("\"saved\"", f.store.entries["qa:alice:projects"]?.json)
+        assertFalse(f.store.entries.containsKey("qa:alice:mock:projects"))
+    }
+
+    @Test fun offlineMockUsesLocalPayloadWithoutOverwritingRealCache() = runTest {
+        val f = Fixture(online = false)
+        f.seed()
+        val mode = mockk<com.project.solaria_mobile.core.mock.MockModeStore> {
+            every { isEnabled() } returns true
+            every { enabled } returns MutableStateFlow(true)
+        }
+        val reader = OfflineReader(f.store, object : NetworkMonitor { override val isOnline = f.connected },
+            ApiCallExecutor(ApiErrorParser(com.project.solaria_mobile.core.network.ApiJson.instance)), CacheScope { f.account }, { 300L }, mode)
+        var calls = 0
+        val result = reader.readResult("projects", String.serializer()) { calls++; "local mock" }
+        assertEquals("local mock", (result.result as ApiResult.Success).data)
+        assertEquals(1, calls)
+        assertEquals("\"saved\"", f.store.entries["qa:alice:projects"]?.json)
+        assertEquals("\"local mock\"", f.store.entries["qa:alice:mock:projects"]?.json)
     }
 
     @Test fun cacheIsVisibleBeforeTheNetworkCompletes() = runTest {

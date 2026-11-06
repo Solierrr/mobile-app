@@ -2,6 +2,9 @@
 
 package com.project.solaria_mobile.feature.communication
 
+import androidx.compose.foundation.layout.PaddingValues
+import com.project.solaria_mobile.core.designsystem.components.StatusBadge
+import com.project.solaria_mobile.core.designsystem.components.ListRow
 import com.project.solaria_mobile.feature.communication.domain.ServiceCall
 import com.project.solaria_mobile.feature.communication.domain.ServiceCallIcon
 
@@ -30,30 +33,23 @@ import com.project.solaria_mobile.core.designsystem.theme.Radius
 
 @Composable
 internal fun CallCard(call: ServiceCall, onClick: () -> Unit) {
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        onClick = onClick,
-        shape = RoundedCornerShape(Radius.medium),
-        color = AppTheme.colors.inputFill,
-    ) {
-        Row(
-            modifier = Modifier.padding(Spacing.md),
-            horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            val icon = when (call.icon) {
-                ServiceCallIcon.HASH -> AppIcons.hash
-                ServiceCallIcon.PHONE -> AppIcons.phone
-                ServiceCallIcon.SHIELD_ALERT -> AppIcons.shield_alert
-            }
-            Icon(painter = painterResource(icon), contentDescription = null, tint = AppTheme.colors.onSurface, modifier = Modifier.size(Sizing.icon))
-            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(Spacing.xxs)) {
-                Text(call.title, color = AppTheme.colors.onSurface, style = androidx.compose.material3.MaterialTheme.typography.titleSmall)
-                Text(call.detail, color = AppTheme.colors.onSurfaceMuted, style = androidx.compose.material3.MaterialTheme.typography.labelMedium, maxLines = 2, overflow = TextOverflow.Ellipsis)
-            }
-            if (call.badge != null) {
-                Text(call.badge, color = if (call.badge == "!!") AppTheme.colors.danger else AppTheme.colors.primary, style = androidx.compose.material3.MaterialTheme.typography.labelMedium)
-            }
-        }
+    val icon = when (call.icon) {
+        ServiceCallIcon.HASH -> AppIcons.hash
+        ServiceCallIcon.PHONE -> AppIcons.phone
+        ServiceCallIcon.SHIELD_ALERT -> AppIcons.shield_alert
     }
+    ListRow(
+        title = call.title,
+        subtitle = call.detail,
+        subtitleMaxLines = 2,
+        onClick = onClick,
+        leading = { Icon(painter = painterResource(icon), contentDescription = null, tint = AppTheme.colors.onSurface, modifier = Modifier.size(Sizing.icon)) },
+        trailing = call.badge?.let { badge ->
+            {
+                StatusBadge(badge, tint = when (call.status) { "COMPLETED" -> AppTheme.colors.success; "CANCELED" -> AppTheme.colors.onSurfaceMuted; else -> AppTheme.colors.action })
+            }
+        },
+        container = AppTheme.colors.inputFill,
+        contentPadding = PaddingValues(Spacing.md),
+    )
 }

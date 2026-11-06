@@ -31,6 +31,13 @@ android {
     }
     fun mapsKey(environment: String): String = providers.environmentVariable("MAPS_ANDROID_KEY_${environment.uppercase()}").orNull
         ?: mapsProperties.getProperty("maps.android.key.$environment", "")
+    fun mapId(environment: String): String = providers.environmentVariable("MAPS_ANDROID_MAP_ID_${environment.uppercase()}").orNull
+        ?: mapsProperties.getProperty("maps.android.map.id.$environment", "")
+
+    // Endereços públicos do site de cada ambiente; variável de ambiente ou local.properties sobrescrevem.
+    val defaultWebBase = mapOf("qa" to "https://web-app-ldi0.onrender.com", "prod" to "https://solarianetwork.site")
+    fun webBase(environment: String): String = providers.environmentVariable("WEB_BASE_URL_${environment.uppercase()}").orNull
+        ?: mapsProperties.getProperty("web.base.url.$environment", defaultWebBase[environment].orEmpty())
 
     flavorDimensions += "environment"
     productFlavors {
@@ -38,6 +45,7 @@ android {
             dimension = "environment"
             manifestPlaceholders["mapsApiKey"] = mapsKey(name)
             buildConfigField("boolean", "MAPS_CONFIGURED", mapsKey(name).isNotBlank().toString())
+            buildConfigField("String", "MAP_ID", "\"${mapId(name)}\"")
             applicationIdSuffix = ".qa"
             versionNameSuffix = "-qa"
             resValue("string", "app_name", "Elos")
@@ -47,12 +55,16 @@ android {
             buildConfigField("String", "AUTH_BASE_URL", "\"https://api-auth-xw6o.onrender.com/\"")
             buildConfigField("String", "CORE_BASE_URL", "\"https://api-core-cqfn.onrender.com/\"")
             buildConfigField("String", "MESSENGER_BASE_URL", "\"https://api-messenger-5g2n.onrender.com/\"")
+            buildConfigField("String", "AI_ASSISTANT_BASE_URL", "\"https://ai-assistant-5ljd.onrender.com/\"")
+            buildConfigField("String", "NOTIFY_BASE_URL", "\"https://api-notify-i637.onrender.com/\"")
             buildConfigField("String", "GOOGLE_REGISTRY_BASE_URL", "\"https://google-registry.onrender.com/\"")
+            buildConfigField("String", "WEB_BASE_URL", "\"${webBase(name)}\"")
         }
         create("prod") {
             dimension = "environment"
             manifestPlaceholders["mapsApiKey"] = mapsKey(name)
             buildConfigField("boolean", "MAPS_CONFIGURED", mapsKey(name).isNotBlank().toString())
+            buildConfigField("String", "MAP_ID", "\"${mapId(name)}\"")
             resValue("string", "app_name", "Elos")
             buildConfigField("String", "ENVIRONMENT", "\"prod\"")
             manifestPlaceholders["authScheme"] = "solaria"
@@ -60,7 +72,10 @@ android {
             buildConfigField("String", "AUTH_BASE_URL", "\"https://api-auth.solarianetwork.site/\"")
             buildConfigField("String", "CORE_BASE_URL", "\"https://api-core.solarianetwork.site/\"")
             buildConfigField("String", "MESSENGER_BASE_URL", "\"https://api-messenger.solarianetwork.site/\"")
+            buildConfigField("String", "AI_ASSISTANT_BASE_URL", "\"https://ai-assistant.solarianetwork.site/\"")
+            buildConfigField("String", "NOTIFY_BASE_URL", "\"https://api-notify.solarianetwork.site/\"")
             buildConfigField("String", "GOOGLE_REGISTRY_BASE_URL", "\"\"")
+            buildConfigField("String", "WEB_BASE_URL", "\"${webBase(name)}\"")
         }
     }
 
@@ -82,6 +97,7 @@ dependencies {
     ksp(libs.androidx.room.compiler)
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.activity.compose)
+    implementation(libs.androidx.core.splashscreen)
     implementation(libs.androidx.compose.material3)
     implementation(libs.androidx.compose.ui)
     implementation(libs.androidx.compose.ui.graphics)
@@ -94,10 +110,12 @@ dependencies {
     ksp(libs.hilt.compiler)
     implementation(libs.androidx.hilt.navigation.compose)
     implementation(libs.androidx.navigation.compose)
+    implementation(libs.haze)
     implementation(libs.retrofit.core)
     implementation(libs.retrofit.kotlinx.serialization)
     implementation(libs.okhttp.core)
     implementation(libs.krossbow.stomp.core)
+    implementation(libs.markdown.renderer.m3)
     implementation(libs.krossbow.websocket.okhttp)
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.kotlinx.coroutines.android)
@@ -106,6 +124,8 @@ dependencies {
     implementation(libs.androidx.graphics.shapes)
     implementation(platform(libs.firebase.bom))
     implementation(libs.firebase.installations)
+    implementation(libs.firebase.messaging)
+    implementation(libs.kotlinx.coroutines.play.services)
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)
     testImplementation(libs.mockk)

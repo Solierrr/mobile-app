@@ -5,8 +5,6 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.Icon
 import androidx.compose.ui.res.painterResource
@@ -30,7 +28,7 @@ fun SectionHeading(
 ) {
     if (navigation && onAction != null) {
         Row(
-            modifier.heightIn(min = Sizing.touchTarget).clickable(onClickLabel = action, role = Role.Button, onClick = onAction),
+            modifier.clickable(onClickLabel = action, role = Role.Button, onClick = onAction),
             horizontalArrangement = Arrangement.spacedBy(Spacing.xs), verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(text, modifier = Modifier.weight(1f, fill = false), color = AppTheme.colors.onSurface, style = androidx.compose.material3.MaterialTheme.typography.titleMedium)
@@ -49,9 +47,7 @@ fun SectionHeading(
             style = androidx.compose.material3.MaterialTheme.typography.titleMedium,
         )
         if (action != null && onAction != null) {
-            TextButton(onClick = onAction, modifier = Modifier.heightIn(min = Sizing.touchTarget)) {
-                Text(action, color = AppTheme.colors.onSurfaceMuted, style = androidx.compose.material3.MaterialTheme.typography.labelLarge)
-            }
+            AppButton(action, onAction, variant = ButtonVariant.Text, size = ButtonSize.Medium)
         }
     }
 }
