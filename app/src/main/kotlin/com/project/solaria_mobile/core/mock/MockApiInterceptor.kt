@@ -458,7 +458,7 @@ class MockApiData internal constructor(private val profileStore: MockProfileStor
         NotificationDto("demo-message", "NEW_MESSAGE", "Nova mensagem", "Há uma mensagem para você na conversa de demonstração.", createdAt = java.time.Instant.now().toString()),
         NotificationDto("demo-scheduled", "SERVICE_SCHEDULED", "Serviço agendado", "Seu serviço foi agendado. Confira a data e organize sua agenda.", createdAt = java.time.Instant.now().minusSeconds(3600).toString()),
         NotificationDto("demo-read", "SERVICE_STATUS_CHANGED", "Serviço atualizado", "As informações do serviço foram atualizadas.", createdAt = java.time.Instant.now().minusSeconds(7200).toString(), readAt = java.time.Instant.now().minusSeconds(1800).toString()),
-    )
+    ).apply { addAll(MockExtraSeed.notifications()) }
 
     @Synchronized fun notifications(): List<NotificationDto> = if (emptyAccount.value) emptyList() else notificationList.map { item ->
         if (item.type == "NEW_MESSAGE") item.copy(data = conversations().firstOrNull()?.id?.let { mapOf("chatId" to it) }.orEmpty()) else item
@@ -480,13 +480,13 @@ class MockApiData internal constructor(private val profileStore: MockProfileStor
         ProjectDto("qa-project-1", "Usina Solar Horizonte", "Instalação fotovoltaica residencial.", "Equipe de demonstração", "qa-company-1", ownerCompanyLogoUrl = "mock-asset:company-logo-1.webp", createdAt = "2026-09-18T12:00:00Z", status = "IN_PROGRESS", location = location(-23.5505, -46.6333, "São Paulo", "SP", "Vila Mariana")),
         ProjectDto("qa-project-2", "Residencial Ipê", "Modernização do sistema de energia.", "Equipe de demonstração", "qa-company-1", ownerCompanyLogoUrl = "mock-asset:company-logo-1.webp", createdAt = "2026-09-23T12:00:00Z", status = "OPEN", location = location(-23.5614, -46.6559, "São Paulo", "SP", "Pinheiros")),
         ProjectDto("qa-project-3", "Sítio Boa Vista", "Projeto de geração distribuída.", "Equipe de demonstração", "qa-company-2", createdAt = "2026-10-01T12:00:00Z", status = "COMPLETED", location = location(-23.5880, -46.6790, "São Paulo", "SP", "Morumbi")),
-    )
+    ).apply { addAll(MockExtraSeed.projects()) }
     private val demoProjectIds = projects.map { it.id }.toSet()
     private val people = mutableListOf(
         UserDto("qa-person-1", "Ana Oliveira", username = "ana.oliveira", avatar = "mock-asset:avatar-ana.webp", authId = "qa-person-1"),
         UserDto("qa-person-2", "Rafael Costa", username = "rafael.costa", avatar = "mock-asset:avatar-rafael.webp", authId = "qa-person-2"),
         UserDto("qa-person-3", "Marina Santos", username = "marina.santos", avatar = "mock-asset:avatar-marina.webp", authId = "qa-person-3"),
-    )
+    ).apply { addAll(MockExtraSeed.people()) }
     private val serviceStore = linkedMapOf(
         "qa-service-1" to ServiceCallDto("qa-service-1", "qa-project-1", "Usina Solar Horizonte", "Revisão dos inversores", "OPEN",
             scheduledDate = OffsetDateTime.now().plusDays(1).toString(), location = projects.first().location, canManage = true, hasExecutors = true),
@@ -494,7 +494,7 @@ class MockApiData internal constructor(private val profileStore: MockProfileStor
             scheduledDate = OffsetDateTime.now().toString(), acceptedAt = OffsetDateTime.now().minusHours(1).toString(), location = projects[1].location, canManage = true, hasExecutors = true),
         "qa-service-3" to ServiceCallDto("qa-service-3", "qa-project-3", "Sítio Boa Vista", "Manutenção preventiva", "COMPLETED",
             endDate = OffsetDateTime.now().minusDays(2).toString(), location = projects[2].location),
-    )
+    ).apply { MockExtraSeed.services(projects).forEach { put(it.id, it) } }
 
     @Synchronized fun services() = if (emptyAccount.value) emptyList() else serviceStore.values.toList()
     @Synchronized fun service(id: String) = if (emptyAccount.value) null else serviceStore[id]

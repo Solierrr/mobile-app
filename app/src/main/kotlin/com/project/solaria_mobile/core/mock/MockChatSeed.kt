@@ -30,7 +30,7 @@ internal object MockChatSeed {
     /** Quem responde sozinho depois que a pessoa envia uma mensagem, com "digitando…" antes. */
     val reactive = mapOf(CONVERSATION_ANA to ANA, CONVERSATION_MARINA to MARINA)
 
-    val names = mapOf(ANA to "Ana Oliveira", RAFAEL to "Rafael Costa", MARINA to "Marina Santos", BEATRIZ to "Beatriz Nunes", ASSISTANT to "Assistente", SELF to "Você")
+    val names = mapOf(ANA to "Ana Oliveira", RAFAEL to "Rafael Costa", MARINA to "Marina Santos", BEATRIZ to "Beatriz Nunes", ASSISTANT to "Assistente", SELF to "Você") + MockExtraSeed.names
 
     /** Quem está online em cada conversa, como no retrato de presença do messenger. */
     val presence: Map<String, Map<String, Boolean>> = mapOf(
@@ -86,7 +86,26 @@ internal object MockChatSeed {
             CONVERSATION_ASSISTANT, "CHAT_BOT", null, now.minusDays(1).toString(),
             userDetails = mapOf("threadId" to kotlinx.serialization.json.JsonPrimitive(ASSISTANT_THREAD)),
         ),
-    )
+    ) + extraConversations(now)
+
+    /** Uma conversa direta com cada uma das primeiras pessoas extras, espalhadas no tempo para a lista ter ordem e datas variadas. */
+    private val extraThreads = MockExtraSeed.personIds.take(8)
+
+    private fun extraConversations(now: OffsetDateTime): List<ConversationDto> = extraThreads.mapIndexed { index, person ->
+        ConversationDto("qa-conversation-x${index + 1}", "USER", names.getValue(person), now.minusHours(5L + index * 9).toString(), participantIds = listOf(person))
+    }
+
+    private fun extraMessages(now: OffsetDateTime): Map<String, MutableList<MessageDto>> = extraThreads.mapIndexed { index, person ->
+        val id = "qa-conversation-x${index + 1}"
+        id to Builder(id, now).apply {
+            val openers = listOf("Oi! Tudo bem?", "Bom dia, vi seu perfil.", "Podemos falar sobre a obra?", "Conseguiu ver a proposta?")
+            val answers = listOf("Tudo certo por aqui.", "Bom dia! Pode falar.", "Claro, quando prefere?", "Vi sim, está ótima.")
+            add(person, openers[index % openers.size], 4L + index, 9, 10)
+            add(SELF, answers[index % answers.size], 4L + index, 9, 18)
+            add(person, "Combinado, te chamo amanhã cedo.", 3L + index, 17, 42)
+            minutesAgo(person, "Passando para confirmar o horário da visita.", 300L + index * 540)
+        }.items
+    }.toMap()
 
     fun messages(now: OffsetDateTime): MutableMap<String, MutableList<MessageDto>> = mutableMapOf(
         CONVERSATION_ANA to ana(now),
@@ -95,7 +114,7 @@ internal object MockChatSeed {
         CONVERSATION_MARINA to marina(now),
         CONVERSATION_EMPTY to mutableListOf(),
         CONVERSATION_ASSISTANT to assistant(now),
-    )
+    ).apply { putAll(extraMessages(now)) }
 
     private class Builder(private val conversationId: String, private val now: OffsetDateTime) {
         val items = mutableListOf<MessageDto>()
