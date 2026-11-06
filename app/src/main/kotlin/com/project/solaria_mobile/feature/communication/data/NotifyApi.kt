@@ -1,5 +1,7 @@
 package com.project.solaria_mobile.feature.communication.data
 
+import kotlinx.serialization.EncodeDefault
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.Serializable
 import retrofit2.http.Body
 import retrofit2.http.DELETE
@@ -30,7 +32,9 @@ data class NotificationPageDto(
 )
 
 @Serializable data class UnreadCountDto(val count: Long)
-@Serializable data class NotifyDeviceRequest(val fcmToken: String, val platform: String = "ANDROID", val appVersion: String? = null)
+/** `platform` precisa ir no corpo mesmo valendo o padrão: o `Json` do app não codifica valores padrão e o api-notify exige o campo. */
+@OptIn(ExperimentalSerializationApi::class)
+@Serializable data class NotifyDeviceRequest(val fcmToken: String, @EncodeDefault val platform: String = "ANDROID", val appVersion: String? = null)
 
 interface NotifyApi {
     @GET("notify/notifications")
