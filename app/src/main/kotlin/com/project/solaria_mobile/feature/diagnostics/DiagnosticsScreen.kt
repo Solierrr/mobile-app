@@ -21,6 +21,8 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.project.solaria_mobile.core.designsystem.components.ScreenTitle
 import com.project.solaria_mobile.core.designsystem.components.SectionHeading
+import com.project.solaria_mobile.core.designsystem.components.RefreshButton
+import com.project.solaria_mobile.core.common.UiState
 import com.project.solaria_mobile.core.designsystem.components.UiStateHost
 import com.project.solaria_mobile.core.designsystem.theme.AppTheme
 import com.project.solaria_mobile.core.designsystem.theme.Spacing
@@ -29,11 +31,11 @@ import kotlinx.coroutines.launch
 @Composable
 fun DiagnosticsRoute(onBack: () -> Unit, viewModel: DiagnosticsViewModel = hiltViewModel()) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
-    UiStateHost(state, viewModel::load) { content -> DiagnosticsScreen(content, onBack, viewModel::load) }
+    UiStateHost(state, viewModel::load, onBack = onBack, header = { ScreenTitle("Diagnóstico", onBack) }) { content -> DiagnosticsScreen(content, onBack, viewModel::load, (state as? UiState.Content)?.refreshing == true) }
 }
 
 @Composable
-fun DiagnosticsScreen(state: DiagnosticsUiState, onBack: () -> Unit, onRefresh: () -> Unit) {
+fun DiagnosticsScreen(state: DiagnosticsUiState, onBack: () -> Unit, onRefresh: () -> Unit, refreshing: Boolean = false) {
     val clipboard = LocalClipboard.current
     val scope = rememberCoroutineScope()
     Column(
@@ -45,7 +47,7 @@ fun DiagnosticsScreen(state: DiagnosticsUiState, onBack: () -> Unit, onRefresh: 
             .verticalScroll(rememberScrollState()),
         verticalArrangement = Arrangement.spacedBy(Spacing.md),
     ) {
-        ScreenTitle("Diagnóstico", onBack)
+        ScreenTitle("Diagnóstico", onBack, actions = { RefreshButton(onRefresh, refreshing, "Atualizar diagnóstico") })
         SectionHeading("Ambiente", faded = true)
         DiagnosticsRow("Ambiente", state.environment)
         DiagnosticsRow("api-auth", state.authUrl)
@@ -62,7 +64,6 @@ fun DiagnosticsScreen(state: DiagnosticsUiState, onBack: () -> Unit, onRefresh: 
         DiagnosticsRow("Endereço", state.registryUrl)
         DiagnosticsRow("Saúde", state.registryStatus)
         DiagnosticsRow("Geocodificação", state.geocodeSample)
-        TextButton(onClick = onRefresh) { Text("Atualizar", color = AppTheme.colors.primary) }
     }
 }
 

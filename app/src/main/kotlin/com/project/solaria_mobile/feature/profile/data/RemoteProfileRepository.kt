@@ -1,7 +1,11 @@
 package com.project.solaria_mobile.feature.profile.data
 
+import kotlinx.coroutines.flow.Flow
+import com.project.solaria_mobile.core.common.ReadResult
+
 import com.project.solaria_mobile.core.common.ApiResult
 import com.project.solaria_mobile.core.common.map
+import kotlinx.coroutines.flow.map
 import com.project.solaria_mobile.core.format.initialsOf
 import com.project.solaria_mobile.core.network.ApiCallExecutor
 import com.project.solaria_mobile.core.offline.OfflineReader
@@ -39,6 +43,9 @@ class RemoteProfileRepository @Inject constructor(
                     executor.execute { api.addConnection(ConnectionRequest(profileId)) }.map { true }
                 }
         }
+    override fun observeOwnProfile(): Flow<ReadResult<UserProfile>> =
+        reader.observe("me", SelfProfileDto.serializer()) { api.me() }.map { read -> read.map { it.toProfile() } }
+
 }
 
 private fun UserDto.displayName(): String = username?.takeIf { it.isNotBlank() } ?: "Usuário"
@@ -66,6 +73,7 @@ internal fun SelfProfileDto.toProfile(): UserProfile {
         phone = person?.phone.orEmpty().trim(),
         avatarUrl = avatar?.takeIf { it.isNotBlank() },
         bannerUrl = banner?.takeIf { it.isNotBlank() },
+        companyId = companyMemberships.firstOrNull { !it.companyId.isNullOrBlank() }?.companyId,
     )
 }
 

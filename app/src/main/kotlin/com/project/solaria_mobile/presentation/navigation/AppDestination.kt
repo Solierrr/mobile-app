@@ -18,7 +18,7 @@ sealed interface AppDestination {
     @Serializable data class ProfileOther(val id: String) : AppDestination
     @Serializable data object Connections : AppDestination
     @Serializable data object Notifications : AppDestination
-    @Serializable data object Enterprise : AppDestination
+    @Serializable data class Enterprise(val id: String? = null) : AppDestination
     @Serializable data object Settings : AppDestination
     @Serializable data object Diagnostics : AppDestination
 }

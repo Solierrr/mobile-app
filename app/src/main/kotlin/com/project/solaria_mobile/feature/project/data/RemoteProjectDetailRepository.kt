@@ -1,7 +1,11 @@
 package com.project.solaria_mobile.feature.project.data
 
+import kotlinx.coroutines.flow.Flow
+import com.project.solaria_mobile.core.common.ReadResult
+
 import com.project.solaria_mobile.core.common.ApiResult
 import com.project.solaria_mobile.core.common.map
+import kotlinx.coroutines.flow.map
 import com.project.solaria_mobile.core.common.onSuccess
 import com.project.solaria_mobile.core.format.initialsOf
 import com.project.solaria_mobile.core.network.ApiCallExecutor
@@ -51,11 +55,31 @@ class RemoteProjectDetailRepository @Inject constructor(
 
     override suspend fun photoContent(projectId: String, photoId: String): ApiResult<ByteArray> {
         val key = "photo:$projectId:$photoId"
-        val saved = withContext(Dispatchers.IO) { images.get(key) }
+        val request = images.request()
+        val saved = withContext(Dispatchers.IO) { images.get(key, request) }
         if (saved != null) return ApiResult.Success(saved)
         return executor.execute { withContext(Dispatchers.IO) { api.photoContent(projectId, photoId).use { it.bytes() } } }
-            .onSuccess { bytes -> images.put(key, bytes) }
+            .onSuccess { bytes -> withContext(Dispatchers.IO) { images.put(key, bytes, request) } }
     }
+    override fun observeLocation(projectId: String): Flow<ReadResult<ProjectLocationInfo>> =
+        reader.observe("project:$projectId", ProjectDto.serializer()) { api.project(projectId) }.map { read -> read.map { it.toLocationInfo() } }
+
+    override fun observeMembers(projectId: String): Flow<ReadResult<List<ProjectMember>>> =
+        reader.observe("members:$projectId", ListSerializer(ProjectMemberDto.serializer())) { api.members(projectId) }.map { read -> read.map { items -> items.map { it.toMember() } } }
+
+    override fun observeActivities(projectId: String): Flow<ReadResult<List<ProjectActivity>>> =
+        reader.observe("activities:$projectId", ListSerializer(ProjectActivityDto.serializer())) { api.activities(projectId) }.map { read -> read.map { items ->
+            items.sortedBy { it.startsAt }.map { it.toActivity() }
+        } }
+
+    override fun observeHistory(projectId: String): Flow<ReadResult<List<ProjectHistoryEntry>>> =
+        reader.observe("history:$projectId", ListSerializer(ProjectHistoryDto.serializer())) { api.history(projectId) }.map { read -> read.map { items -> items.map { it.toEntry() } } }
+
+    override fun observePhotos(projectId: String): Flow<ReadResult<List<ProjectPhoto>>> =
+        reader.observe("photos:$projectId", ListSerializer(ProjectPhotoDto.serializer())) { api.photos(projectId) }.map { read -> read.map { items ->
+            items.sortedByDescending { it.cover }.map { ProjectPhoto(it.id, it.cover) }
+        } }
+
 }
 
 private val dateTime = DateTimeFormatter.ofPattern("d MMM · HH:mm", Locale.forLanguageTag("pt-BR"))

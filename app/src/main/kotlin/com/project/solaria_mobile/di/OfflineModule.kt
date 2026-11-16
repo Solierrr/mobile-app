@@ -12,7 +12,6 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
 import javax.inject.Singleton
 
-/** Banco local onde as leituras ficam guardadas para o modo offline. */
 @Module
 @InstallIn(SingletonComponent::class)
 object OfflineModule {

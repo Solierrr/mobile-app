@@ -34,7 +34,7 @@ class ConversationsViewModel @Inject constructor(private val repository: Communi
     init { load() }
 
     fun load() {
-        viewModelScope.launch { source.load(isEmpty = { it.isEmpty() }) { repository.conversations() } }
+        viewModelScope.launch { source.load() { repository.conversations() } }
     }
 
     fun onQueryChange(value: String) { query.value = value }

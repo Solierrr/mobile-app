@@ -86,6 +86,25 @@ class FeatureViewModelTest {
         }
     }
 
+    @Test fun failedMessageSendKeepsDraftAndExposesFeedback() = runTest {
+        val repository = object : com.project.solaria_mobile.feature.communication.domain.CommunicationRepository by FakeCommunicationRepository() {
+            override suspend fun sendMessage(conversationId: String, text: String): ApiResult<com.project.solaria_mobile.feature.communication.domain.ChatMessage> = ApiResult.Failure(ErrorKind.CONNECTIVITY)
+        }
+        val viewModel = ChatViewModel(handleOf("c1"), repository)
+        viewModel.uiState.test {
+            awaitContent()
+            viewModel.onDraftChange("Não perder este rascunho")
+            advanceUntilIdle()
+            viewModel.send()
+            advanceUntilIdle()
+            val state = latestContent()
+            assertEquals("Não perder este rascunho", state.draft)
+            assertEquals(ErrorKind.CONNECTIVITY, state.sendFailure)
+            assertTrue(!state.sending)
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
     @Test fun conversationsAreFilteredOutsideTheComposable() = runTest {
         val viewModel = ConversationsViewModel(FakeCommunicationRepository())
         viewModel.uiState.test {
@@ -100,7 +119,7 @@ class FeatureViewModelTest {
     }
 
     @Test fun scheduleSelectionChangesEvents() = runTest {
-        val viewModel = ScheduleViewModel(FakeDiscoveryRepository())
+        val viewModel = ScheduleViewModel(FakeDiscoveryRepository(), java.time.LocalDate.of(2026, 1, 4))
         viewModel.uiState.test {
             assertEquals(3, awaitContent().selectedEvents.size)
             viewModel.selectDay(5)
@@ -125,7 +144,7 @@ class FeatureViewModelTest {
         val viewModel = HomeViewModel(FakeProjectRepository(), FakeCommunicationRepository(), FakeProfileRepository())
         viewModel.uiState.test {
             val initial = awaitContent()
-            assertEquals(4, initial.recentProjects.size)
+            assertEquals(3, initial.recentProjects.size)
             assertEquals(4, initial.recentCalls.size)
             viewModel.onCallsQueryChange("segurança")
             advanceUntilIdle()
@@ -155,7 +174,7 @@ class FeatureViewModelTest {
             val content = awaitContent()
             assertEquals(listOf("c2", "c1"), content.recentCompanies.map { it.id })
             assertEquals("https://res.cloudinary.com/x/c1.webp", content.recentCompanies.last().logoUrl)
-            assertEquals(listOf("d", "b", "c", "a"), content.recentProjects.map { it.id })
+            assertEquals(listOf("d", "b", "c"), content.recentProjects.map { it.id })
             cancelAndIgnoreRemainingEvents()
         }
     }
@@ -181,7 +200,7 @@ class FeatureViewModelTest {
         viewModel.uiState.test {
             val content = awaitContent()
             assertEquals(null, content.profile)
-            assertEquals(4, content.recentProjects.size)
+            assertEquals(3, content.recentProjects.size)
             cancelAndIgnoreRemainingEvents()
         }
     }

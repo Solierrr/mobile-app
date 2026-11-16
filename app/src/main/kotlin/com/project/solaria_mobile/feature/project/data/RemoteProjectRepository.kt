@@ -1,7 +1,14 @@
 package com.project.solaria_mobile.feature.project.data
 
+import kotlinx.coroutines.flow.Flow
+import com.project.solaria_mobile.core.common.ReadResult
+
 import com.project.solaria_mobile.core.common.ApiResult
 import com.project.solaria_mobile.core.common.map
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.emitAll
 import com.project.solaria_mobile.core.network.ApiCallExecutor
 import com.project.solaria_mobile.core.offline.OfflineReader
 import com.project.solaria_mobile.feature.project.domain.NewProjectDraft
@@ -17,6 +24,7 @@ class RemoteProjectRepository @Inject constructor(
     private val api: ProjectApi,
     private val executor: ApiCallExecutor,
     private val reader: OfflineReader,
+    private val network: com.project.solaria_mobile.core.network.NetworkMonitor,
 ) : ProjectRepository {
     override suspend fun projects(): ApiResult<List<ProjectSummary>> =
         reader.read("projects", ListSerializer(ProjectDto.serializer())) { api.projects() }.map { items -> items.map { it.toSummary() } }
@@ -25,7 +33,22 @@ class RemoteProjectRepository @Inject constructor(
         reader.read("project:$id", ProjectDto.serializer()) { api.project(id) }.map { it.toSummary() }
 
     override suspend fun create(draft: NewProjectDraft): ApiResult<String> =
-        executor.execute { api.create(draft.toRequest()) }.map { it.id }
+        if (!network.isOnline.first()) ApiResult.Failure(com.project.solaria_mobile.core.common.ErrorKind.CONNECTIVITY)
+        else executor.execute { api.create(draft.toRequest()) }.map { it.id }
+    override fun observeProjects(): Flow<ReadResult<List<ProjectSummary>>> =
+        reader.observe("projects", ListSerializer(ProjectDto.serializer())) { api.projects() }.map { read -> read.map { items -> items.map { it.toSummary() } } }
+
+    override fun observeProject(id: String): Flow<ReadResult<ProjectSummary>> = flow {
+        // The list already contains the summary used by this screen. A first visit
+        // should not hide it while waiting for the detail endpoint to wake up.
+        if (reader.cached("project:$id", ProjectDto.serializer()) == null) {
+            val list = reader.cached("projects", ListSerializer(ProjectDto.serializer()))
+            val project = (list?.result as? ApiResult.Success)?.data?.firstOrNull { it.id == id }
+            if (project != null) emit(ReadResult(ApiResult.Success(project.toSummary()), list?.syncedAt, cached = true, refreshing = network.isOnline.first()))
+        }
+        emitAll(reader.observe("project:$id", ProjectDto.serializer()) { api.project(id) }.map { read -> read.map { it.toSummary() } })
+    }
+
 }
 
 private fun String.orNull(): String? = trim().takeIf { it.isNotEmpty() }

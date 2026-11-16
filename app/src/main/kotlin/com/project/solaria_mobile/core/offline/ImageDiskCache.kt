@@ -7,26 +7,42 @@ import java.security.MessageDigest
 import javax.inject.Inject
 import javax.inject.Singleton
 
-/** Guarda no aparelho os bytes das imagens já vistas (logos, avatares, fotos) para abrirem sem internet. */
 @Singleton
-class ImageDiskCache @Inject constructor(@ApplicationContext context: Context) {
+class ImageDiskCache @Inject constructor(@ApplicationContext context: Context, private val identity: CacheIdentity) {
     private val directory = File(context.filesDir, "offline-images")
+    private var generation = 0L
 
-    fun get(key: String): ByteArray? = runCatching { file(key).takeIf { it.isFile }?.readBytes() }.getOrNull()
+    data class Request(val account: String, val generation: Long)
 
-    fun put(key: String, bytes: ByteArray) {
+    @Synchronized
+    fun request(): Request? = identity.current()?.let { Request(it, generation) }
+
+    @Synchronized
+    fun get(key: String, request: Request? = request()): ByteArray? {
+        if (request == null || request.account != identity.current() || request.generation != generation) return null
+        return runCatching { file(key, request).takeIf { it.isFile }?.readBytes() }.getOrNull()
+    }
+
+    @Synchronized
+    fun put(key: String, bytes: ByteArray, request: Request? = request()) {
+        if (request == null || request.account != identity.current() || request.generation != generation) return
         runCatching {
             directory.mkdirs()
-            file(key).writeBytes(bytes)
+            val target = file(key, request)
+            val pending = File(target.path + ".tmp")
+            pending.writeBytes(bytes)
+            if (!pending.renameTo(target)) pending.delete()
         }
     }
 
+    @Synchronized
     fun clear() {
-        runCatching { directory.deleteRecursively() }
+        generation++
+        directory.deleteRecursively()
     }
 
-    private fun file(key: String): File {
-        val digest = MessageDigest.getInstance("SHA-256").digest(key.toByteArray())
+    private fun file(key: String, request: Request): File {
+        val digest = MessageDigest.getInstance("SHA-256").digest("${request.account}:$key".toByteArray())
         return File(directory, digest.joinToString("") { "%02x".format(it) })
     }
 }

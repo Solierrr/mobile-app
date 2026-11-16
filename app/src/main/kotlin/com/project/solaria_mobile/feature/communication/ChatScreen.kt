@@ -29,7 +29,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
-import com.composables.icons.lucide.R as LucideR
+import com.project.solaria_mobile.core.designsystem.icons.AppIcons
 import com.project.solaria_mobile.core.designsystem.components.RoundIconButton
 import com.project.solaria_mobile.core.designsystem.components.Avatar
 import com.project.solaria_mobile.core.designsystem.theme.AppTheme
@@ -37,11 +37,13 @@ import com.project.solaria_mobile.core.designsystem.theme.Spacing
 import com.project.solaria_mobile.core.designsystem.theme.Sizing
 import com.project.solaria_mobile.core.designsystem.theme.Radius
 import com.project.solaria_mobile.core.designsystem.components.UiStateHost
+import com.project.solaria_mobile.core.designsystem.components.ScreenTitle
+import com.project.solaria_mobile.core.designsystem.components.userMessage
 
 @Composable
 fun ChatRoute(onBack: () -> Unit, viewModel: ChatViewModel = hiltViewModel()) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
-    UiStateHost(state, viewModel::load) { content -> ChatScreen(content, viewModel::onDraftChange, viewModel::send, onBack) }
+    UiStateHost(state, viewModel::load, onBack = onBack, header = { ScreenTitle("Conversa", onBack) }) { content -> ChatScreen(content, viewModel::onDraftChange, viewModel::send, onBack) }
 }
 
 @Composable
@@ -57,46 +59,42 @@ fun ChatScreen(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
         ) {
-            RoundIconButton(LucideR.drawable.lucide_ic_chevron_left, "Voltar", onBack, size = Sizing.compactHeaderControl)
+            RoundIconButton(AppIcons.chevron_left, "Voltar", onBack, size = Sizing.compactHeaderControl)
             Avatar(state.conversation.initials, size = Sizing.compactHeaderControl, color = state.conversation.tone.toColor(), online = true)
             Column(modifier = Modifier.weight(1f)) {
-                Text(state.conversation.name, color = AppTheme.colors.onSurface, style = androidx.compose.material3.MaterialTheme.typography.titleMedium)
-                Text("Disponível", color = AppTheme.colors.primary, style = androidx.compose.material3.MaterialTheme.typography.labelMedium)
+                Text(state.conversation.name, color = AppTheme.colors.onSurface, style = androidx.compose.material3.MaterialTheme.typography.titleSmall)
             }
-            RoundIconButton(LucideR.drawable.lucide_ic_phone, "Ligar", {}, size = Sizing.compactHeaderControl)
-            RoundIconButton(LucideR.drawable.lucide_ic_ellipsis, "Mais opções", {}, size = Sizing.compactHeaderControl)
         }
         Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(AppTheme.colors.outline))
         Column(
             modifier = Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = Spacing.screen).padding(vertical = Spacing.lg),
             verticalArrangement = Arrangement.spacedBy(Spacing.md),
         ) {
-            Text("Hoje", modifier = Modifier.align(Alignment.CenterHorizontally), color = AppTheme.colors.onSurfaceMuted, style = androidx.compose.material3.MaterialTheme.typography.labelMedium)
             state.messages.forEach { message ->
                 MessageBubble(message = message.text, mine = message.mine, time = message.time)
             }
+        }
+        state.sendFailure?.let { failure ->
+            Text(failure.userMessage(), Modifier.padding(horizontal = Spacing.screen), color = AppTheme.colors.danger, style = androidx.compose.material3.MaterialTheme.typography.bodyMedium)
         }
         Row(
             modifier = Modifier.fillMaxWidth().padding(horizontal = Spacing.screen).padding(top = Spacing.sm, bottom = Spacing.md),
             horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            RoundIconButton(LucideR.drawable.lucide_ic_link, "Anexar arquivo", {}, size = Sizing.messageAction)
-            Surface(shape = RoundedCornerShape(Radius.pill), color = AppTheme.colors.inputFill, modifier = Modifier.weight(1f)) {
+            Surface(shape = RoundedCornerShape(Radius.large), color = AppTheme.colors.inputFill, modifier = Modifier.weight(1f)) {
                 BasicTextField(
                     value = state.draft,
                     onValueChange = onDraftChange,
                     modifier = Modifier.padding(horizontal = Spacing.lg, vertical = 14.dp),
-                    textStyle = androidx.compose.material3.MaterialTheme.typography.bodyMedium.copy(color = AppTheme.colors.onSurface),
+                    textStyle = androidx.compose.material3.MaterialTheme.typography.bodyLarge.copy(color = AppTheme.colors.onSurface),
                     decorationBox = { inner ->
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Box(modifier = Modifier.weight(1f)) {
-                                if (state.draft.isEmpty()) Text("Insira sua mensagem aqui", color = AppTheme.colors.onSurfaceMuted, style = androidx.compose.material3.MaterialTheme.typography.bodyMedium)
+                                if (state.draft.isEmpty()) Text("Mensagem", color = AppTheme.colors.onSurfaceMuted, style = androidx.compose.material3.MaterialTheme.typography.bodyMedium)
                                 inner()
                             }
-                            if (state.draft.isEmpty()) {
-                                Icon(painter = painterResource(LucideR.drawable.lucide_ic_mic), contentDescription = "Mensagem de áudio", tint = AppTheme.colors.onSurfaceMuted, modifier = Modifier.size(Sizing.iconSmall))
-                            }
+
                         }
                     },
                 )
@@ -104,11 +102,12 @@ fun ChatScreen(
             Surface(
                 modifier = Modifier.size(Sizing.messageAction),
                 onClick = onSend,
+                enabled = !state.sending && state.draft.isNotBlank(),
                 shape = CircleShape,
                 color = AppTheme.colors.primary,
             ) {
                 Box(contentAlignment = Alignment.Center) {
-                    Icon(painter = painterResource(LucideR.drawable.lucide_ic_send), contentDescription = "Enviar mensagem", tint = AppTheme.colors.onAccent, modifier = Modifier.size(Sizing.icon))
+                    Icon(painter = painterResource(AppIcons.send), contentDescription = "Enviar mensagem", tint = AppTheme.colors.onAccent, modifier = Modifier.size(Sizing.icon))
                 }
             }
         }

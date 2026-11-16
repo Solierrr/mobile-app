@@ -36,6 +36,9 @@ enum class ErrorKind {
     /** resposta com formato inválido dos DTOs */
     SERIALIZATION,
 
+    /** Capability not integrated in this client yet; retrying cannot enable it. */
+    NOT_SUPPORTED,
+
     /** qualquer outra coisa */
     UNKNOWN,
 }

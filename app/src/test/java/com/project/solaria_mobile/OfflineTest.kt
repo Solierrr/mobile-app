@@ -8,10 +8,8 @@ import com.project.solaria_mobile.core.network.ApiJson
 import com.project.solaria_mobile.core.network.NetworkMonitor
 import com.project.solaria_mobile.core.offline.CacheEntry
 import com.project.solaria_mobile.core.offline.CacheStore
-import com.project.solaria_mobile.core.offline.OfflineBannerState
 import com.project.solaria_mobile.core.offline.OfflineReader
 import com.project.solaria_mobile.core.offline.ageLabel
-import com.project.solaria_mobile.core.offline.bannerText
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -38,6 +36,7 @@ class MemoryStore : CacheStore {
         entries[cacheKey] = CacheEntry(cacheKey, json, syncedAt)
     }
     override suspend fun clear() = entries.clear()
+    override suspend fun remove(cacheKey: String) { entries.remove(cacheKey) }
 }
 
 class OfflineTest {
@@ -46,16 +45,14 @@ class OfflineTest {
     private var now = 1_000L
     private val serializer = ListSerializer(String.serializer())
 
-    private fun reader(limit: Long = 10_000) =
-        OfflineReader(store, network, ApiCallExecutor(ApiErrorParser(ApiJson.instance)), { now }, limit)
+    private fun reader() =
+        OfflineReader(store, network, ApiCallExecutor(ApiErrorParser(ApiJson.instance)), com.project.solaria_mobile.core.offline.CacheScope { "qa:owner" }, { now })
 
     @Test fun anOnlineReadIsSavedForLater() = runTest {
         val reader = reader()
         val result = reader.read("projects", serializer) { listOf("a", "b") }
         assertEquals(ApiResult.Success(listOf("a", "b")), result)
-        assertEquals(1_000L, store.entries.getValue("projects").syncedAt)
-        assertFalse(reader.status.value.stale)
-        assertEquals(1_000L, reader.status.value.lastSyncedAt)
+        assertEquals(1_000L, store.entries.getValue("qa:owner:projects").syncedAt)
     }
 
     @Test fun withoutInternetTheSavedReadIsReturnedWithoutCallingTheServer() = runTest {
@@ -67,8 +64,6 @@ class OfflineTest {
         val result = reader.read("projects", serializer) { called = true; listOf("novo") }
         assertEquals(ApiResult.Success(listOf("a")), result)
         assertFalse(called)
-        assertTrue(reader.status.value.stale)
-        assertEquals(1_000L, reader.status.value.lastSyncedAt)
     }
 
     @Test fun withoutInternetAndNothingSavedItFailsAsConnectivity() = runTest {
@@ -82,7 +77,6 @@ class OfflineTest {
         reader.read("projects", serializer) { listOf("a") }
         val result = reader.read("projects", serializer) { throw IOException("sem rede") }
         assertEquals(ApiResult.Success(listOf("a")), result)
-        assertTrue(reader.status.value.stale)
     }
 
     @Test fun aNetworkFailureWithNothingSavedStaysAFailure() = runTest {
@@ -91,9 +85,9 @@ class OfflineTest {
     }
 
     @Test fun aSlowServerFallsBackToTheSavedRead() = runTest {
-        val reader = reader(limit = 50)
+        val reader = reader()
         reader.read("projects", serializer) { listOf("a") }
-        val result = reader.read("projects", serializer) { delay(10_000); listOf("lento") }
+        val result = reader.read("projects", serializer) { delay(120_000); listOf("lento") }
         assertEquals(ApiResult.Success(listOf("a")), result)
     }
 
@@ -102,7 +96,6 @@ class OfflineTest {
         reader.read("projects", serializer) { listOf("a") }
         val result = reader.read("projects", serializer) { throw retrofit2.HttpException(forbidden()) }
         assertEquals(ApiResult.Failure(ErrorKind.FORBIDDEN), result)
-        assertFalse(reader.status.value.stale)
     }
 
     @Test fun clearingRemovesEverythingSaved() = runTest {
@@ -110,7 +103,6 @@ class OfflineTest {
         reader.read("projects", serializer) { listOf("a") }
         reader.clear()
         assertNull(store.get("projects"))
-        assertEquals(null, reader.status.value.lastSyncedAt)
         network.state.value = false
         assertEquals(ApiResult.Failure(ErrorKind.CONNECTIVITY), reader.read("projects", serializer) { listOf("a") })
     }
@@ -131,15 +123,6 @@ class OfflineTest {
         assertEquals("há 1 dia", ageLabel(0, 30 * 3_600_000L))
         assertEquals("há 4 dias", ageLabel(0, 4 * 86_400_000L))
         assertEquals("agora", ageLabel(10, 0))
-    }
-
-    @Test fun theBannerSaysWhyAndHowOldTheDataIs() {
-        val offline = OfflineBannerState(offline = true, stale = true, lastSyncedAt = 0)
-        assertTrue(offline.visible)
-        assertEquals("Sem internet. Mostrando os dados guardados. Atualizado há 5 min.", bannerText(offline, 5 * 60_000L))
-        val slowServer = OfflineBannerState(offline = false, stale = true, lastSyncedAt = null)
-        assertEquals("Mostrando os dados guardados.", bannerText(slowServer, 0))
-        assertFalse(OfflineBannerState().visible)
     }
 
     private fun forbidden() = retrofit2.Response.error<Any>(

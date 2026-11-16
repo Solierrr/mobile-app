@@ -2,71 +2,122 @@ package com.project.solaria_mobile.core.offline
 
 import com.project.solaria_mobile.core.common.ApiResult
 import com.project.solaria_mobile.core.common.ErrorKind
+import com.project.solaria_mobile.core.common.ReadResult
 import com.project.solaria_mobile.core.network.ApiCallExecutor
 import com.project.solaria_mobile.core.network.ApiJson
 import com.project.solaria_mobile.core.network.NetworkMonitor
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.withTimeoutOrNull
-import kotlinx.serialization.KSerializer
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlinx.coroutines.flow.channelFlow
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.last
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withTimeoutOrNull
+import kotlinx.serialization.KSerializer
 
-/** [lastSyncedAt] é o instante da última leitura vinda do servidor; [stale] indica que a tela mostra dados guardados. */
-data class OfflineStatus(val lastSyncedAt: Long? = null, val stale: Boolean = false)
-
-/**
- * Leitura com cache: tenta o servidor e guarda a resposta; sem internet, ou se o servidor demorar ou cair,
- * devolve a última resposta guardada. Erros do próprio servidor (401, 403, 404...) nunca são escondidos.
- */
 @Singleton
 class OfflineReader(
     private val store: CacheStore,
     private val network: NetworkMonitor,
     private val executor: ApiCallExecutor,
+    private val identity: CacheScope,
     private val clock: () -> Long,
-    private val networkLimitMillis: Long,
 ) {
     @Inject
-    constructor(store: CacheStore, network: NetworkMonitor, executor: ApiCallExecutor) :
-        this(store, network, executor, System::currentTimeMillis, NETWORK_LIMIT_MILLIS)
+    constructor(store: CacheStore, network: NetworkMonitor, executor: ApiCallExecutor, identity: CacheIdentity) :
+        this(store, network, executor, identity, System::currentTimeMillis)
 
-    private val mutableStatus = MutableStateFlow(OfflineStatus())
-    val status: StateFlow<OfflineStatus> = mutableStatus
+    private val writeLock = Mutex()
+    @Volatile private var generation = 0L
+    private val requests = java.util.concurrent.ConcurrentHashMap<String, Mutex>()
 
-    suspend fun <T> read(cacheKey: String, serializer: KSerializer<T>, call: suspend () -> T): ApiResult<T> {
-        if (!network.isOnline.first()) return fromCache(cacheKey, serializer) ?: ApiResult.Failure(ErrorKind.CONNECTIVITY)
-        val fresh = withTimeoutOrNull(networkLimitMillis) { executor.execute(call) }
-            ?: ApiResult.Failure(ErrorKind.TIMEOUT)
-        return when {
-            fresh is ApiResult.Success -> {
-                val now = clock()
-                store.put(cacheKey, ApiJson.instance.encodeToString(serializer, fresh.data), now)
-                mutableStatus.value = OfflineStatus(lastSyncedAt = now, stale = false)
-                fresh
-            }
-            fresh is ApiResult.Failure && fresh.kind.isNetworkFailure() -> fromCache(cacheKey, serializer) ?: fresh
-            else -> fresh
+    fun <T> observe(cacheKey: String, serializer: KSerializer<T>, call: suspend () -> T): Flow<ReadResult<T>> = channelFlow {
+        network.isOnline.distinctUntilChanged().collectLatest { online ->
+            updates(cacheKey, serializer, online, call).collect { send(it) }
         }
     }
 
-    /** Apaga tudo o que foi guardado; chamado ao entrar de novo e ao sair da conta. */
-    suspend fun clear() {
-        store.clear()
-        mutableStatus.value = OfflineStatus()
-    }
+    suspend fun <T> read(cacheKey: String, serializer: KSerializer<T>, call: suspend () -> T): ApiResult<T> =
+        updates(cacheKey, serializer, network.isOnline.first(), call).last().result
 
-    private suspend fun <T> fromCache(cacheKey: String, serializer: KSerializer<T>): ApiResult<T>? {
-        val entry = store.get(cacheKey) ?: return null
+    /** Read an already available resource without starting a network request. */
+    suspend fun <T> cached(cacheKey: String, serializer: KSerializer<T>): ReadResult<T>? {
+        val scope = identity.current() ?: return null
+        val version = generation
+        val entry = store.get("$scope:$cacheKey") ?: return null
         val data = runCatching { ApiJson.instance.decodeFromString(serializer, entry.json) }.getOrNull() ?: return null
-        mutableStatus.value = OfflineStatus(lastSyncedAt = entry.syncedAt, stale = true)
-        return ApiResult.Success(data)
+        if (scope != identity.current() || version != generation) return null
+        return ReadResult(ApiResult.Success(data), entry.syncedAt, cached = true)
     }
 
-    private fun ErrorKind.isNetworkFailure() = this == ErrorKind.CONNECTIVITY || this == ErrorKind.TIMEOUT
+    private fun <T> updates(cacheKey: String, serializer: KSerializer<T>, online: Boolean, call: suspend () -> T): Flow<ReadResult<T>> = flow {
+        val scope = identity.current()
+        if (scope == null) {
+            emit(ReadResult(ApiResult.Failure(ErrorKind.UNAUTHORIZED)))
+            return@flow
+        }
+        val version = generation
+        val key = "$scope:$cacheKey"
+        val entry = store.get(key)
+        val cached = entry?.let { runCatching { ApiJson.instance.decodeFromString(serializer, it.json) }.getOrNull() }
+        if (cached != null && identity.current() == scope && version == generation) {
+            emit(ReadResult(ApiResult.Success(cached), entry.syncedAt, cached = true, refreshing = online))
+        }
+        if (!online) {
+            if (cached == null) emit(ReadResult(ApiResult.Failure(ErrorKind.CONNECTIVITY)))
+            return@flow
+        }
+        var syncedAt = entry?.syncedAt
+        val result = requests.getOrPut(key) { Mutex() }.withLock {
+            val newer = store.get(key)
+            val saved = if (newer != null && newer != entry) runCatching {
+                ApiJson.instance.decodeFromString(serializer, newer.json)
+            }.getOrNull() else null
+            if (saved != null) {
+                syncedAt = newer?.syncedAt
+                ApiResult.Success(saved)
+            } else {
+                val response = withTimeoutOrNull(NETWORK_LIMIT_MILLIS) { executor.execute(call) }
+                    ?: ApiResult.Failure(ErrorKind.TIMEOUT)
+                if (response is ApiResult.Success) {
+                    writeLock.withLock {
+                        if (identity.current() == scope && version == generation) {
+                            syncedAt = clock()
+                            store.put(key, ApiJson.instance.encodeToString(serializer, response.data), syncedAt!!)
+                        }
+                    }
+                }
+                response
+            }
+        }
+        if (identity.current() != scope || version != generation) return@flow
+        when (result) {
+            is ApiResult.Success -> emit(ReadResult(result, syncedAt))
+            is ApiResult.Failure -> {
+                if (result.kind in setOf(ErrorKind.FORBIDDEN, ErrorKind.NOT_FOUND, ErrorKind.UNAUTHORIZED)) {
+                    writeLock.withLock { if (version == generation) store.remove(key) }
+                }
+                val temporary = result.kind in setOf(ErrorKind.CONNECTIVITY, ErrorKind.TIMEOUT, ErrorKind.SERVER, ErrorKind.RATE_LIMITED)
+                if (cached != null && temporary) {
+                    emit(ReadResult(ApiResult.Success(cached), entry.syncedAt, cached = true, refreshError = result.kind))
+                } else emit(ReadResult(result))
+            }
+        }
+    }
+
+    suspend fun clear() {
+        writeLock.withLock {
+            generation++
+            store.clear()
+        }
+    }
 
     private companion object {
-        const val NETWORK_LIMIT_MILLIS = 10_000L
+        const val NETWORK_LIMIT_MILLIS = 60_000L
     }
 }

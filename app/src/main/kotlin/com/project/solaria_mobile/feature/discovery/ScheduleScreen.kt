@@ -32,7 +32,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import com.composables.icons.lucide.R as LucideR
+import com.project.solaria_mobile.core.designsystem.icons.AppIcons
 import com.project.solaria_mobile.core.designsystem.components.ActionRow
 import com.project.solaria_mobile.core.designsystem.components.RoundIconButton
 import com.project.solaria_mobile.core.designsystem.components.ScreenTitle
@@ -50,8 +50,8 @@ fun ScheduleRoute(
     viewModel: ScheduleViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
-    UiStateHost(state, viewModel::load) { content ->
-        ScheduleScreen(content, onBack, onOpenSettings, viewModel::selectDay, viewModel::previousMonth, viewModel::nextMonth, viewModel::resetToDemoToday)
+    UiStateHost(state, viewModel::load, onBack = onBack, header = { ScreenTitle("Agenda", onBack) }, unavailableMessage = "Por enquanto, consulte as atividades na agenda de cada projeto.") { content ->
+        ScheduleScreen(content, onBack, onOpenSettings, viewModel::selectDay, viewModel::previousMonth, viewModel::nextMonth, viewModel::selectToday)
     }
 }
 
@@ -69,7 +69,7 @@ fun ScheduleScreen(
         modifier = Modifier.fillMaxSize().background(AppTheme.colors.surface).verticalScroll(rememberScrollState()).padding(horizontal = Spacing.screen).padding(top = Spacing.lg, bottom = Spacing.screenBottom),
         verticalArrangement = Arrangement.spacedBy(Spacing.lg),
     ) {
-        ScreenTitle("Agenda", onBack, trailingIcon = LucideR.drawable.lucide_ic_ellipsis, trailingLabel = "Mais opções", onTrailingClick = onOpenSettings)
+        ScreenTitle("Agenda", onBack, trailingIcon = AppIcons.ellipsis, trailingLabel = "Mais opções", onTrailingClick = onOpenSettings)
         CalendarCard(
             month = state.monthLabel,
             days = state.calendarDays,
@@ -91,9 +91,7 @@ fun ScheduleScreen(
             }
         }
         SectionHeading("Opções", faded = true)
-        ActionRow("Personalizar jornada", LucideR.drawable.lucide_ic_sun, {})
-        ActionRow("Google Agenda", LucideR.drawable.lucide_ic_calendar_days, {}, badge = "10")
-        ActionRow("Configurações", LucideR.drawable.lucide_ic_settings, onOpenSettings)
+        ActionRow("Configurações", AppIcons.settings, onOpenSettings)
     }
 }
 
@@ -110,20 +108,20 @@ private fun CalendarCard(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(Radius.large),
         color = AppTheme.colors.surface,
-        shadowElevation = 2.dp,
+        shadowElevation = com.project.solaria_mobile.core.designsystem.theme.Elevation.floating,
     ) {
         Column(
             modifier = Modifier.padding(Spacing.md),
             verticalArrangement = Arrangement.spacedBy(Spacing.md),
         ) {
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                RoundIconButton(LucideR.drawable.lucide_ic_chevron_left, "Mês anterior", onPrevious, size = Sizing.compactMapControl)
-                Text(month, color = AppTheme.colors.onSurface, style = androidx.compose.material3.MaterialTheme.typography.headlineMedium)
-                RoundIconButton(LucideR.drawable.lucide_ic_chevron_right, "Próximo mês", onNext, size = Sizing.compactMapControl)
+                RoundIconButton(AppIcons.chevron_left, "Mês anterior", onPrevious, size = Sizing.compactMapControl)
+                Text(month, color = AppTheme.colors.onSurface, style = androidx.compose.material3.MaterialTheme.typography.titleMedium)
+                RoundIconButton(AppIcons.chevron_right, "Próximo mês", onNext, size = Sizing.compactMapControl)
             }
             Row(modifier = Modifier.fillMaxWidth()) {
                 listOf("Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb").forEach { day ->
-                    Text(day, modifier = Modifier.weight(1f), color = if (day == "Sáb") AppTheme.colors.secondary else AppTheme.colors.onSurfaceMuted, style = androidx.compose.material3.MaterialTheme.typography.labelLarge, textAlign = TextAlign.Center)
+                    Text(day, modifier = Modifier.weight(1f), color = if (day == "Sáb") AppTheme.colors.onSurface else AppTheme.colors.onSurfaceMuted, style = androidx.compose.material3.MaterialTheme.typography.labelLarge, textAlign = TextAlign.Center)
                 }
             }
             days.chunked(7).forEach { week ->
@@ -137,7 +135,7 @@ private fun CalendarCard(
                             contentAlignment = Alignment.Center,
                         ) {
                             if (day.inCurrentMonth && day.number == selectedDay) {
-                                Box(modifier = Modifier.size(38.dp).clip(RoundedCornerShape(8.dp)).background(AppTheme.colors.secondary), contentAlignment = Alignment.Center) {
+                                Box(modifier = Modifier.size(38.dp).clip(RoundedCornerShape(8.dp)).background(AppTheme.colors.onSurface), contentAlignment = Alignment.Center) {
                                     Text(day.number.toString(), color = AppTheme.colors.onAccent, style = androidx.compose.material3.MaterialTheme.typography.titleMedium)
                                 }
                             } else {
@@ -155,7 +153,7 @@ private fun CalendarCard(
 private fun ScheduleEventRow(event: ScheduleEvent) {
     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(Spacing.md), verticalAlignment = Alignment.CenterVertically) {
         Text(event.time, color = AppTheme.colors.onSurfaceMuted, style = androidx.compose.material3.MaterialTheme.typography.labelLarge)
-        Box(modifier = Modifier.width(2.dp).height(34.dp).background(AppTheme.colors.secondary))
+        Box(modifier = Modifier.width(2.dp).height(34.dp).background(AppTheme.colors.onSurface))
         Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
             Text(event.title, color = AppTheme.colors.onSurface, style = androidx.compose.material3.MaterialTheme.typography.titleMedium)
             Text(event.place, color = AppTheme.colors.onSurfaceMuted, style = androidx.compose.material3.MaterialTheme.typography.bodyMedium)

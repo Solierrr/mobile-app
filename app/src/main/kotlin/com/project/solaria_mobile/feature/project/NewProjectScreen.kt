@@ -149,20 +149,14 @@ fun NewProjectScreen(
                 enabled = enabled,
             )
         }
-        if (state.offline) {
-            Text(
-                "Sem conectividade. Conecte-se à internet para criar o projeto; o que você preencheu fica guardado.",
-                color = AppTheme.colors.danger,
-                style = MaterialTheme.typography.bodyMedium,
-            )
-        }
         state.failure?.let { kind ->
             Text(kind.userMessage(), color = AppTheme.colors.danger, style = MaterialTheme.typography.bodyMedium)
         }
         PrimaryButton(
             text = if (state.submitting) "Criando…" else "Criar projeto",
             onClick = onSubmit,
-            enabled = enabled && !state.offline,
+            enabled = enabled && state.online,
         )
+        if (!state.online) Text("Conecte-se para criar. Seu rascunho permanece nesta tela.", color = AppTheme.colors.onSurfaceMuted, style = MaterialTheme.typography.bodyMedium)
     }
 }

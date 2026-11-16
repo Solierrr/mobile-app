@@ -4,7 +4,8 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.project.solaria_mobile.core.common.UiState
-import com.project.solaria_mobile.core.common.load
+import com.project.solaria_mobile.core.common.collectRead
+import kotlinx.coroutines.Job
 import com.project.solaria_mobile.feature.project.domain.ProjectRepository
 import com.project.solaria_mobile.feature.project.domain.ProjectSummary
 import com.project.solaria_mobile.presentation.navigation.routeId
@@ -25,7 +26,10 @@ class ProjectDetailViewModel @Inject constructor(
 
     init { load() }
 
+    private var loadJob: Job? = null
+
     fun load() {
-        viewModelScope.launch { mutableState.load { repository.project(projectId) } }
+        loadJob?.cancel()
+        loadJob = viewModelScope.launch { mutableState.collectRead(repository.observeProject(projectId)) }
     }
 }

@@ -34,7 +34,7 @@ class ConnectionsViewModel @Inject constructor(private val repository: ProfileRe
     init { load() }
 
     fun load() {
-        viewModelScope.launch { source.load(isEmpty = { it.isEmpty() }) { repository.connections() } }
+        viewModelScope.launch { source.load() { repository.connections() } }
     }
 
     fun onQueryChange(value: String) { query.value = value }

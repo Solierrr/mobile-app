@@ -2,13 +2,14 @@ package com.project.solaria_mobile
 
 import android.content.Intent
 import android.os.Bundle
+import com.project.solaria_mobile.core.offline.OfflineStatus
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.SystemBarStyle
 import androidx.activity.viewModels
 import androidx.compose.runtime.CompositionLocalProvider
 import com.project.solaria_mobile.BuildConfig
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Scaffold
@@ -16,7 +17,6 @@ import androidx.compose.ui.Modifier
 import com.project.solaria_mobile.core.designsystem.theme.AppTheme
 import com.project.solaria_mobile.core.designsystem.components.LocalSlowLoadingHint
 import com.project.solaria_mobile.feature.auth.AuthViewModel
-import com.project.solaria_mobile.core.offline.OfflineBanner
 import com.project.solaria_mobile.presentation.navigation.AppNavHost
 import dagger.hilt.android.AndroidEntryPoint
 
@@ -31,7 +31,11 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        enableEdgeToEdge()
+        enableEdgeToEdge(
+            statusBarStyle = SystemBarStyle.light(android.graphics.Color.TRANSPARENT, android.graphics.Color.TRANSPARENT),
+            navigationBarStyle = SystemBarStyle.light(android.graphics.Color.TRANSPARENT, android.graphics.Color.TRANSPARENT),
+        )
+        window.isNavigationBarContrastEnforced = false
         handleLoginCallback(intent)
         setContent {
             CompositionLocalProvider(LocalSlowLoadingHint provides slowLoadingHint()) {
@@ -40,8 +44,7 @@ class MainActivity : ComponentActivity() {
                         modifier = Modifier.fillMaxSize(),
                         containerColor = androidx.compose.material3.MaterialTheme.colorScheme.background,
                     ) { innerPadding ->
-                        Column(modifier = Modifier.padding(innerPadding)) {
-                            OfflineBanner()
+                        OfflineStatus(Modifier.padding(innerPadding)) {
                             AppNavHost(authViewModel = authViewModel, modifier = Modifier.weight(1f))
                         }
                     }

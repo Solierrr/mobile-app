@@ -37,13 +37,13 @@ fun ActionRow(
     Surface(
         modifier = modifier.fillMaxWidth(),
         onClick = onClick,
-        shape = RoundedCornerShape(Radius.pill),
+        shape = RoundedCornerShape(Radius.medium),
         color = AppTheme.colors.inputFill,
     ) {
         Row(
             modifier = Modifier
-                .defaultMinSize(minHeight = if (compact) 42.dp else Sizing.actionHeight)
-                .padding(horizontal = if (compact) Spacing.md else 22.dp, vertical = if (compact) 8.dp else 11.dp),
+                .defaultMinSize(minHeight = if (compact) Sizing.touchTarget else Sizing.actionHeight)
+                .padding(horizontal = if (compact) Spacing.md else Spacing.md, vertical = Spacing.sm),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
         ) {
@@ -53,13 +53,12 @@ fun ActionRow(
                 tint = AppTheme.colors.onSurface,
                 modifier = Modifier.size(if (compact) Sizing.iconSmall else Sizing.icon),
             )
-            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(1.dp)) {
+            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(Spacing.xxs)) {
                 Text(
                     text = title,
                     color = AppTheme.colors.onSurface,
-                    style = if (compact) androidx.compose.material3.MaterialTheme.typography.bodyMedium
-                    else androidx.compose.material3.MaterialTheme.typography.bodyLarge,
-                    maxLines = 1,
+                    style = androidx.compose.material3.MaterialTheme.typography.bodyLarge,
+                    maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                 )
                 if (subtitle != null) {
@@ -67,7 +66,7 @@ fun ActionRow(
                         text = subtitle,
                         color = AppTheme.colors.onSurfaceMuted,
                         style = androidx.compose.material3.MaterialTheme.typography.labelMedium,
-                        maxLines = 1,
+                        maxLines = 2,
                         overflow = TextOverflow.Ellipsis,
                     )
                 }

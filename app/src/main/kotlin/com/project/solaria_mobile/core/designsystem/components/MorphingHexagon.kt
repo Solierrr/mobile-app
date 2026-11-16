@@ -23,6 +23,7 @@ import androidx.compose.ui.graphics.asAndroidPath
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Matrix
 import androidx.compose.ui.graphics.asComposePath
@@ -45,6 +46,7 @@ private val shapes = listOf(
 @Composable
 fun MorphingHexagon(
     modifier: Modifier = Modifier,
+    rotateShape: Boolean = false,
 ) {
     val morphs = remember {
         shapes.indices.map { Morph(shapes[it], shapes[(it + 1) % shapes.size]) }
@@ -82,7 +84,9 @@ fun MorphingHexagon(
                 translate(CENTER / SHAPE_SCALE, CENTER / SHAPE_SCALE)
             },
         )
-        drawBrandShape(path)
+        rotate(if (rotateShape) position / morphs.size * 360f else 0f) {
+            drawBrandShape(path)
+        }
     }
 }
 

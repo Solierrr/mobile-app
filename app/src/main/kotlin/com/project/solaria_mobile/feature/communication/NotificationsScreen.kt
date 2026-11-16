@@ -18,7 +18,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import com.composables.icons.lucide.R as LucideR
+import com.project.solaria_mobile.core.designsystem.icons.AppIcons
 import com.project.solaria_mobile.core.designsystem.components.ScreenTitle
 import com.project.solaria_mobile.core.designsystem.components.SectionHeading
 import com.project.solaria_mobile.core.designsystem.theme.AppTheme
@@ -29,17 +29,17 @@ import com.project.solaria_mobile.feature.communication.domain.NotificationGroup
 @Composable
 fun NotificationsRoute(onBack: () -> Unit, viewModel: NotificationsViewModel = hiltViewModel()) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
-    UiStateHost(state, viewModel::load) { groups -> NotificationsScreen(groups, onBack) }
+    UiStateHost(state, viewModel::load, onBack = onBack, header = { ScreenTitle("Notificações", onBack) }, unavailableMessage = "Os avisos da sua conta estarão disponíveis aqui quando este recurso estiver pronto.") { groups -> NotificationsScreen(groups, onBack) }
 }
 
 @Composable
 fun NotificationsScreen(groups: List<NotificationGroup>, onBack: () -> Unit) {
     Column(modifier = Modifier.fillMaxSize().background(AppTheme.colors.surface).padding(horizontal = Spacing.screen).padding(top = Spacing.lg)) {
-        ScreenTitle("Notificações", onBack, trailingIcon = LucideR.drawable.lucide_ic_bell_dot, trailingLabel = "Marcar tudo como lido", onTrailingClick = {})
+        ScreenTitle("Notificações", onBack)
         LazyColumn(modifier = Modifier.padding(top = Spacing.md), verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
             groups.forEach { group ->
                 item { SectionHeading(group.title, faded = true) }
-                items(group.calls) { call -> CallCard(call, onClick = {}) }
+                items(group.calls) { call -> com.project.solaria_mobile.core.designsystem.components.InformationRow(call.title, AppIcons.bell, subtitle = call.detail) }
             }
             item {
                 Text("Você está em dia com suas notificações.", modifier = Modifier.fillMaxWidth().padding(Spacing.xl), color = AppTheme.colors.onSurfaceMuted, style = androidx.compose.material3.MaterialTheme.typography.bodyMedium)

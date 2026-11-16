@@ -21,9 +21,10 @@ import com.project.solaria_mobile.R
 @Composable
 fun BrandLoader(
     modifier: Modifier = Modifier,
+    rotateShape: Boolean = false,
 ) {
     Box(modifier = modifier.aspectRatio(1f), contentAlignment = Alignment.Center) {
-        MorphingHexagon(Modifier.fillMaxSize())
+        MorphingHexagon(Modifier.fillMaxSize(), rotateShape = rotateShape)
         Image(
             painter = painterResource(R.drawable.ic_hands),
             contentDescription = null,
@@ -48,5 +49,4 @@ fun BrandLoader(
 }
 
 const val SPLASH_WIDTH_FRACTION = 0.5f
-const val LOADING_WIDTH_FRACTION = 0.34f
 private const val MIN_SIZE_DP = 96
