@@ -24,7 +24,7 @@ data class SettingAction(@StringRes val title: Int, val icon: Int, val target: S
 data class SettingsGroup(@StringRes val title: Int, val actions: List<SettingAction>, val development: Boolean = false)
 
 /** [groups] vem completo; a busca filtra na tela, porque só ela sabe o texto no idioma escolhido. */
-data class SettingsUiState(val query: String = "", val groups: List<SettingsGroup> = emptyList(), val mockModeEnabled: Boolean = false, val mockImagesEnabled: Boolean = true, val mockEmptyAccount: Boolean = false)
+data class SettingsUiState(val query: String = "", val groups: List<SettingsGroup> = emptyList(), val mockModeEnabled: Boolean = false, val mockImagesEnabled: Boolean = true, val mockEmptyAccount: Boolean = true)
 
 @HiltViewModel
 class SettingsViewModel @Inject constructor(private val mockMode: MockModeStore, private val mockChat: com.project.solaria_mobile.core.mock.MockChatRealtime, private val mockData: com.project.solaria_mobile.core.mock.MockApiData) : ViewModel() {

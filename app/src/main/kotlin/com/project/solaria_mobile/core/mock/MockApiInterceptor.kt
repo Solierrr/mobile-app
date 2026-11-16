@@ -248,6 +248,8 @@ class MockApiInterceptor @Inject constructor(
                 val body = decode<ProjectStatusRequest>(request.body?.let(::bodyText).orEmpty())
                 data.changeActivityStatus(segments[2], segments[4], body.status)?.let { success(ProjectActivityDto.serializer(), it) } ?: notFound()
             }
+            segments.size == 4 && segments.take(2) == listOf("api", "projects") && segments[3] == "map-location" && method == "POST" ->
+                data.resolveLocation(segments[2])?.let { success(ProjectDto.serializer(), it) } ?: notFound()
             segments.size == 6 && segments.take(2) == listOf("api", "projects") && segments[3] == "photos" && segments[5] == "cover" && method == "PATCH" ->
                 data.setCover(segments[2], segments[4])?.let { success(ProjectPhotoDto.serializer(), it) } ?: notFound()
             segments.size == 5 && segments.take(2) == listOf("api", "projects") && segments[3] == "photos" && method == "DELETE" -> {
@@ -511,9 +513,15 @@ class MockApiData internal constructor(private val profileStore: MockProfileStor
         if (next != null) serviceStore[id] = next
         return next
     }
-    private val connectedIds = linkedSetOf("qa-person-1")
+    private val connectedIds = linkedSetOf<String>()
+    private val demoConnectedIds = linkedSetOf("qa-person-1")
+
+    private fun isConnected(id: String) = id in connectedIds || (!emptyAccount.value && id in demoConnectedIds)
     private val seedTime = OffsetDateTime.now()
     private val conversationList = MockChatSeed.conversations(seedTime).toMutableList()
+    private val demoConversationIds = conversationList.map { it.id }.toSet()
+
+    private fun visibleConversations() = if (emptyAccount.value) conversationList.filterNot { it.id in demoConversationIds } else conversationList.toList()
     private val conversationMessages = MockChatSeed.messages(seedTime)
     /** Até que mensagem cada conversa foi lida; a conversa de Ana e a do grupo começam com mensagens novas. */
     private val lastRead = conversationMessages.mapValues { (id, items) ->
@@ -528,12 +536,24 @@ class MockApiData internal constructor(private val profileStore: MockProfileStor
     private var nextMessage = 1000
     private val selfId = "qa-mock-user"
 
-    /** Conta recém-criada: sem os projetos, chamados, conversas, conexões e notificações de demonstração; o que a pessoa cria continua aparecendo. */
-    val emptyAccount = kotlinx.coroutines.flow.MutableStateFlow(false)
+    /** Conta recém-criada (o padrão): sem os projetos, chamados, conversas, conexões e notificações de demonstração; o que a pessoa cria continua aparecendo. */
+    val emptyAccount = kotlinx.coroutines.flow.MutableStateFlow(true)
 
     private fun visibleProjects() = if (emptyAccount.value) projects.filterNot { it.id in demoProjectIds } else projects.toList()
 
     @Synchronized fun projects() = visibleProjects()
+
+    /** Dá coordenadas ao projeto que só tem endereço, como o servidor ao geocodificar; as de quem já as tem ficam como estão. */
+    @Synchronized fun resolveLocation(id: String): ProjectDto? {
+        val index = projects.indexOfFirst { it.id == id }
+        if (index < 0) return null
+        val project = projects[index]
+        val place = project.location ?: return project
+        if (place.latitude != null && place.longitude != null) return project
+        val query = listOfNotNull(place.street, place.number, place.neighborhood, place.city, place.state).filter { it.isNotBlank() }.joinToString(", ")
+        val point = geocode(query).results.first()
+        return project.copy(location = place.copy(latitude = point.latitude, longitude = point.longitude, geocodedAt = OffsetDateTime.now().toString())).also { projects[index] = it }
+    }
     @Synchronized fun project(id: String) = visibleProjects().firstOrNull { it.id == id }?.copy(role = "OWNER")
 
     @Synchronized fun createProject(draft: ProjectRequestDto): ProjectDto {
@@ -664,9 +684,9 @@ class MockApiData internal constructor(private val profileStore: MockProfileStor
         return GroupCreationDto(conversation)
     }
 
-    private fun baseMembers(projectId: String) = listOf(
+    private fun baseMembers(projectId: String) = listOfNotNull(
         ProjectMemberDto("$projectId-member-1", selfId, "Pessoa de demonstração", "OWNER", "Responsável", authId = selfId),
-        ProjectMemberDto("$projectId-member-2", "qa-person-1", "Ana Oliveira", "MEMBER", "Técnica solar", authId = "qa-person-1"),
+        ProjectMemberDto("$projectId-member-2", "qa-person-1", "Ana Oliveira", "MEMBER", "Técnica solar", authId = "qa-person-1").takeIf { projectId in demoProjectIds },
     )
 
     private val activityStatus = mutableMapOf<String, String>()
@@ -696,6 +716,7 @@ class MockApiData internal constructor(private val profileStore: MockProfileStor
     }
 
     private fun baseActivities(projectId: String): List<ProjectActivityDto> {
+        if (projectId !in demoProjectIds) return emptyList()
         val now = OffsetDateTime.now()
         return listOf(
             ProjectActivityDto("$projectId-activity-0", "Alinhamento com o cliente", "Revisão do cronograma", "MEETING", "OPEN", now.withHour(17).withMinute(0).withSecond(0).withNano(0).toString(), onsite = false),
@@ -709,7 +730,7 @@ class MockApiData internal constructor(private val profileStore: MockProfileStor
     } + listOf(
         ProjectHistoryDto("$projectId-history-1", "Projeto criado", "Solicitação recebida", "Pessoa de demonstração", OffsetDateTime.now().minusDays(5).toString()),
         ProjectHistoryDto("$projectId-history-2", "Equipe atualizada", "Ana Oliveira adicionada", "Pessoa de demonstração", OffsetDateTime.now().minusDays(2).toString()),
-    )
+    ).filter { projectId in demoProjectIds }
 
     // Relatórios criados no modo mock ficam só na memória; as imagens entram nas fotos do projeto, como no servidor.
     private val reportStore = mutableMapOf<String, MutableList<ProjectReportDto>>()
@@ -738,7 +759,7 @@ class MockApiData internal constructor(private val profileStore: MockProfileStor
      */
     @Synchronized fun photos(projectId: String, demo: ((Int) -> List<MockImage>)? = null): List<ProjectPhotoDto> {
         if (demo != null && seededPhotos.add(projectId)) {
-            val index = projects.indexOfFirst { it.id == projectId }
+            val index = demoProjectIds.indexOf(projectId)
             if (index >= 0) {
                 demo(index).forEach { demoPhotoIds += addPhoto(projectId, it.bytes, it.mime).id }
             }
@@ -791,7 +812,7 @@ class MockApiData internal constructor(private val profileStore: MockProfileStor
         projects.removeAll { it.id == projectId }
     }
 
-    fun ownProfile() = SelfProfileDto(
+    fun ownProfile() = if (emptyAccount.value) SelfProfileDto(id = selfId, person = SelfPersonDto("Pessoa de demonstração")) else SelfProfileDto(
         id = selfId,
         avatar = "mock-asset:avatar-own.webp",
         banner = "mock-asset:banner-own.webp",
@@ -872,29 +893,29 @@ class MockApiData internal constructor(private val profileStore: MockProfileStor
         return listOf(slot(12, 13), slot(15, 16))
     }
 
-    @Synchronized fun connections() = if (emptyAccount.value) emptyList() else people.filter { it.id in connectedIds }.map { it.copy(connected = true) }
+    @Synchronized fun connections() = people.filter { isConnected(it.id) }.map { it.copy(connected = true) }
 
     @Synchronized fun setConnection(id: String, connected: Boolean): UserDto {
-        if (connected) connectedIds.add(id) else connectedIds.remove(id)
+        if (connected) connectedIds.add(id) else { connectedIds.remove(id); demoConnectedIds.remove(id) }
         return person(id)?.copy(connected = connected) ?: UserDto(id, "Pessoa de demonstração", connected)
     }
 
-    @Synchronized fun person(id: String): UserDto? = people.firstOrNull { it.id == id }?.copy(connected = id in connectedIds)
+    @Synchronized fun person(id: String): UserDto? = people.firstOrNull { it.id == id }?.copy(connected = isConnected(id))
 
     @Synchronized fun people(query: String, page: Int, connectedOnly: Boolean): PeoplePageDto {
         val filtered = people.filter { user ->
             (query.isBlank() || listOfNotNull(user.name, user.username).any { it.contains(query, true) }) &&
-                (!connectedOnly || user.id in connectedIds)
+                (!connectedOnly || isConnected(user.id))
         }
         val pageSize = 20
-        val pageItems = filtered.drop(((page - 1).coerceAtLeast(0)) * pageSize).take(pageSize).map { it.copy(connected = it.id in connectedIds) }
+        val pageItems = filtered.drop(((page - 1).coerceAtLeast(0)) * pageSize).take(pageSize).map { it.copy(connected = isConnected(it.id)) }
         return PeoplePageDto(pageItems, filtered.size > page * pageSize)
     }
 
     private val mutedConversations = mutableSetOf<String>()
     private val archivedConversations = mutableSetOf<String>()
 
-    @Synchronized fun conversations() = if (emptyAccount.value) emptyList() else conversationList.filterNot { it.id in archivedConversations }
+    @Synchronized fun conversations() = visibleConversations().filterNot { it.id in archivedConversations }
         .map { it.copy(muted = it.id in mutedConversations, archived = false, unreadCount = unread(it.id).toLong(), lastMessage = lastMessage(it.id)) }
         .sortedByDescending { conversationMessages[it.id]?.lastOrNull()?.timestamp.orEmpty() }
 
@@ -942,7 +963,7 @@ class MockApiData internal constructor(private val profileStore: MockProfileStor
     )
 
     @Synchronized fun archivedConversationList(): List<ConversationDto> =
-        if (emptyAccount.value) emptyList() else conversationList.filter { it.id in archivedConversations }.map { it.copy(archived = true, unreadCount = 0, lastMessage = lastMessage(it.id)) }
+        visibleConversations().filter { it.id in archivedConversations }.map { it.copy(archived = true, unreadCount = 0, lastMessage = lastMessage(it.id)) }
 
     @Synchronized fun createGroup(request: GroupConversationRequest, actor: String): GroupCreationDto {
         val participants = (request.participantIds.map { if (it == actor) selfId else it }.toSet() + selfId).toList()
@@ -1036,7 +1057,7 @@ class MockApiData internal constructor(private val profileStore: MockProfileStor
             MockChatSeed.ANA to MockChatSeed.CONVERSATION_ANA, MockChatSeed.RAFAEL to MockChatSeed.CONVERSATION_RAFAEL,
             MockChatSeed.MARINA to MockChatSeed.CONVERSATION_MARINA, MockChatSeed.BEATRIZ to MockChatSeed.CONVERSATION_EMPTY,
         )
-        known[recipientId]?.let { id -> conversationList.firstOrNull { it.id == id }?.let { return it } }
+        if (!emptyAccount.value) known[recipientId]?.let { id -> conversationList.firstOrNull { it.id == id }?.let { return it } }
         val created = ConversationDto(
             "qa-conversation-d${nextDirect++}", "USER", MockChatSeed.names[recipientId] ?: "Pessoa", OffsetDateTime.now().toString(),
         )

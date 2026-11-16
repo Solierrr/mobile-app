@@ -95,8 +95,15 @@ fun SettingsScreen(state: SettingsUiState, onQueryChange: (String) -> Unit, onMo
                     if (group.development && mockMatches) {
                         AppSwitchRow("Modo mock", state.mockModeEnabled, onMockModeChange, description = "Usar dados locais sem acessar os serviços de QA.")
                         if (state.mockModeEnabled) {
-                            AppSwitchRow("Imagens de demonstração", state.mockImagesEnabled, onMockImagesChange, description = "Fotos de exemplo nas galerias dos projetos. Desligue para testar o estado sem imagens.")
-                            AppSwitchRow("Conta sem projetos", state.mockEmptyAccount, onMockEmptyAccountChange, description = "Simula uma conta recém-criada, sem projetos, chamados, conversas, conexões nem notificações. Fica ligada até você desligar.")
+                            AppSwitchRow("Imagens de demonstração", state.mockImagesEnabled, onMockImagesChange, description = "Fotos de exemplo nas galerias dos projetos populados. Desligue para testar o estado sem imagens.")
+                            ActionRow(
+                                if (state.mockEmptyAccount) "Popular conta" else "Limpar conta", if (state.mockEmptyAccount) AppIcons.folder_plus else AppIcons.trash,
+                                {
+                                    onMockEmptyAccountChange(!state.mockEmptyAccount)
+                                    scope.launch { toast.show(if (state.mockEmptyAccount) "Conta populada" else "Conta limpa", ToastKind.Info) }
+                                },
+                                trailing = if (state.mockEmptyAccount) "Vazia" else "Populada",
+                            )
                         }
                     }
                     group.actions.forEach { action -> ActionRow(stringResource(action.title), action.icon, {
