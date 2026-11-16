@@ -6,6 +6,7 @@ import com.project.solaria_mobile.core.common.ApiResult
 import com.project.solaria_mobile.core.common.ErrorKind
 import com.project.solaria_mobile.feature.auth.domain.AuthRepository
 import com.project.solaria_mobile.feature.auth.domain.SessionState
+import com.project.solaria_mobile.feature.auth.domain.LoginDestination
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.channels.Channel
@@ -48,13 +49,16 @@ class AuthViewModel @Inject constructor(private val repository: AuthRepository) 
     }
 
     fun startLogin() {
+        if (mutableState.value.busy) return
         loginStarted = true
         viewModelScope.launch {
             mutableState.value = mutableState.value.copy(busy = true, error = null)
             when (val result = repository.beginLogin()) {
                 is ApiResult.Success -> {
                     mutableState.value = mutableState.value.copy(busy = false)
-                    effects.send(AuthEffect.OpenLogin(result.data))
+                    if (result.data is LoginDestination.Browser) {
+                        effects.send(AuthEffect.OpenLogin(result.data.url))
+                    }
                 }
                 is ApiResult.Failure -> mutableState.value = mutableState.value.copy(busy = false, error = result.kind)
             }
@@ -76,7 +80,7 @@ class AuthViewModel @Inject constructor(private val repository: AuthRepository) 
     }
 
     fun signOut() {
-        loginStarted = false
+        loginStarted = true
         viewModelScope.launch { repository.signOut() }
     }
 }

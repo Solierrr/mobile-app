@@ -9,6 +9,7 @@ import com.project.solaria_mobile.core.database.isChatbot
 import com.project.solaria_mobile.core.network.ApiCallExecutor
 import com.project.solaria_mobile.feature.profile.data.ProfileApi
 import java.util.concurrent.ConcurrentHashMap
+import com.project.solaria_mobile.core.database.ChatDatabaseRouter
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.flow.Flow
@@ -40,6 +41,7 @@ class UserDirectory @Inject constructor(
     private val users: UserDao,
     private val conversations: ConversationDao,
     private val messages: MessageDao,
+    private val router: ChatDatabaseRouter? = null,
 ) {
     private val askedAt = ConcurrentHashMap<String, Long>()
 
@@ -62,6 +64,12 @@ class UserDirectory @Inject constructor(
      * @param me `sub` do usuário logado em minúsculas. Ele mesmo não é consultado.
      */
     suspend fun refreshFor(conversationId: String?, me: String?) {
+        try {
+            if (router != null) router.session { refreshCurrentFor(conversationId, me) } else refreshCurrentFor(conversationId, me)
+        } catch (_: com.project.solaria_mobile.core.database.ChatContextChanged) { }
+    }
+
+    private suspend fun refreshCurrentFor(conversationId: String?, me: String?) {
         val ids = if (conversationId == null) {
             conversations.all().filter { it.conversationType == DIRECT_TYPE }.flatMap { it.peerIds(me) }
         } else {
@@ -72,12 +80,16 @@ class UserDirectory @Inject constructor(
     }
 
     private suspend fun refresh(authId: String) {
+        if (router != null) router.session { refreshCurrent(authId) } else refreshCurrent(authId)
+    }
+
+    private suspend fun refreshCurrent(authId: String) {
         val last = askedAt[authId]
         if (last != null && now() - last < MIN_INTERVAL_MILLIS) return
-        val summary = executor.execute { api.summary(authId) }.getOrNull() ?: return
-        askedAt[authId] = now()
+        val summary = executor.execute { router?.forOperation(); api.summary(authId) }.getOrNull() ?: return
         val name = summary.username?.takeIf { it.isNotBlank() } ?: return
         users.save(UserEntity(authId, name, summary.avatar?.takeIf { it.isNotBlank() }))
+        askedAt[authId] = now()
     }
 
     /** Esquece quando cada pessoa foi consultada, para o próximo login refazer as consultas sem esperar os 30 s. */

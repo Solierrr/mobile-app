@@ -36,9 +36,18 @@ data class ChatMessage(
     val changeable: Boolean = false,
 )
 
-data class ServiceCall(val id: String, val title: String, val detail: String, val icon: ServiceCallIcon, val badge: String? = null)
+/** Estado pessoal da conversa: silenciar e arquivar valem só para a própria conta. */
+data class ConversationState(val muted: Boolean, val archived: Boolean)
 
-data class NotificationGroup(val title: String, val calls: List<ServiceCall>)
+data class ServiceCall(
+    val id: String, val title: String, val detail: String, val icon: ServiceCallIcon, val badge: String? = null,
+    val projectId: String? = null, val projectName: String = "", val status: String? = null,
+    val scheduledAt: java.time.OffsetDateTime? = null, val acceptedAt: java.time.OffsetDateTime? = null,
+    val endedAt: java.time.OffsetDateTime? = null, val address: String = "", val canManage: Boolean = false,
+    val hasExecutors: Boolean = false, val managedByAgenda: Boolean = false,
+)
+
+
 
 /**
  * O que a tela mostra de ao vivo numa conversa.

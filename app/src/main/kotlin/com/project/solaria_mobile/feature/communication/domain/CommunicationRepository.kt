@@ -24,7 +24,4 @@ interface CommunicationRepository {
     fun stopTyping(conversationId: String)
     suspend fun editMessage(messageId: String, text: String): ApiResult<Unit>
     suspend fun deleteMessage(messageId: String): ApiResult<Unit>
-    suspend fun calls(): ApiResult<List<ServiceCall>>
-    suspend fun call(id: String): ApiResult<ServiceCall>
-    suspend fun notifications(): ApiResult<List<NotificationGroup>>
 }

@@ -65,7 +65,11 @@ Room: messages | conversations | users | sync_state | pending_messages
 | `sync_state` | `syncEpoch` e `cursor` do catch-up. | `MessageSync`. |
 | `pending_messages` | Mensagens que esperam envio. | `MessageOutbox`. |
 
-O Room está na versão 2, com `fallbackToDestructiveMigration`. A troca de versão apaga o banco, inclusive a fila de envio. Não há migração porque não há dados em produção.
+O Room está na versão 3, com migrações explícitas 1→2→3 que preservam a fila. `ChatDatabaseRouter` separa `solaria.db` de `solaria-mock.db`; os DAOs tipados observam mudanças de modo e mantêm o banco/usuário de origem nas operações em andamento. Uma resposta tardia não é gravada no contexto novo. `scripts/verify-chat-migrations.py` confere as migrações em SQLite contra o schema gerado pelo Room.
+
+A fila legada `message-outbox.db` é importada ao abrir a conversa autorizada, mantendo UUID e tentativas incertas. A importação usa `INSERT IGNORE`, permitindo repetir após interrupção sem duplicar. Registros ainda não importados permanecem no arquivo anterior.
+
+O modo mock QA intercepta as APIs e desativa STOMP real. A lista mantém o acesso às arquivadas mesmo quando não há conversas ativas. Leitura, silenciar/arquivar, edição/exclusão e presença usam os contratos da main; serviços técnicos e notificações têm repositórios próprios, sem fallback para chamadas fictícias em runtime real.
 
 ### Quando o banco sincroniza
 

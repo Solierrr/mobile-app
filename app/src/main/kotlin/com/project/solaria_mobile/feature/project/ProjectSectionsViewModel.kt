@@ -4,7 +4,8 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.project.solaria_mobile.core.common.UiState
-import com.project.solaria_mobile.core.common.load
+import com.project.solaria_mobile.core.common.collectRead
+import kotlinx.coroutines.Job
 import com.project.solaria_mobile.feature.project.domain.ProjectActivity
 import com.project.solaria_mobile.feature.project.domain.ProjectDetailRepository
 import com.project.solaria_mobile.feature.project.domain.ProjectHistoryEntry
@@ -17,13 +18,19 @@ import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
+import com.project.solaria_mobile.core.common.ApiResult
+import com.project.solaria_mobile.core.common.ErrorKind
+import com.project.solaria_mobile.feature.project.domain.ProjectStatusOption
+import com.project.solaria_mobile.feature.project.domain.ProjectInvitation
+import com.project.solaria_mobile.feature.project.domain.ProjectRoleOption
+import com.project.solaria_mobile.feature.project.domain.ActivityDraft
 
 @HiltViewModel
 class ProjectSectionsViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
     private val repository: ProjectDetailRepository,
 ) : ViewModel() {
-    private val projectId = savedStateHandle.routeId()
+    val projectId = savedStateHandle.routeId()
 
     private val mutableLocation = MutableStateFlow<UiState<ProjectLocationInfo>>(UiState.Loading)
     private val mutableMembers = MutableStateFlow<UiState<List<ProjectMember>>>(UiState.Loading)
@@ -38,6 +45,7 @@ class ProjectSectionsViewModel @Inject constructor(
     val photos: StateFlow<UiState<List<ProjectPhoto>>> = mutablePhotos
 
     private val loaded = mutableSetOf<ProjectSheet>()
+    private val jobs = mutableMapOf<ProjectSheet, Job>()
 
     init { loadPhotos() }
 
@@ -52,20 +60,145 @@ class ProjectSectionsViewModel @Inject constructor(
         (repository.photoContent(projectId, photoId) as? com.project.solaria_mobile.core.common.ApiResult.Success)?.data
 
     private fun loadPhotos() {
-        viewModelScope.launch { mutablePhotos.load(isEmpty = { it.isEmpty() }) { repository.photos(projectId) } }
+        loaded += ProjectSheet.GALLERY
+        jobs[ProjectSheet.GALLERY] = viewModelScope.launch { mutablePhotos.collectRead(repository.observePhotos(projectId), isEmpty = { it.isEmpty() }) }
     }
 
     private fun load(sheet: ProjectSheet) {
         loaded += sheet
-        viewModelScope.launch {
+        jobs.remove(sheet)?.cancel()
+        jobs[sheet] = viewModelScope.launch {
             when (sheet) {
-                ProjectSheet.LOCATION -> mutableLocation.load { repository.location(projectId) }
-                ProjectSheet.GALLERY -> mutablePhotos.load(isEmpty = { it.isEmpty() }) { repository.photos(projectId) }
-                ProjectSheet.AGENDA -> mutableActivities.load(isEmpty = { it.isEmpty() }) { repository.activities(projectId) }
-                ProjectSheet.HISTORY -> mutableHistory.load(isEmpty = { it.isEmpty() }) { repository.history(projectId) }
-                ProjectSheet.TEAM -> mutableMembers.load(isEmpty = { it.isEmpty() }) { repository.members(projectId) }
+                ProjectSheet.LOCATION -> mutableLocation.collectRead(repository.observeLocation(projectId))
+                ProjectSheet.GALLERY -> mutablePhotos.collectRead(repository.observePhotos(projectId), isEmpty = { it.isEmpty() })
+                ProjectSheet.AGENDA -> mutableActivities.collectRead(repository.observeActivities(projectId), isEmpty = { it.isEmpty() })
+                ProjectSheet.HISTORY -> mutableHistory.collectRead(repository.observeHistory(projectId), isEmpty = { it.isEmpty() })
+                ProjectSheet.TEAM -> {
+                    loadInvitations()
+                    mutableMembers.collectRead(repository.observeMembers(projectId), isEmpty = { it.isEmpty() })
+                }
                 ProjectSheet.CONVERSATIONS -> Unit
             }
         }
     }
+
+    /** Convites pendentes do projeto; vazio para quem não gerencia o projeto (o servidor recusa a listagem). */
+    private val mutableInvitations = MutableStateFlow<List<ProjectInvitation>>(emptyList())
+    val invitations: StateFlow<List<ProjectInvitation>> = mutableInvitations
+
+    private val mutableTeamAction = MutableStateFlow<ProjectAction?>(null)
+    val teamAction: StateFlow<ProjectAction?> = mutableTeamAction
+
+    private fun loadInvitations() {
+        viewModelScope.launch {
+            mutableInvitations.value = (repository.invitations(projectId) as? ApiResult.Success)?.data.orEmpty()
+        }
+    }
+
+    fun invite(email: String, role: ProjectRoleOption, functionName: String) =
+        teamOperation(ProjectOperation.INVITE) { repository.invite(projectId, email, role, functionName) }
+
+    fun revokeInvitation(id: String) = teamOperation(ProjectOperation.REVOKE_INVITE) { repository.revokeInvitation(id) }
+
+    fun resendInvitation(id: String) = teamOperation(ProjectOperation.RESEND_INVITE) { repository.resendInvitation(id) }
+
+    fun removeMember(userId: String) = teamOperation(ProjectOperation.REMOVE_MEMBER) { repository.removeMember(projectId, userId) }
+
+    /** Recusa no aparelho um e-mail que o servidor recusaria, sem chamar a rede. */
+    fun rejectInvite() {
+        mutableTeamAction.value = ProjectAction.Failed(ErrorKind.VALIDATION, ProjectOperation.INVITE)
+    }
+
+    fun clearTeamAction() {
+        if (mutableTeamAction.value != ProjectAction.Working) mutableTeamAction.value = null
+    }
+
+    private fun teamOperation(operation: ProjectOperation, call: suspend () -> ApiResult<*>) {
+        if (mutableTeamAction.value == ProjectAction.Working) return
+        mutableTeamAction.value = ProjectAction.Working
+        viewModelScope.launch {
+            mutableTeamAction.value = when (val result = call()) {
+                is ApiResult.Success -> {
+                    retry(ProjectSheet.TEAM)
+                    ProjectAction.Done(operation)
+                }
+                is ApiResult.Failure -> ProjectAction.Failed(result.kind, operation)
+            }
+        }
+    }
+
+    private val mutablePhotoAction = MutableStateFlow<ProjectAction?>(null)
+    val photoAction: StateFlow<ProjectAction?> = mutablePhotoAction
+
+    /** Envia uma imagem já validada no aparelho; a galeria e a capa são recarregadas do servidor depois. */
+    fun uploadPhoto(image: ByteArray, mime: String) = photoOperation(ProjectOperation.UPLOAD_PHOTO) { repository.uploadPhoto(projectId, image, mime) }
+
+    fun removePhoto(photoId: String) = photoOperation(ProjectOperation.REMOVE_PHOTO) { repository.removePhoto(projectId, photoId) }
+
+    fun setCover(photoId: String) = photoOperation(ProjectOperation.SET_COVER) { repository.setCover(projectId, photoId) }
+
+    /** Recusa no aparelho, antes de enviar, o que o servidor recusaria (formato ou tamanho). */
+    fun rejectPhoto() {
+        mutablePhotoAction.value = ProjectAction.Failed(ErrorKind.VALIDATION, ProjectOperation.UPLOAD_PHOTO)
+    }
+
+    fun clearPhotoAction() {
+        if (mutablePhotoAction.value != ProjectAction.Working) mutablePhotoAction.value = null
+    }
+
+    private val mutableActivityAction = MutableStateFlow<ProjectAction?>(null)
+    val activityAction: StateFlow<ProjectAction?> = mutableActivityAction
+
+    /** Muda a situação da atividade no servidor; a agenda é recarregada só depois da confirmação. */
+    fun changeActivityStatus(activityId: String, status: ProjectStatusOption) {
+        if (mutableActivityAction.value == ProjectAction.Working) return
+        mutableActivityAction.value = ProjectAction.Working
+        viewModelScope.launch {
+            mutableActivityAction.value = when (val result = repository.changeActivityStatus(projectId, activityId, status)) {
+                is ApiResult.Success -> {
+                    retry(ProjectSheet.AGENDA)
+                    null
+                }
+                is ApiResult.Failure -> ProjectAction.Failed(result.kind, ProjectOperation.ACTIVITY_STATUS, status)
+            }
+        }
+    }
+
+    /** Cria (sem id) ou edita uma atividade; o rascunho é validado no aparelho antes de chamar o servidor. */
+    fun saveActivity(activityId: String?, draft: ActivityDraft) {
+        if (mutableActivityAction.value == ProjectAction.Working) return
+        if (draft.validate().isNotEmpty()) {
+            mutableActivityAction.value = ProjectAction.Failed(ErrorKind.VALIDATION, ProjectOperation.SAVE_ACTIVITY)
+            return
+        }
+        mutableActivityAction.value = ProjectAction.Working
+        viewModelScope.launch {
+            mutableActivityAction.value = when (val result = repository.saveActivity(projectId, activityId, draft)) {
+                is ApiResult.Success -> {
+                    retry(ProjectSheet.AGENDA)
+                    ProjectAction.Done(ProjectOperation.SAVE_ACTIVITY)
+                }
+                is ApiResult.Failure -> ProjectAction.Failed(result.kind, ProjectOperation.SAVE_ACTIVITY)
+            }
+        }
+    }
+
+    fun clearActivityAction() {
+        if (mutableActivityAction.value != ProjectAction.Working) mutableActivityAction.value = null
+    }
+
+    private fun photoOperation(operation: ProjectOperation, call: suspend () -> ApiResult<*>) {
+        if (mutablePhotoAction.value == ProjectAction.Working) return
+        mutablePhotoAction.value = ProjectAction.Working
+        viewModelScope.launch {
+            mutablePhotoAction.value = when (val result = call()) {
+                is ApiResult.Success -> {
+                    retry(ProjectSheet.GALLERY)
+                    null
+                }
+                is ApiResult.Failure -> ProjectAction.Failed(result.kind, operation)
+            }
+        }
+    }
+
 }

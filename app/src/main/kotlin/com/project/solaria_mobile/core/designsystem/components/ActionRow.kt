@@ -17,8 +17,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.dp
 import com.project.solaria_mobile.core.designsystem.theme.AppTheme
+import com.project.solaria_mobile.core.designsystem.theme.containerFill
 import com.project.solaria_mobile.core.designsystem.theme.Spacing
 import com.project.solaria_mobile.core.designsystem.theme.Sizing
 import com.project.solaria_mobile.core.designsystem.theme.Radius
@@ -33,17 +33,19 @@ fun ActionRow(
     trailing: String? = null,
     subtitle: String? = null,
     compact: Boolean = false,
+    enabled: Boolean = true,
 ) {
     Surface(
         modifier = modifier.fillMaxWidth(),
         onClick = onClick,
-        shape = RoundedCornerShape(Radius.pill),
-        color = AppTheme.colors.inputFill,
+        enabled = enabled,
+        shape = RoundedCornerShape(Radius.medium),
+        color = containerFill(),
     ) {
         Row(
             modifier = Modifier
-                .defaultMinSize(minHeight = if (compact) 42.dp else Sizing.actionHeight)
-                .padding(horizontal = if (compact) Spacing.md else 22.dp, vertical = if (compact) 8.dp else 11.dp),
+                .defaultMinSize(minHeight = if (compact) Sizing.touchTarget else Sizing.actionHeight)
+                .padding(horizontal = Spacing.md, vertical = Spacing.sm),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
         ) {
@@ -53,13 +55,12 @@ fun ActionRow(
                 tint = AppTheme.colors.onSurface,
                 modifier = Modifier.size(if (compact) Sizing.iconSmall else Sizing.icon),
             )
-            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(1.dp)) {
+            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(Spacing.xxs)) {
                 Text(
                     text = title,
                     color = AppTheme.colors.onSurface,
-                    style = if (compact) androidx.compose.material3.MaterialTheme.typography.bodyMedium
-                    else androidx.compose.material3.MaterialTheme.typography.bodyLarge,
-                    maxLines = 1,
+                    style = androidx.compose.material3.MaterialTheme.typography.bodyLarge,
+                    maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                 )
                 if (subtitle != null) {
@@ -67,7 +68,7 @@ fun ActionRow(
                         text = subtitle,
                         color = AppTheme.colors.onSurfaceMuted,
                         style = androidx.compose.material3.MaterialTheme.typography.labelMedium,
-                        maxLines = 1,
+                        maxLines = 2,
                         overflow = TextOverflow.Ellipsis,
                     )
                 }

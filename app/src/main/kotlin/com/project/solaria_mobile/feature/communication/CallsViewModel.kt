@@ -3,9 +3,9 @@ package com.project.solaria_mobile.feature.communication
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.project.solaria_mobile.core.common.UiState
-import com.project.solaria_mobile.core.common.load
+import com.project.solaria_mobile.core.common.collectRead
 import com.project.solaria_mobile.core.common.map
-import com.project.solaria_mobile.feature.communication.domain.CommunicationRepository
+import com.project.solaria_mobile.feature.communication.domain.ServiceCallRepository
 import com.project.solaria_mobile.feature.communication.domain.ServiceCall
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
@@ -19,7 +19,7 @@ import kotlinx.coroutines.launch
 data class CallsUiState(val query: String = "", val calls: List<ServiceCall> = emptyList())
 
 @HiltViewModel
-class CallsViewModel @Inject constructor(private val repository: CommunicationRepository) : ViewModel() {
+class CallsViewModel @Inject constructor(private val repository: ServiceCallRepository) : ViewModel() {
     private val query = MutableStateFlow("")
     private val source = MutableStateFlow<UiState<List<ServiceCall>>>(UiState.Loading)
 
@@ -31,10 +31,13 @@ class CallsViewModel @Inject constructor(private val repository: CommunicationRe
         }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), UiState.Loading)
 
+    private var job: kotlinx.coroutines.Job? = null
+
     init { load() }
 
     fun load() {
-        viewModelScope.launch { source.load(isEmpty = { it.isEmpty() }) { repository.calls() } }
+        job?.cancel()
+        job = viewModelScope.launch { source.collectRead(repository.observeCalls(), isEmpty = { it.isEmpty() }) }
     }
 
     fun onQueryChange(value: String) { query.value = value }

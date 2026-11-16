@@ -18,7 +18,6 @@ import com.project.solaria_mobile.core.network.ApiJson
 import com.project.solaria_mobile.core.network.CredentialProvider
 import com.project.solaria_mobile.core.network.NetworkMonitor
 import com.project.solaria_mobile.feature.communication.data.ConversationDto
-import com.project.solaria_mobile.feature.communication.data.FakeCommunicationRepository
 import com.project.solaria_mobile.feature.communication.data.MessageOutbox
 import com.project.solaria_mobile.feature.communication.data.MessageStore
 import com.project.solaria_mobile.feature.communication.data.MessageSync
@@ -101,7 +100,7 @@ class RemoteCommunicationRepositoryTest {
         )
         val stateSync = ConversationStateSync(api, executor, networkMonitor, conversationDao, messageDao, backgroundScope)
         val presence = ConversationPresence(realtime, ApiJson.instance, credentials, backgroundScope)
-        return RemoteCommunicationRepository(api, executor, credentials, outbox, networkMonitor, store, conversationDao, users, sync, FakeCommunicationRepository(), stateSync, presence)
+        return RemoteCommunicationRepository(api, executor, credentials, outbox, networkMonitor, store, conversationDao, users, sync, stateSync, presence)
     }
 
     @Test fun listShowsStoredConversationsWithoutNetworkAndHidesArchivedOnes() = runTest {

@@ -3,7 +3,8 @@ package com.project.solaria_mobile.core.designsystem.components
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -13,12 +14,14 @@ import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import com.project.solaria_mobile.core.designsystem.theme.actionGradient
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.unit.dp
 import com.project.solaria_mobile.core.designsystem.theme.AppTheme
 import com.project.solaria_mobile.core.designsystem.theme.Radius
 import com.project.solaria_mobile.core.designsystem.theme.Spacing
+import com.project.solaria_mobile.core.designsystem.theme.Sizing
 
 @Composable
 fun FormField(
@@ -48,7 +51,9 @@ fun FormField(
             keyboardOptions = KeyboardOptions(keyboardType = keyboardType, imeAction = imeAction),
             colors = OutlinedTextFieldDefaults.colors(
                 focusedBorderColor = AppTheme.colors.primary,
-                unfocusedBorderColor = AppTheme.colors.outline,
+                unfocusedBorderColor = androidx.compose.ui.graphics.Color.Transparent,
+                focusedContainerColor = AppTheme.colors.inputFill,
+                unfocusedContainerColor = AppTheme.colors.inputFill,
                 focusedLabelColor = AppTheme.colors.primary,
                 errorBorderColor = AppTheme.colors.danger,
                 errorLabelColor = AppTheme.colors.danger,
@@ -66,17 +71,22 @@ fun PrimaryButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
+    secondary: Boolean = false,
+    compact: Boolean = false,
+    gradient: Boolean = false,
 ) {
     Button(
         onClick = onClick,
         enabled = enabled,
-        modifier = modifier.fillMaxWidth().height(52.dp),
+        modifier = modifier.then(if (compact) Modifier else Modifier.fillMaxWidth()).heightIn(min = if (compact) Sizing.touchTarget else Sizing.actionHeight)
+            .then(if (gradient && enabled && !secondary) Modifier.clip(androidx.compose.foundation.shape.RoundedCornerShape(Radius.medium)).actionGradient() else Modifier),
+        contentPadding = PaddingValues(horizontal = Spacing.xl, vertical = if (compact) Spacing.sm else Spacing.md),
         shape = androidx.compose.foundation.shape.RoundedCornerShape(Radius.medium),
         colors = ButtonDefaults.buttonColors(
-            containerColor = AppTheme.colors.primary,
-            contentColor = AppTheme.colors.onAccent,
+            containerColor = if (secondary) AppTheme.colors.surface else if (gradient) androidx.compose.ui.graphics.Color.Transparent else AppTheme.colors.action,
+            contentColor = if (secondary) AppTheme.colors.onSurface else AppTheme.colors.onAccent,
         ),
     ) {
-        Text(text, style = MaterialTheme.typography.titleMedium)
+        Text(text, style = MaterialTheme.typography.titleSmall)
     }
 }

@@ -55,7 +55,8 @@ class StompRealtimeClient @Inject constructor(
     private val _state = MutableStateFlow<RealtimeState>(RealtimeState.Disconnected)
     override val state: StateFlow<RealtimeState> = _state.asStateFlow()
 
-    private val link = MutableStateFlow<StompLink?>(null)
+    private class Connection(val channel: StompLink, val token: String)
+    private val link = MutableStateFlow<Connection?>(null)
 
     private val lock = Any()
     private var job: Job? = null
@@ -71,6 +72,7 @@ class StompRealtimeClient @Inject constructor(
         synchronized(lock) {
             job?.cancel()
             job = null
+            link.value = null
             _state.value = RealtimeState.Disconnected
         }
     }
@@ -78,14 +80,15 @@ class StompRealtimeClient @Inject constructor(
     @OptIn(ExperimentalCoroutinesApi::class)
     override fun subscribe(destination: String): Flow<String> =
         link.flatMapLatest { current ->
-            current?.subscribe(destination)?.catch { } ?: emptyFlow()
+            current?.channel?.subscribe(destination)?.catch { } ?: emptyFlow()
         }
 
     override suspend fun send(destination: String, body: String): ApiResult<Unit> {
         val current = link.value
             ?: return ApiResult.Failure(ErrorKind.CONNECTIVITY)
+        if (credentials.accessToken() != current.token) return ApiResult.Failure(ErrorKind.UNAUTHORIZED)
         return try {
-            current.send(destination, body)
+            current.channel.send(destination, body)
             ApiResult.Success(Unit)
         } catch (e: CancellationException) {
             throw e
@@ -135,13 +138,22 @@ class StompRealtimeClient @Inject constructor(
             }
 
             attempt = 0
-            link.value = opened
-            publish(RealtimeState.Connected)
+            val accepted = synchronized(lock) {
+                if (self.isActive && credentials.accessToken() == token) {
+                    link.value = Connection(opened, token)
+                    _state.value = RealtimeState.Connected
+                    true
+                } else false
+            }
+            if (!accepted) {
+                withContext(NonCancellable) { runCatching { opened.close() } }
+                return
+            }
 
             val authFailure = try {
                 opened.awaitLoss()
             } finally {
-                link.value = null
+                synchronized(lock) { if (link.value?.channel === opened) link.value = null }
                 withContext(NonCancellable) { runCatching { opened.close() } }
             }
 

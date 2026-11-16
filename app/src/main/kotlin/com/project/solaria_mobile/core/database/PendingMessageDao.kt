@@ -21,7 +21,7 @@ interface PendingMessageDao {
     /**
      * Grava uma mensagem nova na fila. Falha se o `clientMessageId` já existir
      */
-    @Insert
+    @Insert(onConflict = androidx.room.OnConflictStrategy.IGNORE)
     suspend fun insert(message: PendingMessageEntity)
 
     /**

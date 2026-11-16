@@ -270,6 +270,11 @@ class FakeTokenStore(initial: AuthTokens? = null) : TokenStore {
 
 /** [ProfileApi] em memória. Só `summary` responde; as demais rotas não são usadas pelo chat. */
 class FakeProfileApi : ProfileApi {
+    override suspend fun people(query: String, page: Int, connectedOnly: Boolean): com.project.solaria_mobile.feature.profile.data.PeoplePageDto = throw httpError(404)
+    override suspend fun uploadPhoto(userId: String, type: String, file: okhttp3.MultipartBody.Part): kotlinx.serialization.json.JsonElement = throw httpError(404)
+    override suspend fun removePhoto(userId: String, type: String) = Unit
+    override suspend fun changeUsername(body: com.project.solaria_mobile.feature.profile.data.UsernameRequest): kotlinx.serialization.json.JsonElement = throw httpError(404)
+    override suspend fun companyCatalog(): List<com.project.solaria_mobile.feature.profile.data.CatalogCompanyDto> = emptyList()
     val summaries = mutableMapOf<String, UserSummaryDto>()
     val summaryCalls = mutableListOf<String>()
 

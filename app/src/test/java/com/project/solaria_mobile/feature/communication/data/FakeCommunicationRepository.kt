@@ -8,7 +8,6 @@ import com.project.solaria_mobile.feature.communication.domain.AvatarTone
 import com.project.solaria_mobile.feature.communication.domain.ChatMessage
 import com.project.solaria_mobile.feature.communication.domain.CommunicationRepository
 import com.project.solaria_mobile.feature.communication.domain.Conversation
-import com.project.solaria_mobile.feature.communication.domain.NotificationGroup
 import com.project.solaria_mobile.feature.communication.domain.ServiceCall
 import com.project.solaria_mobile.feature.communication.domain.ServiceCallIcon
 import java.text.SimpleDateFormat
@@ -23,7 +22,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 
 @Singleton
-class FakeCommunicationRepository @Inject constructor() : CommunicationRepository {
+class FakeCommunicationRepository @Inject constructor() : CommunicationRepository, com.project.solaria_mobile.feature.communication.domain.ServiceCallRepository {
     private val baseConversations = listOf(
         Conversation("c1", "RD", "Ricardo Dostoiévski", "O Will Smith, aquela lá do holiud", "17:40", AvatarTone.ORANGE),
         Conversation("c2", "AM", "Alexandre de Moraes", "Tu vai apagar agora aquela mensagem?", "16:32", AvatarTone.BLUE),
@@ -101,14 +100,7 @@ class FakeCommunicationRepository @Inject constructor() : CommunicationRepositor
     override suspend fun call(id: String): ApiResult<ServiceCall> =
         calls.firstOrNull { it.id == id }?.let { ApiResult.Success(it) } ?: ApiResult.Failure(ErrorKind.NOT_FOUND)
 
-    override suspend fun notifications(): ApiResult<List<NotificationGroup>> = ApiResult.Success(
-        listOf(
-            NotificationGroup("Recentes", listOf(supervisor)),
-            NotificationGroup("Há menos de 24h", listOf(newCall, security)),
-            NotificationGroup("Há 1 semana", listOf(olderCall, security)),
-            NotificationGroup("Há muito tempo...", listOf(olderCall, olderCall, olderCall, security)),
-        )
-    )
+    override suspend fun change(id: String, decision: com.project.solaria_mobile.feature.communication.domain.ServiceDecision, scheduledAt: java.time.OffsetDateTime?): ApiResult<ServiceCall> = ApiResult.Failure(ErrorKind.FORBIDDEN)
 
     private fun initialMessages(conversationId: String) = listOf(
         ChatMessage("$conversationId-1", "Olá! Você conseguiu revisar o cronograma do projeto?", false, "10:30", 1),

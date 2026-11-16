@@ -2,62 +2,62 @@
 
 package com.project.solaria_mobile.feature.home
 
-import androidx.compose.foundation.Image
+import androidx.lifecycle.repeatOnLifecycle
+
+import androidx.compose.ui.draw.clip
+import com.project.solaria_mobile.feature.project.RecentProjectItem
+import com.project.solaria_mobile.core.designsystem.components.ListItemDivider
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.Surface
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.dp
-import com.project.solaria_mobile.R
-import com.composables.icons.lucide.R as LucideR
+import com.project.solaria_mobile.core.designsystem.icons.AppIcons
 import com.project.solaria_mobile.core.designsystem.components.ActionRow
 import com.project.solaria_mobile.core.designsystem.components.RoundIconButton
-import com.project.solaria_mobile.core.designsystem.components.ScreenTitle
 import com.project.solaria_mobile.core.designsystem.components.SectionHeading
 import com.project.solaria_mobile.core.designsystem.components.Avatar
 import com.project.solaria_mobile.core.images.ImageLoaderViewModel
 import com.project.solaria_mobile.core.designsystem.theme.AppTheme
 import com.project.solaria_mobile.core.designsystem.theme.Spacing
-import com.project.solaria_mobile.core.designsystem.theme.Sizing
 import com.project.solaria_mobile.core.designsystem.theme.Radius
+import com.project.solaria_mobile.core.designsystem.theme.appBackground
+import com.project.solaria_mobile.core.designsystem.theme.containerFill
 import com.project.solaria_mobile.feature.communication.CallsBottomSheet
 import com.project.solaria_mobile.presentation.navigation.AppDestination
-import com.project.solaria_mobile.core.designsystem.components.RemoteImage
-import com.project.solaria_mobile.core.format.initialsOf
-import com.project.solaria_mobile.feature.home.domain.RecentCompany
-import kotlinx.coroutines.launch
 import com.project.solaria_mobile.core.designsystem.components.UiStateHost
+import com.project.solaria_mobile.core.designsystem.components.Skeleton
+import com.project.solaria_mobile.core.designsystem.components.SkeletonGroup
+import com.project.solaria_mobile.core.designsystem.components.SkeletonListRow
+import com.project.solaria_mobile.core.designsystem.components.SkeletonText
+import androidx.compose.foundation.shape.CircleShape
+import com.project.solaria_mobile.core.designsystem.theme.Sizing
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.width
+import androidx.compose.ui.unit.dp
+import com.project.solaria_mobile.feature.discovery.domain.ScheduleEvent
+import java.time.LocalDate
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
 
 @Composable
 fun HomeRoute(
@@ -65,10 +65,20 @@ fun HomeRoute(
     modifier: Modifier = Modifier,
     viewModel: HomeViewModel = hiltViewModel(),
     images: ImageLoaderViewModel = hiltViewModel(),
+    counter: com.project.solaria_mobile.feature.communication.NotificationCounterViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
-    UiStateHost(state, viewModel::load, modifier) { content ->
-        HomeScreen(content, viewModel::onCallsQueryChange, onOpenPage, modifier, images::bytes)
+    androidx.lifecycle.compose.LifecycleEventEffect(androidx.lifecycle.Lifecycle.Event.ON_RESUME) { viewModel.load() }
+    val unread by counter.unread.collectAsStateWithLifecycle()
+    val owner = androidx.lifecycle.compose.LocalLifecycleOwner.current
+    androidx.compose.runtime.LaunchedEffect(owner, counter) {
+        owner.lifecycle.repeatOnLifecycle(androidx.lifecycle.Lifecycle.State.RESUMED) {
+            counter.refresh()
+            kotlinx.coroutines.awaitCancellation()
+        }
+    }
+    UiStateHost(state, viewModel::load, modifier, loading = { HomeSkeleton(modifier) }) { content ->
+        HomeScreen(content, viewModel::onCallsQueryChange, onOpenPage, modifier, images::bytes, unread)
     }
 }
 
@@ -79,143 +89,55 @@ fun HomeScreen(
     onOpenPage: (AppDestination) -> Unit,
     modifier: Modifier = Modifier,
     loadImage: (suspend (String) -> ByteArray?)? = null,
+    unreadCount: Long? = null,
 ) {
-    var menuOpen by remember { mutableStateOf(false) }
     var callsOpen by remember { mutableStateOf(false) }
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-    val scope = rememberCoroutineScope()
 
-    Column(
-        modifier = modifier
-            .fillMaxSize()
-            .background(AppTheme.colors.surface)
-            .verticalScroll(rememberScrollState()),
-    ) {
+    Box(modifier.fillMaxSize().appBackground()) {
         Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(AppTheme.colors.headerFill)
-                .padding(horizontal = Spacing.screen)
-                .padding(top = Spacing.screenTop, bottom = Spacing.xl),
-            verticalArrangement = Arrangement.spacedBy(Spacing.md),
+            Modifier.fillMaxSize().verticalScroll(rememberScrollState())
+                .padding(horizontal = Spacing.screen).padding(top = Spacing.screenTop, bottom = Spacing.screenBottom),
+            verticalArrangement = Arrangement.spacedBy(Spacing.section),
         ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween,
-            ) {
-                Avatar(
-                    initials = state.profile?.initials.orEmpty(),
-                    modifier = Modifier.size(Sizing.compactHeaderControl).clickable { onOpenPage(AppDestination.ProfileSelf) },
-                    size = Sizing.compactHeaderControl,
-                    color = AppTheme.colors.secondary,
-                    imageUrl = state.profile?.avatarUrl,
-                    loadImage = loadImage,
-                )
-                Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-                    RoundIconButton(
-                        icon = LucideR.drawable.lucide_ic_bell,
-                        contentDescription = "Notificações",
-                        onClick = { onOpenPage(AppDestination.Notifications) },
-                        size = Sizing.compactHeaderControl,
-                        badge = "10",
-                    )
-                    RoundIconButton(
-                        icon = LucideR.drawable.lucide_ic_ellipsis,
-                        contentDescription = "Mais opções",
-                        onClick = { menuOpen = true },
-                        size = Sizing.compactHeaderControl,
-                    )
-                }
-            }
-
-            if (state.recentCompanies.isNotEmpty()) {
-                Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-                    SectionHeading(text = "Empresas recentes", faded = true)
-                    Row(
-                        modifier = Modifier.horizontalScroll(rememberScrollState()),
-                        horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
-                    ) {
-                        state.recentCompanies.forEach { company ->
-                            Surface(
-                                modifier = Modifier.size(Sizing.companyLogo),
-                                shape = RoundedCornerShape(Radius.companyLogo),
-                                color = AppTheme.colors.surface,
-                                shadowElevation = 2.dp,
-                            ) {
-                                CompanyLogoImage(company, loadImage)
-                            }
-                        }
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+                    Avatar(initials = state.profile?.initials.orEmpty(), modifier = Modifier.clickable { onOpenPage(AppDestination.ProfileSelf) }, color = AppTheme.colors.inputFill, textColor = AppTheme.colors.onSurface, imageUrl = state.profile?.avatarUrl, loadImage = loadImage)
+                    Column {
+                        Text("Olá,", style = MaterialTheme.typography.bodyMedium, color = AppTheme.colors.onSurfaceMuted)
+                        Text(state.profile?.name?.substringBefore(" ").orEmpty().ifBlank { "Sua conta" }, style = MaterialTheme.typography.titleSmall, color = AppTheme.colors.onSurface)
                     }
                 }
+                RoundIconButton(if ((unreadCount ?: 0) > 0) AppIcons.bell_dot else AppIcons.bell,
+                    unreadCount?.takeIf { it > 0 }?.let { "Notificações: $it não lidas" } ?: "Notificações",
+                    { onOpenPage(AppDestination.Notifications) }, background = AppTheme.colors.inputFill)
             }
-
+            TodaySection(state.today, onOpenPage)
+            if (state.pendingInvitations > 0) {
+                ActionRow(
+                    if (state.pendingInvitations == 1) "1 convite de projeto" else "${state.pendingInvitations} convites de projeto",
+                    AppIcons.mail,
+                    { onOpenPage(AppDestination.Projects) },
+                    subtitle = "Aguardando sua resposta",
+                )
+            }
             Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-                SectionHeading(
-                    text = "Projetos recentes",
-                    faded = true,
-                    action = "Ver todos",
-                    onAction = { onOpenPage(AppDestination.Projects) },
-                )
-                Row(
-                    modifier = Modifier.horizontalScroll(rememberScrollState()),
-                    horizontalArrangement = Arrangement.spacedBy(Spacing.md),
-                ) {
-                    state.recentProjects.forEach { project ->
-                        RecentProjectCard(
-                            name = project.name,
-                            onClick = { onOpenPage(AppDestination.Project(project.id)) },
-                        )
+                SectionHeading("Projetos recentes", action = "Ver todos", navigation = true, onAction = { onOpenPage(AppDestination.Projects) })
+                if (state.recentProjects.isEmpty()) Text("Seus projetos aparecerão aqui.", style = MaterialTheme.typography.bodyMedium, color = AppTheme.colors.onSurfaceMuted)
+                else Column(Modifier.clip(RoundedCornerShape(Radius.large)).background(containerFill())) {
+                    state.recentProjects.take(3).forEachIndexed { index, project ->
+                        if (index > 0) ListItemDivider(Modifier.padding(horizontal = Spacing.md))
+                        RecentProjectItem(project, { onOpenPage(AppDestination.Project(project.id)) })
                     }
                 }
             }
-        }
-
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = Spacing.screen)
-                .padding(top = Spacing.xl, bottom = Spacing.screenBottom),
-            verticalArrangement = Arrangement.spacedBy(Spacing.sm),
-        ) {
-            SectionHeading(text = "Opções", faded = true)
-            ActionRow("Projetos", LucideR.drawable.lucide_ic_folder, { onOpenPage(AppDestination.Projects) })
-            ActionRow("Chamados", LucideR.drawable.lucide_ic_phone, { callsOpen = true }, badge = "10")
-            ActionRow("Agenda", LucideR.drawable.lucide_ic_calendar_days, { onOpenPage(AppDestination.Schedule) })
-            ActionRow("Conversas", LucideR.drawable.lucide_ic_message_circle, { onOpenPage(AppDestination.Chats) }, badge = "10")
-            ActionRow("Conexões", LucideR.drawable.lucide_ic_users, { onOpenPage(AppDestination.Connections) })
-            ActionRow("Sua empresa", LucideR.drawable.lucide_ic_building, { onOpenPage(AppDestination.Enterprise) })
-            ActionRow("Configurações", LucideR.drawable.lucide_ic_settings, { onOpenPage(AppDestination.Settings) })
-        }
-    }
-
-    if (menuOpen) {
-        ModalBottomSheet(
-            onDismissRequest = { menuOpen = false },
-            sheetState = sheetState,
-            containerColor = AppTheme.colors.surface,
-            shape = RoundedCornerShape(topStart = Radius.sheet, topEnd = Radius.sheet),
-            dragHandle = null,
-        ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = Spacing.screen)
-                    .padding(top = Spacing.xxl, bottom = Spacing.screenBottom),
-                verticalArrangement = Arrangement.spacedBy(Spacing.md),
-            ) {
-                ScreenTitle("Opções", onBack = { menuOpen = false })
-                Spacer(Modifier.height(Spacing.xs))
-                ActionRow("Listar projetos", LucideR.drawable.lucide_ic_folder, {
-                    scope.launch { sheetState.hide(); menuOpen = false; onOpenPage(AppDestination.Projects) }
-                })
-                ActionRow("Novo projeto", LucideR.drawable.lucide_ic_folder_plus, {
-                    scope.launch { sheetState.hide(); menuOpen = false; onOpenPage(AppDestination.NewProject) }
-                })
-                ActionRow("Configurações", LucideR.drawable.lucide_ic_settings, {
-                    scope.launch { sheetState.hide(); menuOpen = false; onOpenPage(AppDestination.Settings) }
-                })
-                Spacer(Modifier.height(Spacing.section))
+            Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+                SectionHeading("Seu espaço")
+                ActionRow("Agenda", AppIcons.calendar_days, { onOpenPage(AppDestination.Schedule) })
+                ActionRow("Chamados", AppIcons.phone, { callsOpen = true })
+                ActionRow("Conexões", AppIcons.users, { onOpenPage(AppDestination.Connections) })
+                state.profile?.companyId?.let { id -> ActionRow("Sua empresa", AppIcons.building, { onOpenPage(AppDestination.Enterprise(id)) }) }
+                ActionRow("Novo projeto", AppIcons.folder_plus, { onOpenPage(AppDestination.NewProject) })
+                ActionRow("Configurações", AppIcons.settings, { onOpenPage(AppDestination.Settings) })
             }
         }
     }
@@ -224,6 +146,8 @@ fun HomeScreen(
         CallsBottomSheet(
             calls = state.recentCalls,
             query = state.callsQuery,
+            failure = state.callsFailure,
+            loading = state.callsLoading,
             onQueryChange = onCallsQueryChange,
             onDismiss = { callsOpen = false },
             onOpenCall = { id -> callsOpen = false; onOpenPage(AppDestination.Call(id)) },
@@ -232,54 +156,95 @@ fun HomeScreen(
     }
 }
 
+/** Mesma geometria da Home: cabeçalho, compromissos de hoje, bloco de recentes e atalhos de "Seu espaço". */
 @Composable
-private fun RecentProjectCard(name: String, onClick: () -> Unit) {
-    Surface(
-        modifier = Modifier.width(Sizing.projectCardWidth).height(Sizing.projectCardHeight),
-        onClick = onClick,
-        shape = RoundedCornerShape(Radius.large),
-        color = AppTheme.colors.surface,
-        shadowElevation = 2.dp,
-    ) {
-        Box {
-            Image(
-                painter = painterResource(R.drawable.project_building),
-                contentDescription = null,
-                modifier = Modifier.fillMaxSize(),
-                contentScale = ContentScale.Crop,
-            )
-            Surface(
-                modifier = Modifier
-                    .align(Alignment.BottomStart)
-                    .padding(horizontal = Spacing.xs, vertical = Spacing.sm),
-                shape = RoundedCornerShape(Radius.pill),
-                color = AppTheme.colors.surface,
-                shadowElevation = 2.dp,
-            ) {
-                Text(
-                    text = name,
-                    modifier = Modifier.padding(horizontal = Spacing.sm, vertical = Spacing.xs),
-                    color = AppTheme.colors.onSurface,
-                    style = androidx.compose.material3.MaterialTheme.typography.labelLarge,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
+private fun HomeSkeleton(modifier: Modifier = Modifier) {
+    Box(modifier.fillMaxSize().appBackground()) {
+        SkeletonGroup(
+            Modifier.padding(horizontal = Spacing.screen).padding(top = Spacing.screenTop),
+            verticalArrangement = Arrangement.spacedBy(Spacing.section),
+        ) {
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+                SkeletonListRow(Modifier.fillMaxWidth(0.6f), lines = 2)
+                Skeleton(Modifier.size(Sizing.headerButton), CircleShape)
+            }
+            Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+                Box(Modifier.height(Sizing.touchTarget), contentAlignment = Alignment.CenterStart) { SkeletonText(0.25f, height = Spacing.xl) }
+                SkeletonListRow(Modifier.fillMaxWidth(), lines = 2)
+            }
+            Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+                Box(Modifier.height(Sizing.touchTarget), contentAlignment = Alignment.CenterStart) { SkeletonText(0.5f, height = Spacing.xl) }
+                Column(Modifier.clip(RoundedCornerShape(Radius.large)).background(containerFill())) {
+                    repeat(3) {
+                        Row(Modifier.padding(vertical = Spacing.md, horizontal = Spacing.sm), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+                            Skeleton(Modifier.width(64.dp).height(72.dp))
+                            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
+                                SkeletonText(0.6f, height = Spacing.lg)
+                                SkeletonText(0.85f)
+                                SkeletonText(0.45f)
+                            }
+                        }
+                    }
+                }
+            }
+            Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+                SkeletonText(0.35f, height = Spacing.xl)
+                repeat(3) { Skeleton(Modifier.fillMaxWidth().height(Sizing.actionHeight)) }
+            }
+        }
+    }
+}
+
+/** Compromissos de hoje vindos das atividades dos projetos, com estado próprio quando a agenda não carrega. */
+@Composable
+private fun TodaySection(today: TodayAgenda, onOpenPage: (AppDestination) -> Unit) {
+    Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+        SectionHeading("Hoje", action = "Ver agenda", navigation = true, onAction = { onOpenPage(AppDestination.Schedule) })
+        when (today) {
+            TodayAgenda.Loading -> SkeletonGroup { SkeletonListRow(Modifier.fillMaxWidth(), lines = 2) }
+            TodayAgenda.Unavailable -> Text("Não foi possível carregar a agenda de hoje.", style = MaterialTheme.typography.bodyMedium, color = AppTheme.colors.onSurfaceMuted)
+            is TodayAgenda.Ready -> if (today.events.isEmpty()) {
+                Text("Nenhum compromisso para hoje.", style = MaterialTheme.typography.bodyMedium, color = AppTheme.colors.onSurfaceMuted)
+            } else {
+                val zone = ZoneId.systemDefault()
+                val date = LocalDate.now(zone)
+                Column(Modifier.clip(RoundedCornerShape(Radius.large)).background(containerFill())) {
+                    today.events.forEachIndexed { index, event ->
+                        if (index > 0) ListItemDivider(Modifier.padding(horizontal = Spacing.md))
+                        TodayEventRow(event, todayTimeLabel(event, date, zone)) { onOpenPage(AppDestination.Project(event.projectId)) }
+                    }
+                    if (today.more > 0) {
+                        ListItemDivider(Modifier.padding(horizontal = Spacing.md))
+                        Text(
+                            if (today.more == 1) "Mais 1 compromisso na agenda" else "Mais ${today.more} compromissos na agenda",
+                            Modifier.fillMaxWidth().clickable { onOpenPage(AppDestination.Schedule) }.padding(Spacing.md),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = AppTheme.colors.onSurfaceMuted,
+                        )
+                    }
+                }
             }
         }
     }
 }
 
 @Composable
-private fun CompanyLogoImage(company: RecentCompany, loadImage: (suspend (String) -> ByteArray?)?) {
-    val initials = initialsOf(company.name)
-    val label: @Composable () -> Unit = {
-        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            Text(initials, color = AppTheme.colors.onSurfaceMuted, style = MaterialTheme.typography.titleMedium)
+private fun TodayEventRow(event: ScheduleEvent, time: String, onClick: () -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = Spacing.md, vertical = Spacing.sm),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(Spacing.md),
+    ) {
+        Text(time, Modifier.width(56.dp), style = MaterialTheme.typography.titleSmall, color = AppTheme.colors.onSurface)
+        Column(Modifier.weight(1f)) {
+            Text(event.title, style = MaterialTheme.typography.bodyLarge, color = AppTheme.colors.onSurface, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+            Text(event.projectName, style = MaterialTheme.typography.bodySmall, color = AppTheme.colors.onSurfaceMuted, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
         }
     }
-    if (company.logoUrl != null && loadImage != null) {
-        RemoteImage(company.logoUrl, loadImage, company.name, Modifier.fillMaxSize(), placeholder = false, fallback = label)
-    } else {
-        label()
-    }
+}
+
+/** Horário de início no fuso do aparelho; atividade que começou antes de hoje aparece como em andamento. */
+internal fun todayTimeLabel(event: ScheduleEvent, today: LocalDate, zone: ZoneId): String {
+    val start = event.start(zone)
+    return if (start.toLocalDate() == today) start.format(DateTimeFormatter.ofPattern("HH:mm")) else "Em curso"
 }

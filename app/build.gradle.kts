@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
@@ -23,23 +25,35 @@ android {
 
     }
 
+    val mapsProperties = Properties().apply {
+        val file = rootProject.file("local.properties")
+        if (file.exists()) file.inputStream().use { load(it) }
+    }
+    fun mapsKey(environment: String): String = providers.environmentVariable("MAPS_ANDROID_KEY_${environment.uppercase()}").orNull
+        ?: mapsProperties.getProperty("maps.android.key.$environment", "")
+
     flavorDimensions += "environment"
     productFlavors {
         create("qa") {
             dimension = "environment"
+            manifestPlaceholders["mapsApiKey"] = mapsKey(name)
+            buildConfigField("boolean", "MAPS_CONFIGURED", mapsKey(name).isNotBlank().toString())
             applicationIdSuffix = ".qa"
             versionNameSuffix = "-qa"
-            resValue("string", "app_name", "Elos QA")
+            resValue("string", "app_name", "Elos")
             buildConfigField("String", "ENVIRONMENT", "\"qa\"")
             manifestPlaceholders["authScheme"] = "solaria-qa"
             buildConfigField("String", "AUTH_REDIRECT_URI", "\"solaria-qa://auth/callback\"")
             buildConfigField("String", "AUTH_BASE_URL", "\"https://api-auth-xw6o.onrender.com/\"")
             buildConfigField("String", "CORE_BASE_URL", "\"https://api-core-cqfn.onrender.com/\"")
             buildConfigField("String", "MESSENGER_BASE_URL", "\"https://api-messenger-5g2n.onrender.com/\"")
+            buildConfigField("String", "NOTIFY_BASE_URL", "\"https://api-notify-i637.onrender.com/\"")
             buildConfigField("String", "GOOGLE_REGISTRY_BASE_URL", "\"https://google-registry.onrender.com/\"")
         }
         create("prod") {
             dimension = "environment"
+            manifestPlaceholders["mapsApiKey"] = mapsKey(name)
+            buildConfigField("boolean", "MAPS_CONFIGURED", mapsKey(name).isNotBlank().toString())
             resValue("string", "app_name", "Elos")
             buildConfigField("String", "ENVIRONMENT", "\"prod\"")
             manifestPlaceholders["authScheme"] = "solaria"
@@ -47,13 +61,14 @@ android {
             buildConfigField("String", "AUTH_BASE_URL", "\"https://api-auth.solarianetwork.site/\"")
             buildConfigField("String", "CORE_BASE_URL", "\"https://api-core.solarianetwork.site/\"")
             buildConfigField("String", "MESSENGER_BASE_URL", "\"https://api-messenger.solarianetwork.site/\"")
+            buildConfigField("String", "NOTIFY_BASE_URL", "\"https://api-notify.solarianetwork.site/\"")
             buildConfigField("String", "GOOGLE_REGISTRY_BASE_URL", "\"\"")
         }
     }
 
     compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_11
-        targetCompatibility = JavaVersion.VERSION_11
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
     }
     buildFeatures {
         compose = true
@@ -63,10 +78,14 @@ android {
 }
 
 dependencies {
+    implementation(libs.google.maps.compose)
+    implementation(libs.androidx.room.runtime)
+    implementation(libs.androidx.room.ktx)
+    ksp(libs.androidx.room.compiler)
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.activity.compose)
+    implementation(libs.androidx.core.splashscreen)
     implementation(libs.androidx.compose.material3)
-    implementation(libs.lucide.icons)
     implementation(libs.androidx.compose.ui)
     implementation(libs.androidx.compose.ui.graphics)
     implementation(libs.androidx.compose.ui.tooling.preview)
@@ -86,13 +105,12 @@ dependencies {
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.androidx.datastore.preferences)
-    implementation(libs.androidx.room.runtime)
-    implementation(libs.androidx.room.ktx)
-    ksp(libs.androidx.room.compiler)
     implementation(libs.androidx.browser)
     implementation(libs.androidx.graphics.shapes)
     implementation(platform(libs.firebase.bom))
     implementation(libs.firebase.installations)
+    implementation(libs.firebase.messaging)
+    implementation(libs.kotlinx.coroutines.play.services)
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)
     testImplementation(libs.mockk)

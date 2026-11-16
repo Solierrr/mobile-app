@@ -10,6 +10,11 @@ import com.project.solaria_mobile.core.database.MessageDao
 import com.project.solaria_mobile.core.network.ApiCallExecutor
 import com.project.solaria_mobile.core.network.NetworkMonitor
 import java.util.concurrent.atomic.AtomicBoolean
+import com.project.solaria_mobile.core.mock.MockModeStore
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.flowOf
+import com.project.solaria_mobile.core.database.ChatContextChanged
+import com.project.solaria_mobile.core.database.ChatDatabaseRouter
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.CoroutineScope
@@ -55,6 +60,8 @@ class ConversationStateSync @Inject constructor(
     private val conversations: ConversationDao,
     private val messages: MessageDao,
     @ApplicationScope private val scope: CoroutineScope,
+    private val mockMode: MockModeStore? = null,
+    private val router: ChatDatabaseRouter? = null,
 ) {
     private val requests = Channel<Unit>(Channel.CONFLATED)
     private val started = AtomicBoolean(false)
@@ -67,7 +74,10 @@ class ConversationStateSync @Inject constructor(
     fun start() {
         if (!started.compareAndSet(false, true)) return
         scope.launch { networkMonitor.isOnline.collect { if (it) requests.trySend(Unit) } }
-        scope.launch { runWorker() }
+        scope.launch { (mockMode?.enabled ?: flowOf(false)).collectLatest {
+            requests.trySend(Unit)
+            runWorker()
+        } }
     }
 
     /**
@@ -78,6 +88,12 @@ class ConversationStateSync @Inject constructor(
      * @param conversationId conversa aberta na tela.
      */
     suspend fun markRead(conversationId: String) {
+        try {
+            if (router != null) router.session { markCurrentRead(conversationId) } else markCurrentRead(conversationId)
+        } catch (_: ChatContextChanged) { }
+    }
+
+    private suspend fun markCurrentRead(conversationId: String) {
         val last = messages.stats(conversationId).maxSequence ?: return
         conversations.markReadLocally(conversationId, last)
         requests.trySend(Unit)
@@ -101,9 +117,14 @@ class ConversationStateSync @Inject constructor(
     suspend fun setArchived(conversationId: String, archived: Boolean): ApiResult<Unit> =
         patch(conversationId, ConversationStateRequest(archived = archived))
 
-    private suspend fun patch(conversationId: String, body: ConversationStateRequest): ApiResult<Unit> {
-        if (!networkMonitor.isOnline.first()) return ApiResult.Failure(ErrorKind.CONNECTIVITY)
-        return executor.execute { api.patchState(conversationId, body) }.map { state -> store(state) }
+    private suspend fun patch(conversationId: String, body: ConversationStateRequest): ApiResult<Unit> =
+        try {
+            if (router != null) router.session { patchCurrent(conversationId, body) } else patchCurrent(conversationId, body)
+        } catch (_: ChatContextChanged) { ApiResult.Failure(ErrorKind.CONFLICT) }
+
+    private suspend fun patchCurrent(conversationId: String, body: ConversationStateRequest): ApiResult<Unit> {
+        if (!(mockMode?.isEnabled() == true || networkMonitor.isOnline.first())) return ApiResult.Failure(ErrorKind.CONNECTIVITY)
+        return executor.execute { router?.forOperation(); api.patchState(conversationId, body) }.map { state -> store(state) }
     }
 
     private suspend fun store(state: ConversationStateDto) {
@@ -115,7 +136,7 @@ class ConversationStateSync @Inject constructor(
         while (true) {
             // Depois de uma falha, tenta de novo em 30 s mesmo sem gatilho novo
             if (failed) withTimeoutOrNull(RETRY_MILLIS) { requests.receive() } else requests.receive()
-            if (!networkMonitor.isOnline.first()) {
+            if (!(mockMode?.isEnabled() == true || networkMonitor.isOnline.first())) {
                 failed = false
                 continue
             }
@@ -124,10 +145,14 @@ class ConversationStateSync @Inject constructor(
     }
 
     // Devolve false se alguma leitura ficou pendente por falha que vale tentar de novo
-    private suspend fun flush(): Boolean {
+    private suspend fun flush(): Boolean = try {
+        if (router != null) router.session { flushCurrent() } else flushCurrent()
+    } catch (_: ChatContextChanged) { false }
+
+    private suspend fun flushCurrent(): Boolean {
         for (conversation in conversations.pendingReads()) {
             val body = ConversationStateRequest(lastReadSequence = conversation.localReadSequence)
-            when (val result = executor.execute { api.patchState(conversation.id, body) }) {
+            when (val result = executor.execute { router?.forOperation(); api.patchState(conversation.id, body) }) {
                 is ApiResult.Success -> store(result.data)
                 is ApiResult.Failure -> if (result.kind in DROPPED_KINDS) drop(conversation) else return false
             }

@@ -12,12 +12,17 @@ import com.project.solaria_mobile.core.network.CredentialProvider
 import com.project.solaria_mobile.core.network.NetworkMonitor
 import java.util.UUID
 import java.util.concurrent.atomic.AtomicBoolean
+import com.project.solaria_mobile.core.mock.MockModeStore
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.flowOf
+import com.project.solaria_mobile.core.database.ChatContextChanged
+import com.project.solaria_mobile.core.database.ChatDatabaseRouter
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.coroutines.cancellation.CancellationException
@@ -61,6 +66,8 @@ class MessageOutbox @Inject constructor(
     private val credentials: CredentialProvider,
     private val store: MessageStore,
     @ApplicationScope private val scope: CoroutineScope,
+    private val mockMode: MockModeStore? = null,
+    private val router: ChatDatabaseRouter? = null,
 ) {
     private val drainRequests = Channel<Unit>(Channel.CONFLATED)
     private val started = AtomicBoolean(false)
@@ -74,15 +81,20 @@ class MessageOutbox @Inject constructor(
      *
      * Chamado na abertura do app.
      */
+    fun flush() { drainRequests.trySend(Unit) }
+
     fun start() {
         if (!started.compareAndSet(false, true)) return
         scope.launch {
-            networkMonitor.isOnline.collect { isOnline ->
+            combine(networkMonitor.isOnline, mockMode?.enabled ?: flowOf(false)) { online, mock -> online || mock }.collect { isOnline ->
                 online = isOnline
                 if (isOnline) drainRequests.trySend(Unit)
             }
         }
-        scope.launch { runWorker() }
+        scope.launch { (mockMode?.enabled ?: flowOf(false)).collectLatest {
+            drainRequests.trySend(Unit)
+            runWorker()
+        } }
     }
 
     /**
@@ -166,7 +178,9 @@ class MessageOutbox @Inject constructor(
     // Uma falha do banco não pode matar o worker, senão a fila para de andar até o app reiniciar
     private suspend fun drainSafely(): Outcome =
         try {
-            drainOnce()
+            if (router != null) router.session { drainOnce() } else drainOnce()
+        } catch (_: ChatContextChanged) {
+            Outcome.STOP
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
@@ -200,14 +214,14 @@ class MessageOutbox @Inject constructor(
             content = message.content,
             clientMessageId = message.clientMessageId,
         )
-        return when (val result = executor.execute { api.send(request) }) {
+        return when (val result = executor.execute { router?.forOperation(); api.send(request) }) {
             is ApiResult.Success -> confirm(message, result.data)
             is ApiResult.Failure -> outcomeOf(result.kind)
         }
     }
 
     private suspend fun findOnServer(message: PendingMessageEntity): ApiResult<MessageDto?> =
-        executor.execute { api.messages(message.conversationId, limit = HISTORY_CHECK_LIMIT) }
+        executor.execute { router?.forOperation(); api.messages(message.conversationId, limit = HISTORY_CHECK_LIMIT) }
             .map { recent -> recent.firstOrNull { it.clientMessageId.equals(message.clientMessageId, ignoreCase = true) } }
 
     private suspend fun confirm(message: PendingMessageEntity, sent: MessageDto): Outcome {

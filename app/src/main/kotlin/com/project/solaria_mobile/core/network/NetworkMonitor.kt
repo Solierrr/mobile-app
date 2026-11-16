@@ -38,22 +38,22 @@ class ConnectivityManagerNetworkMonitor @Inject constructor(
     override val isOnline: Flow<Boolean> = callbackFlow {
         val callback = object : ConnectivityManager.NetworkCallback() {
 
-            override fun onAvailable(network: Network) {
-                trySend(true)
-            }
-
             override fun onLost(network: Network) {
                 trySend(false)
+            }
+
+            override fun onCapabilitiesChanged(network: Network, capabilities: NetworkCapabilities) {
+                trySend(capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) &&
+                    capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED))
             }
 
             override fun onUnavailable() {
                 trySend(false)
             }
         }
-        // registra esse callback para receber eventos de conexão
-        connectivityManager.registerDefaultNetworkCallback(callback)
         // emite o estado atual da conexão
         trySend(hasInternet())
+        connectivityManager.registerDefaultNetworkCallback(callback)
         // remove o callback quando o flow for cancelado
         awaitClose { connectivityManager.unregisterNetworkCallback(callback) }
     }
@@ -66,6 +66,7 @@ class ConnectivityManagerNetworkMonitor @Inject constructor(
     private fun hasInternet(): Boolean {
         val network = connectivityManager.activeNetwork ?: return false
         val capabilities = connectivityManager.getNetworkCapabilities(network) ?: return false
-        return capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
+        return capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) &&
+            capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)
     }
 }

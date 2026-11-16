@@ -2,7 +2,6 @@
 
 package com.project.solaria_mobile.feature.communication
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -15,13 +14,19 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import com.composables.icons.lucide.R as LucideR
 import com.project.solaria_mobile.core.designsystem.components.ScreenTitle
 import com.project.solaria_mobile.core.designsystem.components.SearchField
 import com.project.solaria_mobile.core.designsystem.components.SectionHeading
 import com.project.solaria_mobile.core.designsystem.theme.Spacing
-import com.project.solaria_mobile.core.designsystem.theme.AppTheme
+import com.project.solaria_mobile.core.designsystem.theme.appBackground
 import com.project.solaria_mobile.core.designsystem.components.UiStateHost
+import com.project.solaria_mobile.core.designsystem.components.ListSkeleton
+import com.project.solaria_mobile.core.designsystem.components.RefreshButton
+import com.project.solaria_mobile.core.designsystem.components.ResourceStatus
+import com.project.solaria_mobile.core.designsystem.components.StateNotice
+import com.project.solaria_mobile.core.common.UiState
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LifecycleEventEffect
 
 @Composable
 fun CallsRoute(
@@ -30,7 +35,8 @@ fun CallsRoute(
     viewModel: CallsViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
-    UiStateHost(state, viewModel::load) { content -> CallsScreen(content, viewModel::onQueryChange, onBack, onOpenCall) }
+    LifecycleEventEffect(Lifecycle.Event.ON_START) { viewModel.load() }
+    UiStateHost(state, viewModel::load, onBack = onBack, header = { ScreenTitle("Chamados", onBack) }, loading = { ListSkeleton(circle = false) }, emptyMessage = "Nenhum serviço técnico por enquanto.") { content -> CallsScreen(content, viewModel::onQueryChange, onBack, onOpenCall, viewModel::load, state as? UiState.Content) }
 }
 
 @Composable
@@ -39,14 +45,18 @@ fun CallsScreen(
     onQueryChange: (String) -> Unit,
     onBack: () -> Unit,
     onOpenCall: (String) -> Unit,
+    onRefresh: () -> Unit = {},
+    resource: UiState.Content<*>? = null,
 ) {
     Column(
-        modifier = Modifier.fillMaxSize().background(AppTheme.colors.surface).padding(horizontal = Spacing.screen).padding(top = Spacing.lg),
+        modifier = Modifier.fillMaxSize().appBackground().padding(horizontal = Spacing.screen).padding(top = Spacing.lg),
         verticalArrangement = Arrangement.spacedBy(Spacing.md),
     ) {
-        ScreenTitle("Chamados", onBack, trailingIcon = LucideR.drawable.lucide_ic_sliders_horizontal, trailingLabel = "Filtrar", onTrailingClick = {})
-        SearchField("Buscar chamado", state.query, onQueryChange, trailingIcon = LucideR.drawable.lucide_ic_sliders_horizontal, onTrailingClick = {})
+        ScreenTitle("Chamados", onBack, actions = { RefreshButton(onRefresh, resource?.refreshing == true) })
+        resource?.let { ResourceStatus(it) }
+        SearchField("Buscar chamado", state.query, onQueryChange)
         LazyColumn(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+            if (state.calls.isEmpty()) item { StateNotice("Nenhum serviço encontrado", "Tente outro termo ou limpe a busca.") }
             item { SectionHeading("Recentes", faded = true) }
             items(state.calls) { call ->
                 CallCard(call, onClick = { onOpenCall(call.id) })

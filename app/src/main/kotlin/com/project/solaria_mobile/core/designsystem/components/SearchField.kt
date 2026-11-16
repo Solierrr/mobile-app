@@ -5,7 +5,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.text.BasicTextField
@@ -19,8 +19,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.unit.dp
-import com.composables.icons.lucide.R as LucideR
+import com.project.solaria_mobile.core.designsystem.icons.AppIcons
 import com.project.solaria_mobile.core.designsystem.theme.AppTheme
 import com.project.solaria_mobile.core.designsystem.theme.Spacing
 import com.project.solaria_mobile.core.designsystem.theme.Sizing
@@ -41,12 +40,12 @@ fun SearchField(
         color = AppTheme.colors.inputFill,
     ) {
         Row(
-            modifier = Modifier.height(44.dp).padding(horizontal = Spacing.md),
+            modifier = Modifier.heightIn(min = Sizing.touchTarget).padding(horizontal = Spacing.md),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
         ) {
             Icon(
-                painter = painterResource(LucideR.drawable.lucide_ic_search),
+                painter = painterResource(AppIcons.search),
                 contentDescription = null,
                 tint = AppTheme.colors.onSurfaceMuted,
                 modifier = Modifier.size(Sizing.iconSmall),
@@ -56,7 +55,7 @@ fun SearchField(
                 onValueChange = onValueChange,
                 modifier = Modifier.weight(1f),
                 singleLine = true,
-                textStyle = androidx.compose.material3.MaterialTheme.typography.bodyMedium.copy(color = AppTheme.colors.onSurface),
+                textStyle = androidx.compose.material3.MaterialTheme.typography.bodyLarge.copy(color = AppTheme.colors.onSurface),
                 cursorBrush = SolidColor(AppTheme.colors.primary),
                 decorationBox = { innerTextField ->
                     Box {
@@ -64,7 +63,7 @@ fun SearchField(
                             Text(
                                 text = placeholder,
                                 color = AppTheme.colors.onSurfaceMuted,
-                                style = androidx.compose.material3.MaterialTheme.typography.bodyMedium,
+                                style = androidx.compose.material3.MaterialTheme.typography.bodyLarge,
                                 maxLines = 1,
                             )
                         }
@@ -73,7 +72,7 @@ fun SearchField(
                 },
             )
             if (trailingIcon != null && onTrailingClick != null) {
-                IconButton(onClick = onTrailingClick, modifier = Modifier.size(32.dp)) {
+                IconButton(onClick = onTrailingClick, modifier = Modifier.size(Sizing.touchTarget)) {
                     Icon(
                         painter = painterResource(trailingIcon),
                         contentDescription = "Filtrar",

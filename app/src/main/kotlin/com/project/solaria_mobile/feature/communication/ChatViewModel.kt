@@ -65,6 +65,8 @@ data class ChatUiState(
     val editing: ChatMessage? = null,
     val notice: ChatNotice? = null,
     val presence: ChatPresence = ChatPresence(),
+    val busy: Boolean = false,
+    val draftLimitExceeded: Boolean = false,
 )
 
 private data class Live(
@@ -74,11 +76,15 @@ private data class Live(
     val presence: ChatPresence,
 )
 
+internal const val MAX_MESSAGE_LENGTH = 8_000
+
 private data class Local(
     val opened: UiState<Unit>,
     val draft: String,
     val editing: ChatMessage?,
     val notice: ChatNotice?,
+    val busy: Boolean,
+    val limitExceeded: Boolean,
 )
 
 /**
@@ -103,10 +109,13 @@ class ChatViewModel @Inject constructor(
     private val repository: CommunicationRepository,
 ) : ViewModel() {
     private val conversationId = savedStateHandle.routeId()
-    private val draft = MutableStateFlow("")
+    private val draft = savedStateHandle.getStateFlow("draft", "")
+    private val savedDraft = savedStateHandle
     private val opened = MutableStateFlow<UiState<Unit>>(UiState.Loading)
     private val editing = MutableStateFlow<ChatMessage?>(null)
     private val notice = MutableStateFlow<ChatNotice?>(null)
+    private val busy = MutableStateFlow(false)
+    private val limitExceeded = MutableStateFlow(false)
 
     // Relógio da janela de edição. Só os testes trocam.
     internal var now: () -> Long = System::currentTimeMillis
@@ -118,7 +127,8 @@ class ChatViewModel @Inject constructor(
         repository.presence(conversationId),
     ) { conversation, messages, online, presence -> Live(conversation, messages, online, presence) }
 
-    private val local = combine(opened, draft, editing, notice) { open, text, edited, aviso -> Local(open, text, edited, aviso) }
+    private val controls = combine(notice, busy, limitExceeded) { notice, busy, exceeded -> Triple(notice, busy, exceeded) }
+    private val local = combine(opened, draft, editing, controls) { open, text, edited, controls -> Local(open, text, edited, controls.first, controls.second, controls.third) }
 
     val uiState: StateFlow<UiState<ChatUiState>> = combine(live, local) { data, state ->
         val conversation = data.conversation
@@ -133,6 +143,8 @@ class ChatViewModel @Inject constructor(
                     editing = state.editing,
                     notice = state.notice,
                     presence = data.presence,
+                    busy = state.busy,
+                    draftLimitExceeded = state.limitExceeded,
                 ),
             )
             else -> UiState.Loading
@@ -164,7 +176,9 @@ class ChatViewModel @Inject constructor(
     }
 
     fun onDraftChange(value: String) {
-        draft.value = value
+        limitExceeded.value = value.length > MAX_MESSAGE_LENGTH
+        if (limitExceeded.value) return
+        savedDraft["draft"] = value
         if (value.isNotEmpty() && editing.value == null && canSignalTyping()) {
             repository.typing(conversationId)
         } else {
@@ -174,17 +188,17 @@ class ChatViewModel @Inject constructor(
 
     fun send() {
         val text = draft.value
-        if (text.isBlank()) return
+        if (limitExceeded.value || busy.value || text.isBlank() || text.length > MAX_MESSAGE_LENGTH) return
         repository.stopTyping(conversationId)
         val target = editing.value
         if (target != null) {
             saveEdit(target, text)
             return
         }
-        draft.value = ""
+        savedDraft["draft"] = ""
         viewModelScope.launch {
             val result = repository.sendMessage(conversationId, text)
-            if (result is ApiResult.Failure && draft.value.isEmpty()) draft.value = text
+            if (result is ApiResult.Failure && draft.value.isEmpty()) savedDraft["draft"] = text
         }
     }
 
@@ -203,15 +217,18 @@ class ChatViewModel @Inject constructor(
      */
     fun startEdit(messageId: String) {
         val message = currentMessages().firstOrNull { it.id == messageId && it.changeable } ?: return
+        if (editing.value == null) savedDraft["draftBeforeEdit"] = draft.value
         editing.value = message
-        draft.value = message.text
+        savedDraft["draft"] = message.text
         repository.stopTyping(conversationId)
     }
 
     /** Sai do modo de edição e limpa o campo de texto. */
     fun cancelEdit() {
         editing.value = null
-        draft.value = ""
+        savedDraft["draft"] = savedDraft.get<String>("draftBeforeEdit").orEmpty()
+        savedDraft.remove<String>("draftBeforeEdit")
+        limitExceeded.value = false
     }
 
     /**
@@ -223,7 +240,7 @@ class ChatViewModel @Inject constructor(
      */
     fun delete(messageId: String) {
         if (currentMessages().none { it.id == messageId && it.changeable }) return
-        viewModelScope.launch {
+        mutate {
             val result = repository.deleteMessage(messageId)
             if (result is ApiResult.Failure) notice.value = noticeOf(result.kind)
         }
@@ -232,7 +249,7 @@ class ChatViewModel @Inject constructor(
     /** Silencia a conversa, ou reativa se já está silenciada. Só com internet. */
     fun toggleMute() {
         val current = currentConversation() ?: return
-        viewModelScope.launch {
+        mutate {
             val result = repository.setMuted(conversationId, !current.muted)
             if (result is ApiResult.Failure) notice.value = noticeOf(result.kind)
         }
@@ -241,7 +258,7 @@ class ChatViewModel @Inject constructor(
     /** Arquiva a conversa, ou tira do arquivo se já está arquivada. Só com internet. */
     fun toggleArchive() {
         val current = currentConversation() ?: return
-        viewModelScope.launch {
+        mutate {
             val result = repository.setArchived(conversationId, !current.archived)
             if (result is ApiResult.Failure) notice.value = noticeOf(result.kind)
         }
@@ -253,16 +270,22 @@ class ChatViewModel @Inject constructor(
     }
 
     private fun saveEdit(target: ChatMessage, text: String) {
-        viewModelScope.launch {
+        mutate {
             when (val result = repository.editMessage(target.id, text)) {
                 is ApiResult.Success -> {
                     editing.value = null
-                    draft.value = ""
+                    savedDraft["draft"] = ""
                 }
                 // Mantém o texto no campo para o usuário tentar de novo ou copiar
                 is ApiResult.Failure -> notice.value = noticeOf(result.kind)
             }
         }
+    }
+
+    private fun mutate(block: suspend () -> Unit) {
+        if (busy.value) return
+        busy.value = true
+        viewModelScope.launch { try { block() } finally { busy.value = false } }
     }
 
     // Conversa com o chatbot ou sem acesso não tem "digitando" para os outros
@@ -279,4 +302,12 @@ class ChatViewModel @Inject constructor(
         ErrorKind.FORBIDDEN, ErrorKind.NOT_FOUND -> ChatNotice.NO_ACCESS
         else -> ChatNotice.FAILED
     }
+}
+
+internal fun ChatNotice.message(): String = when (this) {
+    ChatNotice.OFFLINE -> "Sem conexão. Esta ação precisa de internet."
+    ChatNotice.NOT_ALLOWED -> "Esta mensagem não pode mais ser alterada."
+    ChatNotice.TRY_AGAIN -> "A mensagem mudou. Tente novamente."
+    ChatNotice.NO_ACCESS -> "Você não tem mais acesso à mensagem ou conversa."
+    ChatNotice.FAILED -> "Não foi possível concluir. Tente novamente."
 }

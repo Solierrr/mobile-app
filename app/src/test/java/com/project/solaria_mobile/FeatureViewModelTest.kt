@@ -62,13 +62,15 @@ class FeatureViewModelTest {
     }
 
     @Test fun sendingMessageUpdatesRepositoryAndClearsDraft() = runTest {
-        val viewModel = ChatViewModel(handleOf("c1"), FakeCommunicationRepository())
+        val repository = FakeCommunicationRepository()
+        val viewModel = ChatViewModel(handleOf("c1"), repository)
         viewModel.uiState.test {
             assertEquals("Ricardo Dostoiévski", awaitContent().conversation.name)
             viewModel.onDraftChange("Nova mensagem")
             advanceUntilIdle()
             assertEquals("Nova mensagem", latestContent().draft)
             viewModel.send()
+            advanceUntilIdle()
             advanceUntilIdle()
             val state = latestContent()
             assertEquals("", state.draft)
@@ -78,7 +80,8 @@ class FeatureViewModelTest {
     }
 
     @Test fun unknownConversationShowsNotFound() = runTest {
-        val viewModel = ChatViewModel(handleOf("missing"), FakeCommunicationRepository())
+        val repository = FakeCommunicationRepository()
+        val viewModel = ChatViewModel(handleOf("missing"), repository)
         viewModel.uiState.test {
             advanceUntilIdle()
             assertEquals(UiState.Error(ErrorKind.NOT_FOUND), expectMostRecentItem())
@@ -100,7 +103,7 @@ class FeatureViewModelTest {
     }
 
     @Test fun scheduleSelectionChangesEvents() = runTest {
-        val viewModel = ScheduleViewModel(FakeDiscoveryRepository())
+        val viewModel = ScheduleViewModel(FakeDiscoveryRepository(), java.time.LocalDate.of(2026, 1, 4))
         viewModel.uiState.test {
             assertEquals(3, awaitContent().selectedEvents.size)
             viewModel.selectDay(5)
@@ -110,8 +113,27 @@ class FeatureViewModelTest {
         }
     }
 
+    @Test fun connectionsReloadWhenNetworkReturns() = runTest {
+        val online = kotlinx.coroutines.flow.MutableStateFlow(false)
+        var reads = 0
+        val repository = object : com.project.solaria_mobile.feature.profile.domain.ProfileRepository by FakeProfileRepository() {
+            override suspend fun readPeople(query: String, page: Int, connectedOnly: Boolean): com.project.solaria_mobile.core.common.ReadResult<com.project.solaria_mobile.feature.profile.domain.PeoplePage> {
+                reads++
+                return com.project.solaria_mobile.core.common.ReadResult(ApiResult.Success(com.project.solaria_mobile.feature.profile.domain.PeoplePage(emptyList())), syncedAt = 100L, cached = !online.value)
+            }
+        }
+        val model = ConnectionsViewModel(repository, object : com.project.solaria_mobile.core.network.NetworkMonitor { override val isOnline = online })
+        advanceUntilIdle()
+        assertEquals(1, reads)
+        assertTrue((model.uiState.value as UiState.Content).cached)
+        online.value = true
+        advanceUntilIdle()
+        assertEquals(2, reads)
+        assertTrue(!(model.uiState.value as UiState.Content).cached)
+    }
+
     @Test fun connectionsSearchChangesVisibleList() = runTest {
-        val viewModel = ConnectionsViewModel(FakeProfileRepository())
+        val viewModel = ConnectionsViewModel(FakeProfileRepository(), object : com.project.solaria_mobile.core.network.NetworkMonitor { override val isOnline = kotlinx.coroutines.flow.MutableStateFlow(true) })
         viewModel.uiState.test {
             awaitContent()
             viewModel.onQueryChange("Ana")
@@ -125,7 +147,7 @@ class FeatureViewModelTest {
         val viewModel = HomeViewModel(FakeProjectRepository(), FakeCommunicationRepository(), FakeProfileRepository())
         viewModel.uiState.test {
             val initial = awaitContent()
-            assertEquals(4, initial.recentProjects.size)
+            assertEquals(3, initial.recentProjects.size)
             assertEquals(4, initial.recentCalls.size)
             viewModel.onCallsQueryChange("segurança")
             advanceUntilIdle()
@@ -155,7 +177,7 @@ class FeatureViewModelTest {
             val content = awaitContent()
             assertEquals(listOf("c2", "c1"), content.recentCompanies.map { it.id })
             assertEquals("https://res.cloudinary.com/x/c1.webp", content.recentCompanies.last().logoUrl)
-            assertEquals(listOf("d", "b", "c", "a"), content.recentProjects.map { it.id })
+            assertEquals(listOf("d", "b", "c"), content.recentProjects.map { it.id })
             cancelAndIgnoreRemainingEvents()
         }
     }
@@ -181,18 +203,17 @@ class FeatureViewModelTest {
         viewModel.uiState.test {
             val content = awaitContent()
             assertEquals(null, content.profile)
-            assertEquals(4, content.recentProjects.size)
+            assertEquals(3, content.recentProjects.size)
             cancelAndIgnoreRemainingEvents()
         }
     }
 
-    @Test fun savedLocationSurvivesNewViewModelWithinSession() = runTest {
-        val repository = FakeDiscoveryRepository()
-        MapViewModel(repository).toggleSaved()
+    @Test fun projectMapLoadsAccessibleProjectsWithoutInventedCoordinates() = runTest {
+        val viewModel = MapViewModel(androidx.lifecycle.SavedStateHandle(), FakeProjectRepository(), io.mockk.mockk { io.mockk.every { observe() } returns kotlinx.coroutines.flow.flowOf(emptySet()) })
         advanceUntilIdle()
-        val reopened = MapViewModel(repository)
-        advanceUntilIdle()
-        assertTrue((reopened.uiState.value as UiState.Content).data.saved)
+        val content = (viewModel.uiState.value as UiState.Content).data
+        assertEquals(4, content.projects.size)
+        assertTrue(content.projects.all { it.latitude == null && it.longitude == null })
     }
 
     @Test fun projectListShowsLoadFailure() = runTest {

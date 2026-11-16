@@ -68,7 +68,7 @@ class ConversationsViewModel @Inject constructor(private val repository: Communi
                 ),
             )
             sync is ApiResult.Failure -> UiState.Error(sync.kind)
-            sync is ApiResult.Success -> UiState.Empty
+            sync is ApiResult.Success -> UiState.Content(ConversationsUiState(query = text, showArchived = archived))
             else -> UiState.Loading
         }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), UiState.Loading)

@@ -14,8 +14,9 @@ import com.project.solaria_mobile.core.network.NetworkMonitor
 import com.project.solaria_mobile.feature.communication.domain.ChatMessage
 import com.project.solaria_mobile.feature.communication.domain.CommunicationRepository
 import com.project.solaria_mobile.feature.communication.domain.Conversation
-import com.project.solaria_mobile.feature.communication.domain.NotificationGroup
-import com.project.solaria_mobile.feature.communication.domain.ServiceCall
+import com.project.solaria_mobile.core.database.ChatDatabaseRouter
+import com.project.solaria_mobile.core.database.ChatContextChanged
+import com.project.solaria_mobile.core.mock.MockModeStore
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.flow.Flow
@@ -32,11 +33,13 @@ class RemoteCommunicationRepository @Inject constructor(
     private val conversationDao: ConversationDao,
     private val users: UserDirectory,
     private val sync: MessageSync,
-    private val serviceCalls: FakeCommunicationRepository,
     private val stateSync: ConversationStateSync,
     private val livePresence: ConversationPresence,
+    private val legacy: LegacyMessageImporter? = null,
+    private val router: ChatDatabaseRouter? = null,
+    private val mockMode: MockModeStore? = null,
 ) : CommunicationRepository {
-    override val online: Flow<Boolean> get() = networkMonitor.isOnline
+    override val online: Flow<Boolean> get() = combine(networkMonitor.isOnline, mockMode?.enabled ?: kotlinx.coroutines.flow.flowOf(false)) { online, mock -> online || mock }
 
     override val syncResult: Flow<ApiResult<Unit>?> get() = sync.result
 
@@ -63,24 +66,26 @@ class RemoteCommunicationRepository @Inject constructor(
             timelineOf(stored.map { it.toMessage(me, names, group) }, pending.map { it.toMessage() })
         }
 
-    override suspend fun open(conversationId: String): ApiResult<Unit> {
+    override suspend fun open(conversationId: String): ApiResult<Unit> = session {
         val conversation = conversationDao.find(conversationId)
-            ?: when (val fetched = executor.execute { api.conversation(conversationId) }) {
-                is ApiResult.Failure -> return fetched
+            ?: when (val fetched = executor.execute { router?.forOperation(); api.conversation(conversationId) }) {
+                is ApiResult.Failure -> return@session fetched
                 is ApiResult.Success -> fetched.data.toEntity().also { conversationDao.upsert(listOf(it)) }
             }
-        if (!conversation.isChatbot) return ApiResult.Success(Unit)
-        return executor.execute { api.messages(conversationId, limit = CHATBOT_HISTORY) }.map { store.apply(it) }
+        legacy?.import(conversationId, conversation.messageType())
+        outbox.flush()
+        if (!conversation.isChatbot) return@session ApiResult.Success(Unit)
+        return@session executor.execute { router?.forOperation(); api.messages(conversationId, limit = CHATBOT_HISTORY) }.map { store.apply(it) }
     }
 
     override fun refresh() = sync.refresh()
 
     override suspend fun refreshNames(conversationId: String?) = users.refreshFor(conversationId, credentials.currentUserId())
 
-    override suspend fun sendMessage(conversationId: String, text: String): ApiResult<Unit> {
-        val conversation = conversationDao.find(conversationId) ?: return ApiResult.Failure(ErrorKind.NOT_FOUND)
-        if (conversation.accessLost) return ApiResult.Failure(ErrorKind.FORBIDDEN)
-        return outbox.enqueue(conversationId, conversation.messageType(), text)
+    override suspend fun sendMessage(conversationId: String, text: String): ApiResult<Unit> = session {
+        val conversation = conversationDao.find(conversationId) ?: return@session ApiResult.Failure(ErrorKind.NOT_FOUND)
+        if (conversation.accessLost) return@session ApiResult.Failure(ErrorKind.FORBIDDEN)
+        return@session outbox.enqueue(conversationId, conversation.messageType(), text)
     }
 
     override suspend fun retryMessage(messageId: String) = outbox.retry(messageId)
@@ -96,9 +101,9 @@ class RemoteCommunicationRepository @Inject constructor(
     // O servidor devolve a conversa existente se já houver uma com a pessoa. A resposta não traz os cabeçalhos de
     // sincronização, então só entra no banco se a conversa ainda não está lá; a sincronização completa a refaz com os
     // dados reais.
-    override suspend fun startDirect(recipientAuthId: String): ApiResult<String> {
-        if (!networkMonitor.isOnline.first()) return ApiResult.Failure(ErrorKind.CONNECTIVITY)
-        return executor.execute { api.direct(DirectConversationRequest(recipientAuthId)) }.map { created ->
+    override suspend fun startDirect(recipientAuthId: String): ApiResult<String> = session {
+        if (!online.first()) return@session ApiResult.Failure(ErrorKind.CONNECTIVITY)
+        return@session executor.execute { router?.forOperation(); api.direct(DirectConversationRequest(recipientAuthId)) }.map { created ->
             if (conversationDao.find(created.id) == null) {
                 conversationDao.upsert(listOf(created.toEntity()))
                 sync.refresh()
@@ -110,14 +115,14 @@ class RemoteCommunicationRepository @Inject constructor(
     // Edição e exclusão só com internet: não entram na fila de envio, porque o servidor pode recusá-las (prazo,
     // mensagem já excluída, concorrência) e o usuário precisa ver o motivo na hora. A resposta já traz a versão nova;
     // o evento que chega depois tem a mesma versão e é ignorado pela regra de versão maior vence.
-    override suspend fun editMessage(messageId: String, text: String): ApiResult<Unit> {
-        if (!networkMonitor.isOnline.first()) return ApiResult.Failure(ErrorKind.CONNECTIVITY)
-        return executor.execute { api.edit(messageId, EditMessageRequest(text)) }.map { store.apply(listOf(it)) }
+    override suspend fun editMessage(messageId: String, text: String): ApiResult<Unit> = session {
+        if (!online.first()) return@session ApiResult.Failure(ErrorKind.CONNECTIVITY)
+        return@session executor.execute { router?.forOperation(); api.edit(messageId, EditMessageRequest(text)) }.map { store.apply(listOf(it)) }
     }
 
-    override suspend fun deleteMessage(messageId: String): ApiResult<Unit> {
-        if (!networkMonitor.isOnline.first()) return ApiResult.Failure(ErrorKind.CONNECTIVITY)
-        return executor.execute { api.delete(messageId) }.map { store.apply(listOf(it)) }
+    override suspend fun deleteMessage(messageId: String): ApiResult<Unit> = session {
+        if (!online.first()) return@session ApiResult.Failure(ErrorKind.CONNECTIVITY)
+        return@session executor.execute { router?.forOperation(); api.delete(messageId) }.map { store.apply(listOf(it)) }
     }
 
     override fun presence(conversationId: String): Flow<ChatPresence> =
@@ -139,11 +144,14 @@ class RemoteCommunicationRepository @Inject constructor(
 
     override fun stopTyping(conversationId: String) = livePresence.stopTyping(conversationId)
 
-    override suspend fun calls(): ApiResult<List<ServiceCall>> = serviceCalls.calls()
 
-    override suspend fun call(id: String): ApiResult<ServiceCall> = serviceCalls.call(id)
 
-    override suspend fun notifications(): ApiResult<List<NotificationGroup>> = serviceCalls.notifications()
+
+    private suspend fun <T> session(block: suspend () -> ApiResult<T>): ApiResult<T> = try {
+        if (router != null) router.session(block) else block()
+    } catch (_: ChatContextChanged) {
+        ApiResult.Failure(ErrorKind.CONFLICT)
+    }
 
     private companion object {
         const val CHATBOT_HISTORY = 100

@@ -21,8 +21,6 @@ import com.project.solaria_mobile.feature.communication.domain.ChatMessage
 import com.project.solaria_mobile.feature.communication.domain.CommunicationRepository
 import com.project.solaria_mobile.feature.communication.domain.Conversation
 import com.project.solaria_mobile.feature.communication.domain.MessageStatus
-import com.project.solaria_mobile.feature.communication.domain.NotificationGroup
-import com.project.solaria_mobile.feature.communication.domain.ServiceCall
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
@@ -141,9 +139,6 @@ class ChatSyncTest {
             deletes += messageId
             return deleteResult
         }
-        override suspend fun calls(): ApiResult<List<ServiceCall>> = ApiResult.Success(emptyList())
-        override suspend fun call(id: String): ApiResult<ServiceCall> = ApiResult.Failure(ErrorKind.NOT_FOUND)
-        override suspend fun notifications(): ApiResult<List<NotificationGroup>> = ApiResult.Success(emptyList())
     }
 
     // ---- ações do chat: edição e exclusão de mensagem
@@ -404,7 +399,9 @@ class ChatSyncTest {
         repository.sync.value = ApiResult.Success(Unit)
         advanceUntilIdle()
 
-        assertEquals(UiState.Empty, state())
+        val empty = state() as UiState.Content
+        assertTrue(empty.data.conversations.isEmpty())
+        assertFalse(empty.data.showArchived)
     }
 
     @Test fun emptyListAfterAFailedSyncShowsTheError() = runTest {

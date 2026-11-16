@@ -1,5 +1,8 @@
 package com.project.solaria_mobile.feature.communication.data
 
+import com.project.solaria_mobile.core.mock.MockModeStore
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flowOf
 import com.project.solaria_mobile.core.auth.TokenStore
 import com.project.solaria_mobile.core.auth.accessTokenUserId
 import com.project.solaria_mobile.core.common.ApiResult
@@ -20,6 +23,7 @@ import com.project.solaria_mobile.core.network.realtime.RealtimeClient
 import com.project.solaria_mobile.core.network.realtime.RealtimeState
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicBoolean
+import com.project.solaria_mobile.core.database.ChatDatabaseRouter
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlin.coroutines.cancellation.CancellationException
@@ -96,6 +100,8 @@ class MessageSync @Inject constructor(
     private val users: UserDirectory,
     private val wiper: LocalDataWiper,
     @ApplicationScope private val scope: CoroutineScope,
+    private val mockMode: MockModeStore? = null,
+    private val router: ChatDatabaseRouter? = null,
 ) {
     private val _result = MutableStateFlow<ApiResult<Unit>?>(null)
 
@@ -120,10 +126,18 @@ class MessageSync @Inject constructor(
         if (!started.compareAndSet(false, true)) return
         scope.launch {
             var previous: String? = null
-            tokens.tokens
-                .map { it?.accessToken?.let(::accessTokenUserId) }
+            var previousMode: Boolean? = null
+            combine(tokens.tokens, mockMode?.enabled ?: flowOf(false)) { token, mock ->
+                    token?.accessToken?.let(::accessTokenUserId) to mock
+                }
                 .distinctUntilChanged()
-                .collectLatest { userId ->
+                .collectLatest { (userId, mode) ->
+                    if (previousMode != null && previousMode != mode) {
+                        store.forget()
+                        users.forget()
+                        _result.value = null
+                    }
+                    previousMode = mode
                     // Um novo login sobre outra conta, sem passar pelo logout, também não pode herdar os dados antigos
                     val switched = userId != null && previous != null && previous != userId
                     previous = userId
@@ -135,7 +149,7 @@ class MessageSync @Inject constructor(
                         }
                         _result.value = null
                     }
-                    if (userId != null) runSession(userId)
+                    if (userId != null) { if (router != null) router.session { runSession(userId) } else runSession(userId) }
                 }
         }
     }
@@ -166,7 +180,7 @@ class MessageSync @Inject constructor(
         while (true) {
             if (failures == 0) requests.receive() else withTimeoutOrNull(RETRY_MILLIS) { requests.receive() }
             // Sem internet não há tentativa agendada: a sincronização espera o próximo gatilho, em geral a volta da conexão
-            if (!networkMonitor.isOnline.first()) {
+            if (!(mockMode?.isEnabled() == true || networkMonitor.isOnline.first())) {
                 _result.value = ApiResult.Failure(ErrorKind.CONNECTIVITY)
                 failures = 0
                 continue
@@ -197,8 +211,8 @@ class MessageSync @Inject constructor(
 
     // Duas leituras porque a lista padrão do servidor esconde as arquivadas, e uma arquivada não é uma conversa perdida
     private suspend fun refreshConversations(userId: String): ApiResult<Unit> {
-        val active = executor.execute { api.conversations(archived = false) }.orFail { return it }
-        val archived = executor.execute { api.conversations(archived = true) }.orFail { return it }
+        val active = executor.execute { router?.forOperation(); api.conversations(archived = false) }.orFail { return it }
+        val archived = executor.execute { router?.forOperation(); api.conversations(archived = true) }.orFail { return it }
         conversations.applyList((active + archived).map { it.toEntity() })
         messages.purgeChatbots()
         users.refreshFor(null, userId)
@@ -208,7 +222,7 @@ class MessageSync @Inject constructor(
     private suspend fun catchUp(): ApiResult<Unit> {
         var state = syncState.get() ?: return bootstrap()
         while (true) {
-            val page = executor.execute { api.updates(since = state.cursor, limit = PAGE_SIZE) }.orFail { return it }
+            val page = executor.execute { router?.forOperation(); api.updates(since = state.cursor, limit = PAGE_SIZE) }.orFail { return it }
             if (page.syncEpoch != state.syncEpoch) {
                 // O relógio do servidor recomeçou: as versões guardadas não se comparam mais. A fila de envio fica.
                 messages.clear()
@@ -225,7 +239,7 @@ class MessageSync @Inject constructor(
 
     // O cursor é lido antes de baixar os históricos: o que mudar durante o download volta no próximo catch-up
     private suspend fun bootstrap(): ApiResult<Unit> {
-        val start = executor.execute { api.updates() }.orFail { return it }
+        val start = executor.execute { router?.forOperation(); api.updates() }.orFail { return it }
         syncState.put(SyncStateEntity(syncEpoch = start.syncEpoch, cursor = start.cursor))
         return ApiResult.Success(Unit)
     }
@@ -256,9 +270,9 @@ class MessageSync @Inject constructor(
             val hole = if (stats.hasHole) messages.holeAfter(conversationId) else null
             val page = when (val step = nextHistoryStep(stats, hole, conversation.lastMessageSequence)) {
                 HistoryStep.Done -> return ApiResult.Success(Unit)
-                HistoryStep.Latest -> executor.execute { api.messages(conversationId, limit = PAGE_SIZE) }
-                is HistoryStep.Since -> executor.execute { api.messages(conversationId, sinceSequence = step.sequence, limit = PAGE_SIZE) }
-                is HistoryStep.Before -> executor.execute { api.messages(conversationId, beforeSequence = step.sequence, limit = PAGE_SIZE) }
+                HistoryStep.Latest -> executor.execute { router?.forOperation(); api.messages(conversationId, limit = PAGE_SIZE) }
+                is HistoryStep.Since -> executor.execute { router?.forOperation(); api.messages(conversationId, sinceSequence = step.sequence, limit = PAGE_SIZE) }
+                is HistoryStep.Before -> executor.execute { router?.forOperation(); api.messages(conversationId, beforeSequence = step.sequence, limit = PAGE_SIZE) }
             }.orFail { return it }
             store.apply(page)
         }

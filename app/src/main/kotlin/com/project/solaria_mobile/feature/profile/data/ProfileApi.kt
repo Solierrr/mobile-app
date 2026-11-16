@@ -7,13 +7,22 @@ import retrofit2.http.DELETE
 import retrofit2.http.GET
 import retrofit2.http.POST
 import retrofit2.http.Path
+import retrofit2.http.Query
+import okhttp3.MultipartBody
+import retrofit2.http.Multipart
+import retrofit2.http.PUT
+import retrofit2.http.PATCH
+import retrofit2.http.Part
 
 @Serializable
 data class UserDto(
     val id: String,
-    val authId: String? = null,
+    val name: String? = null,
+    val connected: Boolean = false,
+    val banner: String? = null,
     val username: String? = null,
     val avatar: String? = null,
+    val authId: String? = null,
 )
 
 @Serializable
@@ -43,9 +52,29 @@ data class SelfProfileDto(
 data class UserSummaryDto(val username: String? = null, val avatar: String? = null)
 
 @Serializable
+data class PeoplePageDto(val items: List<UserDto> = emptyList(), val hasMore: Boolean = false)
+
+@Serializable
 data class ConnectionRequest(val connectedUserId: String)
 
 interface ProfileApi {
+    @GET("api/connections/people")
+    suspend fun people(@Query("query") query: String, @Query("page") page: Int,
+        @Query("connectedOnly") connectedOnly: Boolean): PeoplePageDto
+
+    @Multipart
+    @PUT("api/user-photos/user/{userId}/type/{type}")
+    suspend fun uploadPhoto(@Path("userId") userId: String, @Path("type") type: String, @Part file: MultipartBody.Part): kotlinx.serialization.json.JsonElement
+
+    @DELETE("api/user-photos/user/{userId}/type/{type}")
+    suspend fun removePhoto(@Path("userId") userId: String, @Path("type") type: String)
+
+    @PATCH("api/users/me")
+    suspend fun changeUsername(@Body body: UsernameRequest): kotlinx.serialization.json.JsonElement
+
+    @GET("api/catalog/companies")
+    suspend fun companyCatalog(): List<CatalogCompanyDto>
+
     @GET("api/users/me")
     suspend fun me(): SelfProfileDto
 
@@ -55,7 +84,7 @@ interface ProfileApi {
     @GET("api/connections")
     suspend fun connections(): List<UserDto>
 
-    @GET("api/connections/{id}")
+    @GET("api/connections/people/{id}")
     suspend fun connection(@Path("id") id: String): UserDto
 
     @POST("api/connections")
@@ -64,3 +93,15 @@ interface ProfileApi {
     @DELETE("api/connections/{id}")
     suspend fun removeConnection(@Path("id") id: String): Response<Unit>
 }
+
+@Serializable
+data class UsernameRequest(val username: String)
+
+@Serializable
+data class CatalogCompanyDto(
+    val id: String,
+    val tradeName: String? = null,
+    val slug: String? = null,
+    val city: String? = null,
+    val state: String? = null,
+)
