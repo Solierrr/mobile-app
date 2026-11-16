@@ -4,6 +4,7 @@ import com.project.solaria_mobile.core.common.ApiResult
 import com.project.solaria_mobile.core.common.map
 import com.project.solaria_mobile.core.format.initialsOf
 import com.project.solaria_mobile.core.network.ApiCallExecutor
+import com.project.solaria_mobile.core.offline.OfflineReader
 import com.project.solaria_mobile.feature.profile.domain.Connection
 import com.project.solaria_mobile.feature.profile.domain.ProfileRepository
 import com.project.solaria_mobile.feature.profile.domain.UserProfile
@@ -14,9 +15,10 @@ import javax.inject.Singleton
 class RemoteProfileRepository @Inject constructor(
     private val api: ProfileApi,
     private val executor: ApiCallExecutor,
+    private val reader: OfflineReader,
 ) : ProfileRepository {
     override suspend fun ownProfile(): ApiResult<UserProfile> =
-        executor.execute { api.me() }.map { it.toProfile() }
+        reader.read("me", SelfProfileDto.serializer()) { api.me() }.map { it.toProfile() }
 
     override suspend fun profile(id: String): ApiResult<UserProfile> =
         executor.execute { api.connection(id) }.map { it.toProfile() }

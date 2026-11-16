@@ -60,7 +60,12 @@ fun AppNavHost(
         }
         composable<AppDestination.Home> { HomeRoute(onOpenPage = ::open) }
         composable<AppDestination.Projects> {
-            ProjectListRoute(onBack = ::back, onOpenProject = { open(AppDestination.Project(it)) }, onOpenMap = { open(AppDestination.Map) })
+            ProjectListRoute(
+                onBack = ::back,
+                onOpenProject = { open(AppDestination.Project(it)) },
+                onOpenMap = { open(AppDestination.Map) },
+                onCreateProject = { open(AppDestination.NewProject) },
+            )
         }
         composable<AppDestination.Project> { ProjectDetailRoute(onBack = ::back, onNavigate = ::open) }
         composable<AppDestination.NewProject> {

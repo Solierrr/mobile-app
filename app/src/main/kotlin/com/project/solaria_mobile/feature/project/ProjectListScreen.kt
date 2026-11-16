@@ -43,10 +43,11 @@ fun ProjectListRoute(
     onBack: () -> Unit,
     onOpenProject: (String) -> Unit,
     onOpenMap: () -> Unit,
+    onCreateProject: () -> Unit,
     viewModel: ProjectListViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
-    UiStateHost(state, viewModel::load) { projects -> ProjectListScreen(projects, onBack, onOpenProject, onOpenMap) }
+    UiStateHost(state, viewModel::load) { projects -> ProjectListScreen(projects, onBack, onOpenProject, onOpenMap, onCreateProject) }
 }
 
 @Composable
@@ -55,6 +56,7 @@ fun ProjectListScreen(
     onBack: () -> Unit,
     onOpenProject: (String) -> Unit,
     onOpenMap: () -> Unit,
+    onCreateProject: () -> Unit,
 ) {
     Column(
         modifier = Modifier
@@ -70,7 +72,7 @@ fun ProjectListScreen(
         projects.forEachIndexed { index, project ->
             ProjectListCard(project = project, index = index, onClick = { onOpenProject(project.id) })
         }
-        ActionRow("Criar projeto", LucideR.drawable.lucide_ic_folder_plus, onClick = {})
+        ActionRow("Criar projeto", LucideR.drawable.lucide_ic_folder_plus, onClick = onCreateProject)
     }
 }
 

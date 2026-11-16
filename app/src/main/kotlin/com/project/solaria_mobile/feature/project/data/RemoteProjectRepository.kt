@@ -3,23 +3,26 @@ package com.project.solaria_mobile.feature.project.data
 import com.project.solaria_mobile.core.common.ApiResult
 import com.project.solaria_mobile.core.common.map
 import com.project.solaria_mobile.core.network.ApiCallExecutor
+import com.project.solaria_mobile.core.offline.OfflineReader
 import com.project.solaria_mobile.feature.project.domain.NewProjectDraft
 import com.project.solaria_mobile.feature.project.domain.ProjectRepository
 import com.project.solaria_mobile.feature.project.domain.ProjectSummary
 import java.time.OffsetDateTime
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlinx.serialization.builtins.ListSerializer
 
 @Singleton
 class RemoteProjectRepository @Inject constructor(
     private val api: ProjectApi,
     private val executor: ApiCallExecutor,
+    private val reader: OfflineReader,
 ) : ProjectRepository {
     override suspend fun projects(): ApiResult<List<ProjectSummary>> =
-        executor.execute { api.projects() }.map { items -> items.map { it.toSummary() } }
+        reader.read("projects", ListSerializer(ProjectDto.serializer())) { api.projects() }.map { items -> items.map { it.toSummary() } }
 
     override suspend fun project(id: String): ApiResult<ProjectSummary> =
-        executor.execute { api.project(id) }.map { it.toSummary() }
+        reader.read("project:$id", ProjectDto.serializer()) { api.project(id) }.map { it.toSummary() }
 
     override suspend fun create(draft: NewProjectDraft): ApiResult<String> =
         executor.execute { api.create(draft.toRequest()) }.map { it.id }

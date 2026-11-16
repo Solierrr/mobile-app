@@ -10,6 +10,7 @@ import com.project.solaria_mobile.feature.project.domain.NewProjectDraft
 import com.project.solaria_mobile.feature.project.domain.NewProjectField
 import com.project.solaria_mobile.feature.project.domain.ProjectRepository
 import com.project.solaria_mobile.feature.project.domain.ProjectSummary
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
@@ -30,6 +31,25 @@ class NewProjectTest {
             drafts += draft
             return result
         }
+    }
+
+    @Test fun creatingAProjectIsBlockedWithoutInternetAndTheDraftIsKept() = runTest {
+        val repository = RecordingRepository()
+        val network = FakeNetwork(online = false)
+        val model = NewProjectViewModel(repository, network)
+        backgroundScope.launch(mainDispatcher.dispatcher) { model.uiState.collect { } }
+        model.update { it.copy(name = "Instalação no telhado") }
+        advanceUntilIdle()
+        model.submit()
+        advanceUntilIdle()
+        assertTrue(model.uiState.value.offline)
+        assertTrue(repository.drafts.isEmpty())
+        assertEquals("Instalação no telhado", model.uiState.value.draft.name)
+        network.state.value = true
+        advanceUntilIdle()
+        model.submit()
+        advanceUntilIdle()
+        assertEquals(1, repository.drafts.size)
     }
 
     @Test fun aNameIsRequiredAndTheRestIsOptional() {
@@ -61,7 +81,7 @@ class NewProjectTest {
 
     @Test fun submitWithInvalidDataShowsTheErrorsAndDoesNotCallTheServer() = runTest {
         val repository = RecordingRepository()
-        val model = NewProjectViewModel(repository)
+        val model = NewProjectViewModel(repository, FakeNetwork(true))
         model.submit()
         advanceUntilIdle()
         assertEquals(setOf(NewProjectField.NAME), model.uiState.value.errors)
@@ -69,7 +89,7 @@ class NewProjectTest {
     }
 
     @Test fun editingClearsTheErrors() = runTest {
-        val model = NewProjectViewModel(RecordingRepository())
+        val model = NewProjectViewModel(RecordingRepository(), FakeNetwork(true))
         model.submit()
         model.update { it.copy(name = "Obra nova") }
         assertTrue(model.uiState.value.errors.isEmpty())
@@ -77,7 +97,7 @@ class NewProjectTest {
 
     @Test fun aValidSubmitCreatesTheProjectAndEmitsItsId() = runTest {
         val repository = RecordingRepository()
-        val model = NewProjectViewModel(repository)
+        val model = NewProjectViewModel(repository, FakeNetwork(true))
         model.update { it.copy(name = "Obra nova") }
         model.effectFlow.test {
             model.submit()
@@ -91,7 +111,7 @@ class NewProjectTest {
 
     @Test fun aServerFailureKeepsTheFormAndShowsTheError() = runTest {
         val repository = RecordingRepository(ApiResult.Failure(ErrorKind.VALIDATION))
-        val model = NewProjectViewModel(repository)
+        val model = NewProjectViewModel(repository, FakeNetwork(true))
         model.update { it.copy(name = "Obra nova", city = "Goiânia") }
         model.submit()
         advanceUntilIdle()

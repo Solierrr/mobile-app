@@ -2,6 +2,7 @@ package com.project.solaria_mobile.core.images
 
 import android.util.LruCache
 import androidx.lifecycle.ViewModel
+import com.project.solaria_mobile.core.offline.ImageDiskCache
 import dagger.hilt.android.lifecycle.HiltViewModel
 import java.util.concurrent.TimeUnit
 import javax.inject.Inject
@@ -16,7 +17,7 @@ import okhttp3.Request
  * o `Authorization` da sessão nunca é enviado a hosts de terceiros.
  */
 @Singleton
-class PublicImageFetcher @Inject constructor() {
+class PublicImageFetcher @Inject constructor(private val disk: ImageDiskCache) {
     private val client = OkHttpClient.Builder()
         .connectTimeout(15, TimeUnit.SECONDS)
         .readTimeout(30, TimeUnit.SECONDS)
@@ -30,11 +31,11 @@ class PublicImageFetcher @Inject constructor() {
         if (!url.startsWith("https://")) return null
         cache.get(url)?.let { return it }
         val loaded = withContext(Dispatchers.IO) {
-            runCatching {
+            disk.get(url) ?: runCatching {
                 client.newCall(Request.Builder().url(url).build()).execute().use { response ->
                     if (response.isSuccessful) response.body.bytes() else null
                 }
-            }.getOrNull()
+            }.getOrNull()?.also { disk.put(url, it) }
         }
         if (loaded != null) cache.put(url, loaded)
         return loaded
