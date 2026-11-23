@@ -3,7 +3,7 @@
 
 [versions]
 mapsCompose = "9.0.1"
-agp = "9.5.0"
+agp = "9.5.2"
 coreKtx = "1.19.1"
 coreSplashscreen = "1.2.0"
 junit = "4.13.2"
@@ -17,7 +17,7 @@ kotlin = "2.4.21"
 composeBom = "2026.09.00"
 
 # Injecao de dependencia (Hilt + KSP)
-ksp = "2.3.12"
+ksp = "2.3.14"
 hilt = "2.60.1"
 
 # Hilt + Navigation Compose
@@ -33,7 +33,7 @@ retrofit = "3.0.0"
 okhttp = "5.5.1"
 
 # Serializacao JSON
-kotlinxSerializationJson = "1.12.0"
+kotlinxSerializationJson = "1.13.0"
 
 # Assincronismo
 kotlinxCoroutinesAndroid = "1.11.0"
@@ -55,10 +55,10 @@ graphicsShapes = "1.1.0"
 
 # Firebase (identificador da instalacao, sem notificacao nesta etapa)
 firebaseBom = "34.0.0"
-googleServices = "4.5.0"
+googleServices = "4.6.0"
 
 # suporte a TDD
-mockk = "1.14.11"
+mockk = "1.14.12"
 
 # Testa emissoes de Flow/StateFlow em sequência
 turbine = "1.2.1"
